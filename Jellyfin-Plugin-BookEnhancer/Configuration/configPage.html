@@ -1,0 +1,208 @@
+<div id="booksConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-collapse">
+    <div data-role="content">
+        <div class="content-primary">
+            <div class="sectionTitleContainer" style="display:flex;align-items:center;margin-bottom:16px;">
+                <h2 class="sectionTitle">Books Plugin Configuration</h2>
+            </div>
+
+            <div style="display:flex;gap:2px;margin-bottom:20px;border-bottom:2px solid #ccc;flex-wrap:wrap;">
+                <button is="emby-button" class="tab-btn raised" data-tab="metadata"
+                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;border-bottom:2px solid #00a4dc;">
+                    Metadata
+                </button>
+                <button is="emby-button" class="tab-btn" data-tab="settings"
+                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
+                    Settings
+                </button>
+            </div>
+
+            <form id="pluginConfigForm" style="max-width:800px;">
+                <div class="tab-content" id="tab-metadata">
+                    <h3>Metadata Sources</h3>
+                    <p class="fieldDescription">
+                        Enrich your book library with metadata from online sources.
+                        The plugin extracts ISBN from book files and looks up full metadata
+                        from the sources below, cascading from highest quality to fallback.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkUnifiedMetadata" type="checkbox" checked />
+                            <span>Enable unified metadata enrichment</span>
+                        </label>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h4 style="margin-bottom:4px;">Hardcover</h4>
+                    <p class="fieldDescription">
+                        Primary source — best quality metadata including authors, narrators,
+                        translators, illustrators, series, genre tags, ratings, ASIN, and more.
+                        Requires a free API key.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkHardcoverEnabled" type="checkbox" checked />
+                            <span>Enable Hardcover metadata lookup</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <label class="inputLabel inputLabelUnfocused" for="txtHardcoverApiKey">Hardcover API Key</label>
+                        <input is="emby-input" id="txtHardcoverApiKey" type="password"
+                               label="Hardcover API Key" />
+                        <div class="fieldDescription">
+                            Paste your Hardcover API key here.
+                        </div>
+                    </div>
+
+                    <details style="margin:12px 0;padding:12px;background:#f0f0f0;border-radius:6px;border:1px solid #ddd;">
+                        <summary style="cursor:pointer;font-weight:600;color:#00a4dc;">
+                            How to get a Hardcover API Key
+                        </summary>
+                        <ol style="margin-top:10px;padding-left:20px;line-height:1.8;">
+                            <li>Go to <a href="https://hardcover.app/account/api" target="_blank" rel="noopener">https://hardcover.app/account/api</a></li>
+                            <li>Sign in to your Hardcover account (or create one — it's free)</li>
+                            <li>Click <strong>Generate API Key</strong></li>
+                            <li>Copy the generated key and paste it in the field above</li>
+                            <li><strong>Rate limit:</strong> 60 requests per minute, free</li>
+                            <li><strong>Note:</strong> API tokens expire annually on January 1st</li>
+                        </ol>
+                    </details>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h4 style="margin-bottom:4px;">Google Books</h4>
+                    <p class="fieldDescription">
+                        Fallback source — good metadata coverage. Optional API key increases rate limit to 1,000 requests/day.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkGoogleBooksEnabled" type="checkbox" checked />
+                            <span>Enable Google Books metadata lookup</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <label class="inputLabel inputLabelUnfocused" for="txtGoogleBooksApiKey">Google Books API Key (optional)</label>
+                        <input is="emby-input" id="txtGoogleBooksApiKey" type="password"
+                               label="Google Books API Key (optional)" />
+                        <div class="fieldDescription">
+                            Leave blank to use the unauthenticated endpoint (IP-based rate limiting).
+                            Get a key at
+                            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">
+                                Google Cloud Console
+                            </a> (enable Books API).
+                        </div>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h4 style="margin-bottom:4px;">OpenLibrary</h4>
+                    <p class="fieldDescription">
+                        Final fallback — free, no API key required. Covers many public domain and
+                        older titles not found in other sources.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkOpenLibraryEnabled" type="checkbox" checked />
+                            <span>Enable OpenLibrary metadata lookup</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-settings" style="display:none;">
+                    <h3>General Settings</h3>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtMatchThreshold">
+                            Title Match Confidence Threshold
+                        </label>
+                        <input is="emby-input" id="txtMatchThreshold" type="number"
+                               min="0" max="1" step="0.05" label="Match Threshold" />
+                        <div class="fieldDescription">
+                            Minimum confidence score (0.0–1.0) for fuzzy title matching.
+                            Higher values require closer matches. Default: 0.85.
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top:24px;">
+                    <button is="emby-button" type="submit" class="raised button-submit block">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var pluginId = "66bc815f-035b-43a4-82ec-d1f39dfe988b";
+            var currentTab = "metadata";
+
+            document.querySelectorAll(".tab-btn").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var tab = this.getAttribute("data-tab");
+                    switchTab(tab);
+                });
+            });
+
+            function switchTab(tab) {
+                currentTab = tab;
+                document.querySelectorAll(".tab-content").forEach(function (el) {
+                    el.style.display = "none";
+                });
+                var active = document.getElementById("tab-" + tab);
+                if (active) active.style.display = "block";
+
+                document.querySelectorAll(".tab-btn").forEach(function (btn) {
+                    btn.style.borderBottom = "2px solid transparent";
+                    btn.style.color = "";
+                });
+                var activeBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+                if (activeBtn) {
+                    activeBtn.style.borderBottom = "2px solid #00a4dc";
+                    activeBtn.style.color = "#00a4dc";
+                }
+            }
+
+            function loadConfig() {
+                Dashboard.getPluginConfiguration(pluginId).then(function (config) {
+                    document.getElementById("chkUnifiedMetadata").checked = config.UnifiedMetadataEnabled || false;
+                    document.getElementById("chkHardcoverEnabled").checked = config.HardcoverEnabled || false;
+                    document.getElementById("txtHardcoverApiKey").value = config.HardcoverApiKey || "";
+                    document.getElementById("chkGoogleBooksEnabled").checked = config.GoogleBooksEnabled || false;
+                    document.getElementById("txtGoogleBooksApiKey").value = config.GoogleBooksApiKey || "";
+                    document.getElementById("chkOpenLibraryEnabled").checked = config.OpenLibraryEnabled || false;
+                    document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
+                });
+            }
+
+            document.getElementById("pluginConfigForm").addEventListener("submit", function (e) {
+                e.preventDefault();
+                var form = this;
+
+                Dashboard.getPluginConfiguration(pluginId).then(function (config) {
+                    config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;
+                    config.HardcoverEnabled = document.getElementById("chkHardcoverEnabled").checked;
+                    config.HardcoverApiKey = document.getElementById("txtHardcoverApiKey").value;
+                    config.GoogleBooksEnabled = document.getElementById("chkGoogleBooksEnabled").checked;
+                    config.GoogleBooksApiKey = document.getElementById("txtGoogleBooksApiKey").value;
+                    config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
+                    config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
+
+                    Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
+                        Dashboard.processPluginConfigurationUpdateResult();
+                    });
+                });
+            });
+
+            loadConfig();
+        })();
+    </script>
+</div>

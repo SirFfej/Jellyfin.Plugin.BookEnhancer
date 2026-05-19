@@ -1,0 +1,29 @@
+# .NET build outputs
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# NuGet
+*.nupkg
+*.snupkg
+packages/
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archived design docs
+archive/
+
+# Build/release output
+dist/
+release/
+
+# Test data
+test-data/

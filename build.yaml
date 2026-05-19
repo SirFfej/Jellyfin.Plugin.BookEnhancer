@@ -1,0 +1,18 @@
+---
+name: "Books"
+guid: "66bc815f-035b-43a4-82ec-d1f39dfe988b"
+version: "1.0.0.0"
+targetAbi: "10.11.8.0"
+framework: "net9.0"
+overview: "Unified ebook, audiobook, and comic metadata enrichment plugin"
+description: >
+  Extracts metadata directly from book files (EPUB, CBZ, CBR, PDF, audiobooks)
+  and enriches via online APIs in a cascade: Hardcover → Google Books → OpenLibrary.
+  No Calibre, Audiobookshelf, or Komga dependencies required.
+category: "Metadata"
+owner: "SirFfej"
+artifacts:
+  - "Jellyfin-Plugin-BookEnhancer.dll"
+changelog: >
+  v1.0.0.0 - Initial release. File metadata extraction for EPUB, CBZ/CBR/CB7, PDF, audio.
+  Online enrichment via Hardcover, Google Books, OpenLibrary. Unified metadata provider.

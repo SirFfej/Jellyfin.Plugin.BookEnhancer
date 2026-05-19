@@ -1,0 +1,18 @@
+# Default: normalize all text files to LF in the repo
+* text=auto eol=lf
+
+# Shell scripts must always be LF
+*.sh text eol=lf
+
+# Windows-only files that should keep CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files — no line ending conversion
+*.dll binary
+*.pdb binary
+*.zip binary
+*.png binary
+*.jpg binary
+*.ico binary
