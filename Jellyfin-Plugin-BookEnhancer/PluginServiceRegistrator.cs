@@ -1,4 +1,5 @@
 using Jellyfin.Plugin.BookEnhancer.Clients;
+using Jellyfin.Plugin.BookEnhancer.Controllers;
 using Jellyfin.Plugin.BookEnhancer.Logging;
 using Jellyfin.Plugin.BookEnhancer.Services;
 using MediaBrowser.Common.Configuration;
@@ -27,5 +28,21 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<GoogleBooksApiClient>();
         serviceCollection.AddTransient<OpenLibraryApiClient>();
         serviceCollection.AddSingleton<MetadataEnrichmentService>();
+
+        serviceCollection.AddSingleton<BookGroupingService>(sp =>
+        {
+            var paths = sp.GetRequiredService<IApplicationPaths>();
+            var logger = sp.GetRequiredService<ILogger<BookGroupingService>>();
+            var dbDir = Path.Combine(paths.DataPath, "plugins", "BookEnhancer");
+            return new BookGroupingService(dbDir, logger);
+        });
+
+        serviceCollection.AddSingleton<MetadataAggregationService>();
+
+        serviceCollection.AddTransient<GroupingPostProcessingService>();
+        serviceCollection.AddSingleton<LibraryOrganizationService>();
+        serviceCollection.AddTransient<BookIngestionService>();
+        serviceCollection.AddTransient<GroupingController>();
+        serviceCollection.AddTransient<IngestionController>();
     }
 }

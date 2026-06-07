@@ -2,6 +2,7 @@ using Jellyfin.Data.Enums;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using Jellyfin.Plugin.BookEnhancer.Services;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
@@ -13,15 +14,21 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
 {
     private readonly FileMetadataExtractor _fileExtractor;
     private readonly MetadataEnrichmentService _enrichment;
+    private readonly BookGroupingService _grouping;
+    private readonly ILibraryManager _libraryManager;
     private readonly ILogger<UnifiedMetadataProvider> _logger;
 
     public UnifiedMetadataProvider(
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
+        BookGroupingService grouping,
+        ILibraryManager libraryManager,
         ILogger<UnifiedMetadataProvider> logger)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
+        _grouping = grouping;
+        _libraryManager = libraryManager;
         _logger = logger;
     }
 
@@ -50,6 +57,33 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 cancellationToken);
 
             if (string.IsNullOrWhiteSpace(enriched.Title)) return result;
+
+            if (config.EnableFormatGrouping && !string.IsNullOrWhiteSpace(enriched.Isbn))
+            {
+                var formatType = enriched.FileFormat;
+                var existingGroup = _grouping.GetGroupByIsbn(enriched.Isbn);
+
+                if (existingGroup == null)
+                {
+                    var group = _grouping.CreateGroup(enriched);
+                    _grouping.AddFormatToGroup(group.Id, info.Path, formatType, isPrimary: true);
+                    _logger.LogDebug("Created new book group for ISBN {Isbn} ({Title})", enriched.Isbn, enriched.Title);
+                }
+                else
+                {
+                    var currentPrimary = existingGroup.Formats.FirstOrDefault(f => f.IsPrimary);
+                    var newPriority = BookGroupingService.GetFormatPriority(formatType);
+                    var currentPriority = currentPrimary != null
+                        ? BookGroupingService.GetFormatPriority(currentPrimary.FormatType)
+                        : int.MaxValue;
+
+                    _grouping.AddFormatToGroup(existingGroup.Id, info.Path, formatType, isPrimary: newPriority < currentPriority);
+                    _logger.LogDebug(
+                        "Added alternate format to existing group for ISBN {Isbn} ({Title})",
+                        enriched.Isbn,
+                        enriched.Title);
+                }
+            }
 
             result.HasMetadata = true;
             result.Item = MapToBook(enriched, info);

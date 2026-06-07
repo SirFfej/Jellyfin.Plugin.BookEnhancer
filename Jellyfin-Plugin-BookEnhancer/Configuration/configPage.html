@@ -3,13 +3,21 @@
     <div data-role="content">
         <div class="content-primary">
             <div class="sectionTitleContainer" style="display:flex;align-items:center;margin-bottom:16px;">
-                <h2 class="sectionTitle">Books Plugin Configuration</h2>
+                <h2 class="sectionTitle">BookEnhancers Plugin Configuration</h2>
             </div>
 
             <div style="display:flex;gap:2px;margin-bottom:20px;border-bottom:2px solid #ccc;flex-wrap:wrap;">
                 <button is="emby-button" class="tab-btn raised" data-tab="metadata"
                         style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;border-bottom:2px solid #00a4dc;">
                     Metadata
+                </button>
+                <button is="emby-button" class="tab-btn" data-tab="grouping"
+                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
+                    Grouping
+                </button>
+                <button is="emby-button" class="tab-btn" data-tab="ingestion"
+                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
+                    Ingestion
                 </button>
                 <button is="emby-button" class="tab-btn" data-tab="settings"
                         style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
@@ -115,6 +123,83 @@
                     </div>
                 </div>
 
+                <div class="tab-content" id="tab-grouping" style="display:none;">
+                    <h3>Format Grouping</h3>
+                    <p class="fieldDescription">
+                        Group multiple formats (EPUB, PDF, audiobook, comic) of the same book
+                        under a single library entry. Library counts reflect unique titles, not files.
+                        Books are matched by ISBN when available.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkEnableFormatGrouping" type="checkbox" checked />
+                            <span>Enable format grouping</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:16px;">
+                        <label class="inputLabel inputLabelUnfocused" for="selGroupingStrategy">Grouping Strategy</label>
+                        <select is="emby-select" id="selGroupingStrategy" label="Grouping Strategy">
+                            <option value="IsbnOnly">ISBN only (exact match, recommended)</option>
+                            <option value="TitleAuthor">Title + Author (fuzzy match)</option>
+                            <option value="Both">ISBN first, then Title + Author</option>
+                        </select>
+                        <div class="fieldDescription">
+                            How to determine if two files represent the same book.
+                        </div>
+                    </div>
+
+                    <div style="margin-top:20px;">
+                        <button is="emby-button" id="btnProcessGroups" type="button" class="raised">
+                            Process Groups Now
+                        </button>
+                        <div class="fieldDescription" style="margin-top:4px;">
+                            Merge existing duplicate entries into grouped entries. Run this after a library scan.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="tab-ingestion" style="display:none;">
+                    <h3>Managed Directories</h3>
+                    <p class="fieldDescription">
+                        Configure external folders to scan for book files. Files are moved into
+                        your Jellyfin library organized as <code>Author / Book Title / file</code>.
+                        Each source folder can target a different library folder (e.g., separate
+                        folders for print books and audiobooks).
+                    </p>
+
+                    <div id="managedDirsContainer" style="margin-top:16px;"></div>
+
+                    <div style="margin-top:12px;display:flex;gap:8px;">
+                        <button is="emby-button" id="btnAddDirectory" type="button" class="raised">
+                            + Add Directory
+                        </button>
+                    </div>
+
+                    <div style="margin-top:20px;">
+                        <button is="emby-button" id="btnScanAll" type="button" class="raised button-submit">
+                            Scan All Now
+                        </button>
+                        <div class="fieldDescription" style="margin-top:4px;">
+                            Immediately scan all enabled source directories and move files into the library.
+                        </div>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtAutoScanInterval">
+                            Auto-scan Interval (minutes)
+                        </label>
+                        <input is="emby-input" id="txtAutoScanInterval" type="number"
+                               min="0" max="1440" step="5" label="Auto-scan Interval" />
+                        <div class="fieldDescription">
+                            How often to automatically scan source directories. Set to 0 to disable.
+                        </div>
+                    </div>
+                </div>
+
                 <div class="tab-content" id="tab-settings" style="display:none;">
                     <h3>General Settings</h3>
 
@@ -144,6 +229,7 @@
         (function () {
             var pluginId = "66bc815f-035b-43a4-82ec-d1f39dfe988b";
             var currentTab = "metadata";
+            var dirEntryIndex = 0;
 
             document.querySelectorAll(".tab-btn").forEach(function (btn) {
                 btn.addEventListener("click", function () {
@@ -171,6 +257,144 @@
                 }
             }
 
+            function renderDirectories(dirs) {
+                var container = document.getElementById("managedDirsContainer");
+                container.innerHTML = "";
+
+                if (!dirs || dirs.length === 0) {
+                    container.innerHTML = '<p style="color:#888;font-style:italic;">No directories configured. Click "Add Directory" to add one.</p>';
+                    return;
+                }
+
+                dirs.forEach(function (dir, idx) {
+                    var row = document.createElement("div");
+                    row.style.cssText = "border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:8px;background:#f9f9f9;";
+
+                    row.innerHTML =
+                        '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
+                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">' +
+                                '<input is="emby-checkbox" class="dir-enabled" type="checkbox" data-idx="' + idx + '"' + (dir.Enabled ? ' checked' : '') + ' />' +
+                                '<span>Enabled</span>' +
+                            '</label>' +
+                            '<button is="emby-button" type="button" class="raised btn-remove-dir" data-idx="' + idx + '" style="margin-left:auto;background:#c33;color:#fff;">Remove</button>' +
+                        '</div>' +
+                        '<div class="inputContainer" style="margin-bottom:4px;">' +
+                            '<label class="inputLabel inputLabelUnfocused">Source Path (where files originate)</label>' +
+                            '<input is="emby-input" class="dir-source" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.SourcePath || '') + '" />' +
+                        '</div>' +
+                        '<div class="inputContainer">' +
+                            '<label class="inputLabel inputLabelUnfocused">Library Path (where files get moved to)</label>' +
+                            '<input is="emby-input" class="dir-library" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.LibraryPath || '') + '" />' +
+                        '</div>';
+
+                    container.appendChild(row);
+                });
+
+                container.querySelectorAll(".btn-remove-dir").forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var idx = parseInt(this.getAttribute("data-idx"));
+                        var dirs = getCurrentDirectories();
+                        dirs.splice(idx, 1);
+                        renderDirectories(dirs);
+                    });
+                });
+
+                container.querySelectorAll(".dir-enabled, .dir-source, .dir-library").forEach(function (input) {
+                    input.addEventListener("change", function () { /* live update handled on save */ });
+                });
+            }
+
+            function getCurrentDirectories() {
+                var dirs = [];
+                var container = document.getElementById("managedDirsContainer");
+                var rows = container.querySelectorAll("div[style]");
+
+                container.querySelectorAll(".dir-source").forEach(function (input, idx) {
+                    var sourceInput = input;
+                    var libInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
+                    var enabledInput = container.querySelector('.dir-enabled[data-idx="' + idx + '"]');
+
+                    dirs.push({
+                        SourcePath: sourceInput ? sourceInput.value : "",
+                        LibraryPath: libInput ? libInput.value : "",
+                        Enabled: enabledInput ? enabledInput.checked : true
+                    });
+                });
+
+                return dirs;
+            }
+
+            function escapeHtml(str) {
+                if (!str) return "";
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            }
+
+            document.getElementById("btnAddDirectory").addEventListener("click", function () {
+                var dirs = getCurrentDirectories();
+                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true });
+                renderDirectories(dirs);
+            });
+
+            document.getElementById("btnProcessGroups").addEventListener("click", function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Processing...";
+
+                var apiUrl = "Books/Grouping/Process";
+                if (window.ApiClient) {
+                    apiUrl = window.ApiClient.getUrl("Books/Grouping/Process");
+                }
+
+                fetch(apiUrl, { method: "POST" })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        Dashboard.alert({
+                            title: "Grouping Complete",
+                            message: "Processed " + result.processedGroups + " groups."
+                        });
+                    })
+                    .catch(function () {
+                        Dashboard.alert({
+                            title: "Error",
+                            message: "Failed to process groups. Check server logs."
+                        });
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Process Groups Now";
+                    });
+            });
+
+            document.getElementById("btnScanAll").addEventListener("click", function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Scanning...";
+
+                var apiUrl = "Books/Ingestion/Scan";
+                if (window.ApiClient) {
+                    apiUrl = window.ApiClient.getUrl("Books/Ingestion/Scan");
+                }
+
+                fetch(apiUrl, { method: "POST" })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        Dashboard.alert({
+                            title: "Scan Complete",
+                            message: "Scanned " + result.filesFound + " files, added " + result.filesAdded + " new."
+                        });
+                    })
+                    .catch(function () {
+                        Dashboard.alert({
+                            title: "Error",
+                            message: "Scan failed. Check server logs."
+                        });
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Scan All Now";
+                    });
+            });
+
             function loadConfig() {
                 Dashboard.getPluginConfiguration(pluginId).then(function (config) {
                     document.getElementById("chkUnifiedMetadata").checked = config.UnifiedMetadataEnabled || false;
@@ -180,12 +404,18 @@
                     document.getElementById("txtGoogleBooksApiKey").value = config.GoogleBooksApiKey || "";
                     document.getElementById("chkOpenLibraryEnabled").checked = config.OpenLibraryEnabled || false;
                     document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
+
+                    document.getElementById("chkEnableFormatGrouping").checked = config.EnableFormatGrouping !== false;
+                    document.getElementById("selGroupingStrategy").value = config.GroupingStrategy || "IsbnOnly";
+
+                    document.getElementById("txtAutoScanInterval").value = config.AutoScanIntervalMinutes || 0;
+
+                    renderDirectories(config.ManagedDirectories || []);
                 });
             }
 
             document.getElementById("pluginConfigForm").addEventListener("submit", function (e) {
                 e.preventDefault();
-                var form = this;
 
                 Dashboard.getPluginConfiguration(pluginId).then(function (config) {
                     config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;
@@ -195,6 +425,12 @@
                     config.GoogleBooksApiKey = document.getElementById("txtGoogleBooksApiKey").value;
                     config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
                     config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
+
+                    config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;
+                    config.GroupingStrategy = document.getElementById("selGroupingStrategy").value;
+
+                    config.AutoScanIntervalMinutes = parseInt(document.getElementById("txtAutoScanInterval").value) || 0;
+                    config.ManagedDirectories = getCurrentDirectories();
 
                     Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
                         Dashboard.processPluginConfigurationUpdateResult();

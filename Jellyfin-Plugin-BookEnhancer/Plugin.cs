@@ -24,7 +24,7 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     }
 
     /// <inheritdoc />
-    public override string Name => "Books";
+    public override string Name => "BookEnhancers";
 
     /// <inheritdoc />
     public override string Description => "Unified ebook, audiobook, and comic metadata enrichment plugin.";
@@ -44,8 +44,8 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
         [
             new PluginPageInfo
             {
-                Name = "Books",
-                DisplayName = "Books",
+                Name = "BookEnhancers",
+                DisplayName = "BookEnhancers",
                 EmbeddedResourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.Configuration.configPage.html", GetType().Namespace)
             }
         ];
