@@ -2,13 +2,11 @@ using System.Net.Http;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.BookEnhancer.Controllers;
 
 [ApiController]
-[Authorize]
 [Route("Books/Config")]
 public class ConfigController : ControllerBase
 {
