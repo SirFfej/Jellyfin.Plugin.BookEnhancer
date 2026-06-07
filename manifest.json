@@ -15,6 +15,14 @@
         "targetAbi": "10.11.8.0",
         "timestamp": "2026-05-19T00:00:00Z",
         "version": "0.1.0.0"
+      },
+      {
+        "changelog": "v0.1.1.0 - Format grouping (single entry per title by ISBN); Managed source directories with file ingestion/moving; Format priority (EPUB > MOBI > PDF > others)",
+        "checksum": "70890bb6d0e15cefff9e79aad0599fcb",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.1.0/Jellyfin.Plugin.BookEnhancer_0.1.1.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.1.0"
       }
     ]
   }
