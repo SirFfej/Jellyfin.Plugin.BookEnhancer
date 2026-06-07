@@ -348,6 +348,7 @@
         (function () {
             var pluginId = "66bc815f-035b-43a4-82ec-d1f39dfe988b";
             var currentTab = "main";
+            var _beLibraries = null;
 
             function switchTab(tab) {
                 currentTab = tab;
@@ -434,7 +435,8 @@
                     .then(function (result) {
                         showTestResult("testHardcoverResult", result.success, result.message);
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Hardcover API test failed:", err);
                         showTestResult("testHardcoverResult", false, "Request failed. Check server connectivity.");
                     })
                     .finally(function () {
@@ -458,7 +460,8 @@
                     .then(function (result) {
                         showTestResult("testGoogleBooksResult", result.success, result.message);
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Google Books API test failed:", err);
                         showTestResult("testGoogleBooksResult", false, "Request failed. Check server connectivity.");
                     })
                     .finally(function () {
@@ -577,6 +580,8 @@
                 authFetch("Books/Libraries")
                     .then(function (r) { return r.json(); })
                     .then(function (libraries) {
+                        _beLibraries = libraries;
+
                         if (!libraries || libraries.length === 0) {
                             container.innerHTML = '<p style="color:var(--text-secondary,#888);">No libraries found.</p>';
                             return;
@@ -593,8 +598,14 @@
                             html += '</label>';
                         });
                         container.innerHTML = html;
+
+                        if (typeof getCurrentDirectories === 'function') {
+                            var dirs = getCurrentDirectories();
+                            if (dirs.length > 0) renderDirectories(dirs);
+                        }
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Failed to load libraries:", err);
                         container.innerHTML = '<p style="color:var(--text-secondary,#888);">Failed to load libraries.</p>';
                     });
             }
@@ -616,9 +627,25 @@
                     return;
                 }
 
+                var selectedLibIds = [];
+                document.querySelectorAll(".be-library-checkbox:checked").forEach(function (cb) {
+                    selectedLibIds.push(cb.value);
+                });
+
+                var availableLibs = selectedLibIds.length > 0 && _beLibraries
+                    ? _beLibraries.filter(function (l) { return selectedLibIds.indexOf(l.id) >= 0; })
+                    : (_beLibraries || []);
+
                 dirs.forEach(function (dir, idx) {
                     var row = document.createElement("div");
                     row.style.cssText = "border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:8px;background:#f9f9f9;";
+
+                    var libOpts = '<option value="">-- Select Library --</option>';
+                    availableLibs.forEach(function (lib) {
+                        var sel = lib.id === dir.LibraryId ? ' selected' : '';
+                        libOpts += '<option value="' + escapeHtml(lib.id) + '"' + sel + '>'
+                            + escapeHtml(lib.name) + ' (' + escapeHtml(lib.collectionType) + ')</option>';
+                    });
 
                     row.innerHTML =
                         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
@@ -633,7 +660,11 @@
                             '<input is="emby-input" class="dir-source" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.SourcePath || '') + '" />' +
                         '</div>' +
                         '<div class="inputContainer">' +
-                            '<label class="inputLabel inputLabelUnfocused">Library Path (where files get moved to)</label>' +
+                            '<label class="inputLabel inputLabelUnfocused">Target Library</label>' +
+                            '<select is="emby-select" class="dir-library-select" data-idx="' + idx + '">' + libOpts + '</select>' +
+                        '</div>' +
+                        '<div class="inputContainer">' +
+                            '<label class="inputLabel inputLabelUnfocused">Library Path (auto-filled from library)</label>' +
                             '<input is="emby-input" class="dir-library" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.LibraryPath || '') + '" />' +
                         '</div>';
 
@@ -652,6 +683,20 @@
                 container.querySelectorAll(".dir-enabled, .dir-source, .dir-library").forEach(function (input) {
                     input.addEventListener("change", function () { /* live update handled on save */ });
                 });
+
+                container.querySelectorAll(".dir-library-select").forEach(function (sel) {
+                    sel.addEventListener("change", function () {
+                        var idx = parseInt(this.getAttribute("data-idx"));
+                        var libId = this.value;
+                        var pathInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
+                        if (pathInput && libId && _beLibraries) {
+                            var lib = _beLibraries.filter(function (l) { return l.id === libId; });
+                            if (lib.length > 0 && lib[0].locations && lib[0].locations.length > 0) {
+                                pathInput.value = lib[0].locations[0];
+                            }
+                        }
+                    });
+                });
             }
 
             function getCurrentDirectories() {
@@ -660,13 +705,15 @@
 
                 container.querySelectorAll(".dir-source").forEach(function (input, idx) {
                     var sourceInput = input;
+                    var libSelect = container.querySelector('.dir-library-select[data-idx="' + idx + '"]');
                     var libInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
                     var enabledInput = container.querySelector('.dir-enabled[data-idx="' + idx + '"]');
 
                     dirs.push({
                         SourcePath: sourceInput ? sourceInput.value : "",
                         LibraryPath: libInput ? libInput.value : "",
-                        Enabled: enabledInput ? enabledInput.checked : true
+                        Enabled: enabledInput ? enabledInput.checked : true,
+                        LibraryId: libSelect ? libSelect.value : ""
                     });
                 });
 
@@ -675,7 +722,7 @@
 
             document.getElementById("btnAddDirectory").addEventListener("click", function () {
                 var dirs = getCurrentDirectories();
-                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true });
+                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "" });
                 renderDirectories(dirs);
             });
 
@@ -692,7 +739,8 @@
                             message: "Processed " + result.processedGroups + " groups."
                         });
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Group processing failed:", err);
                         Dashboard.alert({
                             title: "Error",
                             message: "Failed to process groups. Check server logs."
@@ -717,7 +765,8 @@
                             message: "Scanned " + result.filesFound + " files, added " + result.filesAdded + " new."
                         });
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Ingestion scan failed:", err);
                         Dashboard.alert({
                             title: "Error",
                             message: "Scan failed. Check server logs."
@@ -782,6 +831,8 @@
                     } else {
                         document.getElementById("radioMoveMode").checked = true;
                     }
+                }).catch(function (err) {
+                    console.error("[BookEnhancers] Failed to load plugin configuration:", err);
                 });
 
                 authFetch("Books/Config/Info")
@@ -791,7 +842,8 @@
                             '<p><strong>Name:</strong> ' + escapeHtml(info.name) + '</p>' +
                             '<p><strong>Version:</strong> ' + escapeHtml(info.version) + '</p>';
                     })
-                    .catch(function () {
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Failed to load plugin info:", err);
                         document.getElementById("bePluginInfo").innerHTML = '<p>Could not load plugin info.</p>';
                     });
             }
@@ -824,7 +876,12 @@
 
                     Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
                         Dashboard.processPluginConfigurationUpdateResult();
+                    }).catch(function (err) {
+                        console.error("[BookEnhancers] Failed to save configuration:", err);
+                        Dashboard.alert({ title: "Error", message: "Failed to save configuration." });
                     });
+                }).catch(function (err) {
+                    console.error("[BookEnhancers] Failed to read configuration for save:", err);
                 });
             });
 

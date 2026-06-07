@@ -55,4 +55,5 @@ public class ManagedSourceDirectory
     public string SourcePath { get; set; } = string.Empty;
     public string LibraryPath { get; set; } = string.Empty;
     public bool Enabled { get; set; } = true;
+    public string LibraryId { get; set; } = string.Empty;
 }

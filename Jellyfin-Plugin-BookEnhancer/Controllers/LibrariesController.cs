@@ -25,7 +25,8 @@ public class LibrariesController : ControllerBase
             {
                 Id = lf.ItemId,
                 Name = lf.Name ?? string.Empty,
-                CollectionType = lf.CollectionType?.ToString() ?? "unknown"
+                CollectionType = lf.CollectionType?.ToString() ?? "unknown",
+                Locations = lf.Locations?.ToList() ?? new List<string>()
             })
             .OrderBy(l => l.Name)
             .ToList();
@@ -39,4 +40,5 @@ public class LibraryDto
     public string Id { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string CollectionType { get; set; } = string.Empty;
+    public List<string> Locations { get; set; } = new();
 }
