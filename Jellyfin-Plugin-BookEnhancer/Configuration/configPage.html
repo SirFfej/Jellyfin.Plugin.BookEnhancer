@@ -78,11 +78,8 @@
                     <h3>General Settings</h3>
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtMatchThreshold">
-                            Title Match Confidence Threshold
-                        </label>
                         <input is="emby-input" id="txtMatchThreshold" type="number"
-                               min="0" max="1" step="0.05" label="Match Threshold" />
+                               min="0" max="1" step="0.05" label="Title Match Confidence Threshold" />
                         <div class="fieldDescription">
                             Minimum confidence score (0.0–1.0) for fuzzy title matching.
                             Higher values require closer matches. Default: 0.85.
@@ -139,7 +136,6 @@
                     </div>
 
                     <div class="inputContainer" style="margin-top:8px;">
-                        <label class="inputLabel inputLabelUnfocused" for="txtHardcoverApiKey">Hardcover API Key</label>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <input is="emby-input" id="txtHardcoverApiKey" type="password"
                                    label="Hardcover API Key" style="flex:1;" />
@@ -185,12 +181,9 @@
                     </div>
 
                     <div class="inputContainer" style="margin-top:8px;">
-                        <label class="inputLabel inputLabelUnfocused" for="txtGoogleBooksApiKey">
-                            Google Books API Key <span style="color:#c33;">(optional — leave blank to use unauthenticated endpoint)</span>
-                        </label>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <input is="emby-input" id="txtGoogleBooksApiKey" type="password"
-                                   label="Google Books API Key" style="flex:1;" />
+                                   label='Google Books API Key (optional - leave blank to use unauthenticated endpoint)' style="flex:1;" />
                             <button is="emby-button" id="btnTestGoogleBooks" type="button" class="raised"
                                     style="white-space:nowrap;flex-shrink:0;">Test</button>
                         </div>
@@ -236,7 +229,6 @@
                     </div>
 
                     <div class="inputContainer" style="margin-top:16px;">
-                        <label class="inputLabel inputLabelUnfocused" for="selGroupingStrategy">Grouping Strategy</label>
                         <select is="emby-select" id="selGroupingStrategy" label="Grouping Strategy">
                             <option value="IsbnOnly">ISBN only (exact match, recommended)</option>
                             <option value="TitleAuthor">Title + Author (fuzzy match)</option>
@@ -313,11 +305,8 @@
                     <hr style="margin:20px 0;" />
 
                     <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtAutoScanInterval">
-                            Auto-scan Interval (minutes)
-                        </label>
                         <input is="emby-input" id="txtAutoScanInterval" type="number"
-                               min="0" max="1440" step="5" label="Auto-scan Interval" />
+                               min="0" max="1440" step="5" label="Auto-scan Interval (minutes)" />
                         <div class="fieldDescription">
                             How often to automatically scan source directories. Set to 0 to disable.
                         </div>
@@ -386,6 +375,23 @@
                 { FormatName: "Audio", Priority: 4 }
             ];
 
+            function getJellyfinToken() {
+                try {
+                    return typeof ApiClient.accessToken === 'function' ? ApiClient.accessToken() : '';
+                } catch (e) { return ''; }
+            }
+
+            function authFetch(path, options) {
+                options = options || {};
+                options.headers = options.headers || {};
+                var token = getJellyfinToken();
+                if (token) {
+                    options.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
+                }
+                var url = window.ApiClient ? window.ApiClient.getUrl(path) : path;
+                return fetch(url, options);
+            }
+
             function buildApiUrl(path) {
                 if (window.ApiClient) {
                     return window.ApiClient.getUrl(path);
@@ -415,7 +421,7 @@
                 btn.disabled = true;
                 btn.textContent = "Testing...";
 
-                fetch(buildApiUrl("Books/Config/TestHardcover"), {
+                authFetch("Books/Config/TestHardcover", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ ApiKey: key })
@@ -439,7 +445,7 @@
                 btn.disabled = true;
                 btn.textContent = "Testing...";
 
-                fetch(buildApiUrl("Books/Config/TestGoogleBooks"), {
+                authFetch("Books/Config/TestGoogleBooks", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ ApiKey: key })
@@ -562,11 +568,9 @@
 
             function renderLibraryList(selectedIds) {
                 var container = document.getElementById("beLibraryList");
-                container.innerHTML = "";
+                container.innerHTML = '<p style="color:var(--text-secondary,#888);"><span class="loading-spinner"></span> Loading libraries...</p>';
 
-                var url = buildApiUrl("Books/Libraries");
-
-                fetch(url)
+                authFetch("Books/Libraries")
                     .then(function (r) { return r.json(); })
                     .then(function (libraries) {
                         if (!libraries || libraries.length === 0) {
@@ -676,7 +680,7 @@
                 btn.disabled = true;
                 btn.textContent = "Processing...";
 
-                fetch(buildApiUrl("Books/Grouping/Process"), { method: "POST" })
+                authFetch("Books/Grouping/Process", { method: "POST" })
                     .then(function (r) { return r.json(); })
                     .then(function (result) {
                         Dashboard.alert({
@@ -701,7 +705,7 @@
                 btn.disabled = true;
                 btn.textContent = "Scanning...";
 
-                fetch(buildApiUrl("Books/Ingestion/Scan"), { method: "POST" })
+                authFetch("Books/Ingestion/Scan", { method: "POST" })
                     .then(function (r) { return r.json(); })
                     .then(function (result) {
                         Dashboard.alert({
@@ -776,7 +780,7 @@
                     }
                 });
 
-                fetch(buildApiUrl("Books/Config/Info"))
+                authFetch("Books/Config/Info")
                     .then(function (r) { return r.json(); })
                     .then(function (info) {
                         document.getElementById("bePluginInfo").innerHTML =
@@ -821,6 +825,13 @@
             });
 
             loadConfig();
+
+            var page = document.getElementById("booksConfigPage");
+            if (page) {
+                page.addEventListener("pageshow", function () {
+                    loadConfig();
+                });
+            }
         })();
     </script>
 </div>

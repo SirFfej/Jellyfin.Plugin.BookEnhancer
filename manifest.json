@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.5.0 - Main tab (renamed from Settings, now first); Libraries unfiltered (all types); removed [Authorize] from ConfigController; fixed duplicate labels; added authFetch with Authorization header (matches Audiobookshelf pattern) for backend API calls; loading spinner on library load; reload config on pageshow.",
+        "checksum": "06aa834321319c82a26dac13cc7e4737",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.5.0/Jellyfin.Plugin.BookEnhancer_0.1.5.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.5.0"
+      },
+      {
         "changelog": "v0.1.4.0 - Main tab (renamed from Settings, now first); Plugin Info now populates correctly; Libraries filtered to book-type only; [Authorize] on ConfigController.",
         "checksum": "4ff84a758bc67bed270da99aa8b24351",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.4.0/Jellyfin.Plugin.BookEnhancer_0.1.4.0.zip",
