@@ -47,6 +47,17 @@
         .be-test-result.fail {
             background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
         }
+        .loading-spinner {
+            display: inline-block;
+            width: 14px; height: 14px;
+            border: 2px solid rgba(255,255,255,0.2);
+            border-top-color: var(--accent-color, #00a0dc);
+            border-radius: 50%;
+            animation: loading-spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 6px;
+        }
+        @keyframes loading-spin { to { transform: rotate(360deg); } }
     </style>
 
     <div data-role="content">
@@ -376,9 +387,8 @@
             ];
 
             function getJellyfinToken() {
-                try {
-                    return typeof ApiClient.accessToken === 'function' ? ApiClient.accessToken() : '';
-                } catch (e) { return ''; }
+                try { return typeof ApiClient.accessToken === 'function' ? ApiClient.accessToken() : ''; }
+                catch (e) { return ''; }
             }
 
             function authFetch(path, options) {
@@ -388,15 +398,9 @@
                 if (token) {
                     options.headers['Authorization'] = 'MediaBrowser Token="' + token + '"';
                 }
+                options.headers['Accept'] = 'application/json';
                 var url = window.ApiClient ? window.ApiClient.getUrl(path) : path;
-                return fetch(url, options);
-            }
-
-            function buildApiUrl(path) {
-                if (window.ApiClient) {
-                    return window.ApiClient.getUrl(path);
-                }
-                return path;
+                return fetch(url, options).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
             }
 
             function escapeHtml(str) {
@@ -826,12 +830,21 @@
 
             loadConfig();
 
-            var page = document.getElementById("booksConfigPage");
-            if (page) {
-                page.addEventListener("pageshow", function () {
-                    loadConfig();
-                });
+            if (!window._beListenersBound) {
+                window._beListenersBound = true;
+                var pageEl = document.getElementById("booksConfigPage");
+                if (pageEl) {
+                    pageEl.addEventListener("pageshow", function () { loadConfig(); });
+                }
+                document.addEventListener("pageshow", function () { loadConfig(); });
             }
+
+            document.addEventListener("viewshow", function onView() {
+                var p = document.getElementById("booksConfigPage");
+                if (!p) return;
+                document.removeEventListener("viewshow", onView);
+                loadConfig();
+            });
         })();
     </script>
 </div>
