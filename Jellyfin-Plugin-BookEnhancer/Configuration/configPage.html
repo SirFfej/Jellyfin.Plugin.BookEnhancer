@@ -56,13 +56,57 @@
             </div>
 
             <div class="be-tabs">
-                <button is="emby-button" type="button" class="be-tab active" data-tab="metadata">Metadata</button>
+                <button is="emby-button" type="button" class="be-tab active" data-tab="main">Main</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="metadata">Metadata</button>
                 <button is="emby-button" type="button" class="be-tab" data-tab="grouping">Grouping</button>
                 <button is="emby-button" type="button" class="be-tab" data-tab="ingestion">Ingestion</button>
-                <button is="emby-button" type="button" class="be-tab" data-tab="settings">Settings</button>
             </div>
 
             <form id="pluginConfigForm" style="max-width:800px;">
+                <div class="tab-content" id="tab-main">
+                    <h3>Affected Libraries</h3>
+                    <p class="fieldDescription">
+                        Select which Jellyfin libraries the metadata enrichment should process.
+                        Leave all unchecked to affect all libraries.
+                    </p>
+                    <div id="beLibraryList" style="margin-bottom:20px;">
+                        <p style="color:var(--text-secondary,#888);">Loading libraries...</p>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h3>General Settings</h3>
+
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="txtMatchThreshold">
+                            Title Match Confidence Threshold
+                        </label>
+                        <input is="emby-input" id="txtMatchThreshold" type="number"
+                               min="0" max="1" step="0.05" label="Match Threshold" />
+                        <div class="fieldDescription">
+                            Minimum confidence score (0.0–1.0) for fuzzy title matching.
+                            Higher values require closer matches. Default: 0.85.
+                        </div>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h3>Plugin Info</h3>
+                    <div id="bePluginInfo" style="color:var(--text-secondary,#888);font-size:14px;">
+                        <p>Loading...</p>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <button is="emby-button" id="btnResetConfig" type="button" class="raised"
+                            style="background:#c33;color:#fff;">
+                        Reset All Settings to Defaults
+                    </button>
+                    <div class="fieldDescription" style="margin-top:4px;">
+                        This will reset all plugin settings to their default values and reload the page.
+                    </div>
+                </div>
+
                 <div class="tab-content" id="tab-metadata">
                     <h3>Metadata Sources</h3>
                     <p class="fieldDescription">
@@ -122,7 +166,7 @@
                         </ol>
                     </details>
 
-                    <div class="fieldDescription" style="margin-top:8px;padding:8px;background:#fff3cd;border-radius:4px;border:1px solid #ffc107;">
+                    <div class="fieldDescription" style="margin-top:8px;padding:8px;background:#fff3cd;border-radius:4px;border:1px solid #ffc107;color:#333;">
                         A Hardcover API key is <strong>strongly recommended</strong> — it provides the best quality metadata (authors, narrators, series, genres). The plugin works without it by falling back to Google Books and OpenLibrary.
                     </div>
 
@@ -289,49 +333,7 @@
                     </div>
                 </div>
 
-                <div class="tab-content" id="tab-settings" style="display:none;">
-                    <h3>Affected Libraries</h3>
-                    <p class="fieldDescription">
-                        Select which Jellyfin libraries the metadata enrichment should process.
-                        Leave all unchecked to affect all libraries.
-                    </p>
-                    <div id="beLibraryList" style="margin-bottom:20px;">
-                        <p style="color:var(--text-secondary,#888);">Loading libraries...</p>
-                    </div>
 
-                    <hr style="margin:20px 0;" />
-
-                    <h3>General Settings</h3>
-
-                    <div class="inputContainer">
-                        <label class="inputLabel inputLabelUnfocused" for="txtMatchThreshold">
-                            Title Match Confidence Threshold
-                        </label>
-                        <input is="emby-input" id="txtMatchThreshold" type="number"
-                               min="0" max="1" step="0.05" label="Match Threshold" />
-                        <div class="fieldDescription">
-                            Minimum confidence score (0.0–1.0) for fuzzy title matching.
-                            Higher values require closer matches. Default: 0.85.
-                        </div>
-                    </div>
-
-                    <hr style="margin:20px 0;" />
-
-                    <h3>Plugin Info</h3>
-                    <div id="bePluginInfo" style="color:var(--text-secondary,#888);font-size:14px;">
-                        <p>Loading...</p>
-                    </div>
-
-                    <hr style="margin:20px 0;" />
-
-                    <button is="emby-button" id="btnResetConfig" type="button" class="raised"
-                            style="background:#c33;color:#fff;">
-                        Reset All Settings to Defaults
-                    </button>
-                    <div class="fieldDescription" style="margin-top:4px;">
-                        This will reset all plugin settings to their default values and reload the page.
-                    </div>
-                </div>
 
                 <div style="margin-top:24px;">
                     <button is="emby-button" type="submit" class="raised button-submit block">
@@ -345,7 +347,7 @@
     <script>
         (function () {
             var pluginId = "66bc815f-035b-43a4-82ec-d1f39dfe988b";
-            var currentTab = "metadata";
+            var currentTab = "main";
 
             function switchTab(tab) {
                 currentTab = tab;
@@ -368,7 +370,7 @@
                 });
             });
 
-            switchTab("metadata");
+            switchTab("main");
 
             var DefaultExtensions = [
                 ".epub", ".pdf",

@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.4.0 - Main tab (renamed from Settings, now first); Plugin Info now populates correctly; Libraries filtered to book-type only; [Authorize] on ConfigController.",
+        "checksum": "4ff84a758bc67bed270da99aa8b24351",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.4.0/Jellyfin.Plugin.BookEnhancer_0.1.4.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.4.0"
+      },
+      {
         "changelog": "v0.1.3.0 - Config page enhancements: format priority reordering, file type filters, copy/move mode, test API key buttons, plugin info & reset.",
         "checksum": "c6dee98a30c93dbdd7fd086ddb31cdb8",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.3.0/Jellyfin.Plugin.BookEnhancer_0.1.3.0.zip",

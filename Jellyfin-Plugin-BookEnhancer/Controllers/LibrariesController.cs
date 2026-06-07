@@ -21,11 +21,12 @@ public class LibrariesController : ControllerBase
     public ActionResult<List<LibraryDto>> GetLibraries()
     {
         var libraries = _libraryManager.GetVirtualFolders()
+            .Where(lf => lf.CollectionType == CollectionTypeOptions.books)
             .Select(lf => new LibraryDto
             {
-                Id = lf.ItemId.ToString(),
+                Id = lf.ItemId,
                 Name = lf.Name ?? string.Empty,
-                CollectionType = lf.CollectionType?.ToString() ?? "unknown"
+                CollectionType = "books"
             })
             .OrderBy(l => l.Name)
             .ToList();
