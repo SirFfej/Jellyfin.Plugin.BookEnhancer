@@ -12,13 +12,6 @@ public class BookIngestionService
     private readonly LibraryOrganizationService _organization;
     private readonly ILogger<BookIngestionService> _logger;
 
-    private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".epub", ".pdf",
-        ".cbz", ".cbr", ".cb7",
-        ".mp3", ".m4a", ".m4b", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
-    };
-
     public BookIngestionService(
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
@@ -34,6 +27,22 @@ public class BookIngestionService
     }
 
     private static PluginConfiguration? Config => Plugin.Instance?.Configuration;
+
+    private static HashSet<string> GetSupportedExtensions()
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.IngestionFileExtensions == null || config.IngestionFileExtensions.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".epub", ".pdf",
+                ".cbz", ".cbr", ".cb7",
+                ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
+            };
+        }
+
+        return new HashSet<string>(config.IngestionFileExtensions, StringComparer.OrdinalIgnoreCase);
+    }
 
     public async Task<IngestionResult> ScanAllAsync(CancellationToken ct = default)
     {
@@ -78,8 +87,9 @@ public class BookIngestionService
             return result;
         }
 
+        var supportedExts = GetSupportedExtensions();
         var files = Directory.EnumerateFiles(dir.SourcePath, "*", SearchOption.AllDirectories)
-            .Where(f => SupportedExtensions.Contains(Path.GetExtension(f)))
+            .Where(f => supportedExts.Contains(Path.GetExtension(f)))
             .ToList();
 
         result.FilesFound = files.Count;
@@ -113,7 +123,7 @@ public class BookIngestionService
                 }
 
                 var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata);
-                var moveResult = _organization.MoveFile(file, targetPath);
+                var moveResult = _organization.MoveFile(file, targetPath, Config?.CopyMode == true);
 
                 if (moveResult.Success)
                 {

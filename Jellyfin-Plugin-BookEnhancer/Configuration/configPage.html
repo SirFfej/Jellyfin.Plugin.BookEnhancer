@@ -1,28 +1,65 @@
 <div id="booksConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
      data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-collapse">
+    <style>
+        .be-tabs {
+            display:flex; gap:2px; margin-bottom:20px; border-bottom:2px solid #38c; flex-wrap:wrap;
+        }
+        .be-tab {
+            border-radius:4px 4px 0 0; margin:0 2px -2px 0; padding:0.6em 1.2em;
+            border:0; border-bottom:2px solid transparent;
+            background:transparent; color:#888; cursor:pointer; font-size:inherit;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .be-tab:hover {
+            color:#555;
+        }
+        .be-tab.active {
+            color:#38c; border-bottom-color:#38c;
+        }
+        .be-priority-row {
+            display:flex; align-items:center; gap:8px; padding:8px 10px;
+            border:1px solid var(--border-color,#ddd); border-radius:4px;
+            margin-bottom:4px; background:var(--card-background,#f9f9f9);
+        }
+        .be-priority-row .be-drag-handle {
+            cursor:grab; color:#888; font-size:18px; user-select:none;
+        }
+        .be-priority-row .be-priority-badge {
+            display:inline-block; min-width:28px; text-align:center;
+            background:#38c; color:#fff; border-radius:10px; font-size:12px;
+            padding:2px 6px; font-weight:600;
+        }
+        .be-ext-group {
+            display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 16px;
+        }
+        .be-ext-group label {
+            display:flex; align-items:center; gap:4px;
+            padding:4px 10px; border:1px solid var(--border-color,#ddd);
+            border-radius:4px; cursor:pointer; font-size:13px;
+            background:var(--card-background,#f9f9f9);
+        }
+        .be-test-result {
+            margin-top:4px; padding:4px 10px; border-radius:4px; font-size:13px;
+        }
+        .be-test-result.success {
+            background:#d4edda; color:#155724; border:1px solid #c3e6cb;
+        }
+        .be-test-result.fail {
+            background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
+        }
+    </style>
+
     <div data-role="content">
         <div class="content-primary">
             <div class="sectionTitleContainer" style="display:flex;align-items:center;margin-bottom:16px;">
                 <h2 class="sectionTitle">BookEnhancers Plugin Configuration</h2>
             </div>
 
-            <div style="display:flex;gap:2px;margin-bottom:20px;border-bottom:2px solid #ccc;flex-wrap:wrap;">
-                <button is="emby-button" class="tab-btn raised" data-tab="metadata"
-                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;border-bottom:2px solid #00a4dc;">
-                    Metadata
-                </button>
-                <button is="emby-button" class="tab-btn" data-tab="grouping"
-                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
-                    Grouping
-                </button>
-                <button is="emby-button" class="tab-btn" data-tab="ingestion"
-                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
-                    Ingestion
-                </button>
-                <button is="emby-button" class="tab-btn" data-tab="settings"
-                        style="border-radius:4px 4px 0 0;margin:0 2px -2px 0;">
-                    Settings
-                </button>
+            <div class="be-tabs">
+                <button is="emby-button" type="button" class="be-tab active" data-tab="metadata">Metadata</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="grouping">Grouping</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="ingestion">Ingestion</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="settings">Settings</button>
             </div>
 
             <form id="pluginConfigForm" style="max-width:800px;">
@@ -59,8 +96,13 @@
 
                     <div class="inputContainer" style="margin-top:8px;">
                         <label class="inputLabel inputLabelUnfocused" for="txtHardcoverApiKey">Hardcover API Key</label>
-                        <input is="emby-input" id="txtHardcoverApiKey" type="password"
-                               label="Hardcover API Key" />
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtHardcoverApiKey" type="password"
+                                   label="Hardcover API Key" style="flex:1;" />
+                            <button is="emby-button" id="btnTestHardcover" type="button" class="raised"
+                                    style="white-space:nowrap;flex-shrink:0;">Test</button>
+                        </div>
+                        <div id="testHardcoverResult" class="be-test-result" style="display:none;"></div>
                         <div class="fieldDescription">
                             Paste your Hardcover API key here.
                         </div>
@@ -71,20 +113,24 @@
                             How to get a Hardcover API Key
                         </summary>
                         <ol style="margin-top:10px;padding-left:20px;line-height:1.8;">
-                            <li>Go to <a href="https://hardcover.app/account/api" target="_blank" rel="noopener">https://hardcover.app/account/api</a></li>
-                            <li>Sign in to your Hardcover account (or create one — it's free)</li>
+                            <li>Go to <a href="https://hardcover.app/account/api" target="_blank" rel="noopener">hardcover.app/account/api</a></li>
+                            <li>Sign in to your Hardcover account (or create one — it's free, no subscription required)</li>
                             <li>Click <strong>Generate API Key</strong></li>
                             <li>Copy the generated key and paste it in the field above</li>
-                            <li><strong>Rate limit:</strong> 60 requests per minute, free</li>
-                            <li><strong>Note:</strong> API tokens expire annually on January 1st</li>
+                            <li><strong>Rate limit:</strong> 60 requests per minute, free tier</li>
+                            <li><strong>Note:</strong> API tokens expire annually on January 1st — generate a new one each year</li>
                         </ol>
                     </details>
+
+                    <div class="fieldDescription" style="margin-top:8px;padding:8px;background:#fff3cd;border-radius:4px;border:1px solid #ffc107;">
+                        A Hardcover API key is <strong>strongly recommended</strong> — it provides the best quality metadata (authors, narrators, series, genres). The plugin works without it by falling back to Google Books and OpenLibrary.
+                    </div>
 
                     <hr style="margin:20px 0;" />
 
                     <h4 style="margin-bottom:4px;">Google Books</h4>
                     <p class="fieldDescription">
-                        Fallback source — good metadata coverage. Optional API key increases rate limit to 1,000 requests/day.
+                        Fallback source — good metadata coverage.
                     </p>
 
                     <div class="checkboxContainer">
@@ -95,15 +141,22 @@
                     </div>
 
                     <div class="inputContainer" style="margin-top:8px;">
-                        <label class="inputLabel inputLabelUnfocused" for="txtGoogleBooksApiKey">Google Books API Key (optional)</label>
-                        <input is="emby-input" id="txtGoogleBooksApiKey" type="password"
-                               label="Google Books API Key (optional)" />
+                        <label class="inputLabel inputLabelUnfocused" for="txtGoogleBooksApiKey">
+                            Google Books API Key <span style="color:#c33;">(optional — leave blank to use unauthenticated endpoint)</span>
+                        </label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtGoogleBooksApiKey" type="password"
+                                   label="Google Books API Key" style="flex:1;" />
+                            <button is="emby-button" id="btnTestGoogleBooks" type="button" class="raised"
+                                    style="white-space:nowrap;flex-shrink:0;">Test</button>
+                        </div>
+                        <div id="testGoogleBooksResult" class="be-test-result" style="display:none;"></div>
                         <div class="fieldDescription">
-                            Leave blank to use the unauthenticated endpoint (IP-based rate limiting).
-                            Get a key at
+                            <strong>You do NOT need an API key</strong> — the plugin works without one (IP-based rate limiting applies).
+                            If you have a key:
                             <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">
-                                Google Cloud Console
-                            </a> (enable Books API).
+                                Get one at Google Cloud Console
+                            </a>, enable the Books API, then paste it here for a higher rate limit (1,000 requests/day).
                         </div>
                     </div>
 
@@ -150,6 +203,17 @@
                         </div>
                     </div>
 
+                    <hr style="margin:20px 0;" />
+
+                    <h4 style="margin-bottom:4px;">Format Priority</h4>
+                    <p class="fieldDescription">
+                        Drag to reorder, or use the arrow buttons. Higher-priority formats (top) become the primary library entry.
+                        Changes take effect on the next grouping run.
+                    </p>
+                    <div id="beFormatPriorityList" style="margin-top:8px;"></div>
+                    <button is="emby-button" id="btnResetFormatPriority" type="button" class="raised"
+                            style="margin-top:8px;">Reset to Defaults</button>
+
                     <div style="margin-top:20px;">
                         <button is="emby-button" id="btnProcessGroups" type="button" class="raised">
                             Process Groups Now
@@ -177,13 +241,29 @@
                         </button>
                     </div>
 
-                    <div style="margin-top:20px;">
-                        <button is="emby-button" id="btnScanAll" type="button" class="raised button-submit">
-                            Scan All Now
-                        </button>
-                        <div class="fieldDescription" style="margin-top:4px;">
-                            Immediately scan all enabled source directories and move files into the library.
-                        </div>
+                    <hr style="margin:20px 0;" />
+
+                    <h4 style="margin-bottom:4px;">File Type Filters</h4>
+                    <p class="fieldDescription">
+                        Select which file types to include when scanning source directories.
+                    </p>
+                    <div class="be-ext-group" id="beFileExtList"></div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h4 style="margin-bottom:4px;">Ingestion Mode</h4>
+                    <p class="fieldDescription">
+                        Choose whether files are moved (removed from source) or copied (left in place).
+                    </p>
+                    <div style="display:flex;gap:16px;margin-top:8px;">
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input is="emby-radio" id="radioMoveMode" name="ingestionMode" type="radio" value="move" checked />
+                            <span>Move (delete from source)</span>
+                        </label>
+                        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                            <input is="emby-radio" id="radioCopyMode" name="ingestionMode" type="radio" value="copy" />
+                            <span>Copy (keep in source)</span>
+                        </label>
                     </div>
 
                     <hr style="margin:20px 0;" />
@@ -198,9 +278,29 @@
                             How often to automatically scan source directories. Set to 0 to disable.
                         </div>
                     </div>
+
+                    <div style="margin-top:20px;">
+                        <button is="emby-button" id="btnScanAll" type="button" class="raised button-submit">
+                            Scan All Now
+                        </button>
+                        <div class="fieldDescription" style="margin-top:4px;">
+                            Immediately scan all enabled source directories.
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="tab-settings" style="display:none;">
+                    <h3>Affected Libraries</h3>
+                    <p class="fieldDescription">
+                        Select which Jellyfin libraries the metadata enrichment should process.
+                        Leave all unchecked to affect all libraries.
+                    </p>
+                    <div id="beLibraryList" style="margin-bottom:20px;">
+                        <p style="color:var(--text-secondary,#888);">Loading libraries...</p>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
                     <h3>General Settings</h3>
 
                     <div class="inputContainer">
@@ -213,6 +313,23 @@
                             Minimum confidence score (0.0–1.0) for fuzzy title matching.
                             Higher values require closer matches. Default: 0.85.
                         </div>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <h3>Plugin Info</h3>
+                    <div id="bePluginInfo" style="color:var(--text-secondary,#888);font-size:14px;">
+                        <p>Loading...</p>
+                    </div>
+
+                    <hr style="margin:20px 0;" />
+
+                    <button is="emby-button" id="btnResetConfig" type="button" class="raised"
+                            style="background:#c33;color:#fff;">
+                        Reset All Settings to Defaults
+                    </button>
+                    <div class="fieldDescription" style="margin-top:4px;">
+                        This will reset all plugin settings to their default values and reload the page.
                     </div>
                 </div>
 
@@ -229,14 +346,6 @@
         (function () {
             var pluginId = "66bc815f-035b-43a4-82ec-d1f39dfe988b";
             var currentTab = "metadata";
-            var dirEntryIndex = 0;
-
-            document.querySelectorAll(".tab-btn").forEach(function (btn) {
-                btn.addEventListener("click", function () {
-                    var tab = this.getAttribute("data-tab");
-                    switchTab(tab);
-                });
-            });
 
             function switchTab(tab) {
                 currentTab = tab;
@@ -246,15 +355,246 @@
                 var active = document.getElementById("tab-" + tab);
                 if (active) active.style.display = "block";
 
-                document.querySelectorAll(".tab-btn").forEach(function (btn) {
-                    btn.style.borderBottom = "2px solid transparent";
-                    btn.style.color = "";
+                document.querySelectorAll(".be-tab").forEach(function (btn) {
+                    btn.classList.remove("active");
                 });
-                var activeBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
-                if (activeBtn) {
-                    activeBtn.style.borderBottom = "2px solid #00a4dc";
-                    activeBtn.style.color = "#00a4dc";
+                var activeBtn = document.querySelector('.be-tab[data-tab="' + tab + '"]');
+                if (activeBtn) activeBtn.classList.add("active");
+            }
+
+            document.querySelectorAll(".be-tab").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    switchTab(this.getAttribute("data-tab"));
+                });
+            });
+
+            switchTab("metadata");
+
+            var DefaultExtensions = [
+                ".epub", ".pdf",
+                ".cbz", ".cbr", ".cb7",
+                ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
+            ];
+
+            var DefaultFormatPriority = [
+                { FormatName: "EPUB", Priority: 0 },
+                { FormatName: "MOBI", Priority: 1 },
+                { FormatName: "PDF", Priority: 2 },
+                { FormatName: "Comic", Priority: 3 },
+                { FormatName: "Audio", Priority: 4 }
+            ];
+
+            function buildApiUrl(path) {
+                if (window.ApiClient) {
+                    return window.ApiClient.getUrl(path);
                 }
+                return path;
+            }
+
+            function escapeHtml(str) {
+                if (!str) return "";
+                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+            }
+
+            function showTestResult(containerId, success, message) {
+                var el = document.getElementById(containerId);
+                el.style.display = "block";
+                el.className = "be-test-result " + (success ? "success" : "fail");
+                el.textContent = message;
+            }
+
+            document.getElementById("btnTestHardcover").addEventListener("click", function () {
+                var key = document.getElementById("txtHardcoverApiKey").value;
+                if (!key) {
+                    showTestResult("testHardcoverResult", false, "Enter an API key first.");
+                    return;
+                }
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Testing...";
+
+                fetch(buildApiUrl("Books/Config/TestHardcover"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ApiKey: key })
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        showTestResult("testHardcoverResult", result.success, result.message);
+                    })
+                    .catch(function () {
+                        showTestResult("testHardcoverResult", false, "Request failed. Check server connectivity.");
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Test";
+                    });
+            });
+
+            document.getElementById("btnTestGoogleBooks").addEventListener("click", function () {
+                var key = document.getElementById("txtGoogleBooksApiKey").value;
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Testing...";
+
+                fetch(buildApiUrl("Books/Config/TestGoogleBooks"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ApiKey: key })
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        showTestResult("testGoogleBooksResult", result.success, result.message);
+                    })
+                    .catch(function () {
+                        showTestResult("testGoogleBooksResult", false, "Request failed. Check server connectivity.");
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Test";
+                    });
+            });
+
+            function renderFormatPriority(entries) {
+                var container = document.getElementById("beFormatPriorityList");
+                container.innerHTML = "";
+
+                if (!entries || entries.length === 0) {
+                    container.innerHTML = '<p style="color:#888;font-style:italic;">No format entries configured.</p>';
+                    return;
+                }
+
+                entries.forEach(function (entry, idx) {
+                    var row = document.createElement("div");
+                    row.className = "be-priority-row";
+                    row.setAttribute("data-idx", idx);
+
+                    var isFirst = idx === 0;
+                    var isLast = idx === entries.length - 1;
+
+                    row.innerHTML =
+                        '<span class="be-drag-handle">&#x2630;</span>' +
+                        '<span class="be-priority-badge">' + (idx + 1) + '</span>' +
+                        '<span style="flex:1;font-weight:500;">' + escapeHtml(entry.FormatName) + '</span>' +
+                        '<span style="color:var(--text-secondary,#888);font-size:12px;">priority ' + entry.Priority + '</span>' +
+                        '<span style="display:flex;gap:4px;">' +
+                            '<button is="emby-button" type="button" class="raised be-priority-up" data-idx="' + idx + '"' + (isFirst ? ' disabled style="opacity:0.3;"' : '') + '>&#x25B2;</button>' +
+                            '<button is="emby-button" type="button" class="raised be-priority-down" data-idx="' + idx + '"' + (isLast ? ' disabled style="opacity:0.3;"' : '') + '>&#x25BC;</button>' +
+                        '</span>';
+
+                    container.appendChild(row);
+                });
+
+                container.querySelectorAll(".be-priority-up").forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var idx = parseInt(this.getAttribute("data-idx"));
+                        if (idx > 0) {
+                            var arr = getCurrentFormatPriority();
+                            var tmp = arr[idx - 1];
+                            arr[idx - 1] = arr[idx];
+                            arr[idx] = tmp;
+                            arr = arr.map(function (e, i) { e.Priority = i; return e; });
+                            renderFormatPriority(arr);
+                        }
+                    });
+                });
+
+                container.querySelectorAll(".be-priority-down").forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var idx = parseInt(this.getAttribute("data-idx"));
+                        var arr = getCurrentFormatPriority();
+                        if (idx < arr.length - 1) {
+                            var tmp = arr[idx + 1];
+                            arr[idx + 1] = arr[idx];
+                            arr[idx] = tmp;
+                            arr = arr.map(function (e, i) { e.Priority = i; return e; });
+                            renderFormatPriority(arr);
+                        }
+                    });
+                });
+            }
+
+            function getCurrentFormatPriority() {
+                var rows = document.querySelectorAll("#beFormatPriorityList .be-priority-row");
+                var entries = [];
+                rows.forEach(function (row, idx) {
+                    var nameEl = row.querySelector("span[style*='flex:1']");
+                    if (nameEl) {
+                        entries.push({ FormatName: nameEl.textContent, Priority: idx });
+                    }
+                });
+                return entries;
+            }
+
+            document.getElementById("btnResetFormatPriority").addEventListener("click", function () {
+                renderFormatPriority(JSON.parse(JSON.stringify(DefaultFormatPriority)));
+            });
+
+            function renderFileExtensions(selectedExts) {
+                var container = document.getElementById("beFileExtList");
+                container.innerHTML = "";
+
+                var allExts = DefaultExtensions;
+                var set = {};
+                if (selectedExts) {
+                    selectedExts.forEach(function (e) { set[e.toLowerCase()] = true; });
+                }
+
+                allExts.forEach(function (ext) {
+                    var label = document.createElement("label");
+                    var isChecked = !selectedExts || set[ext.toLowerCase()];
+                    label.innerHTML =
+                        '<input type="checkbox" class="be-ext-checkbox" value="' + escapeHtml(ext) + '"' + (isChecked ? ' checked' : '') + ' />' +
+                        '<span>' + escapeHtml(ext) + '</span>';
+                    container.appendChild(label);
+                });
+            }
+
+            function getSelectedExtensions() {
+                var exts = [];
+                document.querySelectorAll(".be-ext-checkbox:checked").forEach(function (cb) {
+                    exts.push(cb.value);
+                });
+                return exts;
+            }
+
+            function renderLibraryList(selectedIds) {
+                var container = document.getElementById("beLibraryList");
+                container.innerHTML = "";
+
+                var url = buildApiUrl("Books/Libraries");
+
+                fetch(url)
+                    .then(function (r) { return r.json(); })
+                    .then(function (libraries) {
+                        if (!libraries || libraries.length === 0) {
+                            container.innerHTML = '<p style="color:var(--text-secondary,#888);">No libraries found.</p>';
+                            return;
+                        }
+
+                        var html = "";
+                        libraries.forEach(function (lib) {
+                            var isSelected = !selectedIds || selectedIds.length === 0 || selectedIds.indexOf(lib.id) >= 0;
+                            var typeIcon = lib.collectionType === "books" ? "\u{1F4DA}" : "\u{1F3B5}";
+                            html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border-color,#ddd);border-radius:4px;cursor:pointer;margin-bottom:4px;">';
+                            html += '<input type="checkbox" class="be-library-checkbox" value="' + escapeHtml(lib.id) + '"' + (isSelected ? ' checked' : '') + ' />';
+                            html += '<span>' + typeIcon + ' ' + escapeHtml(lib.name) + '</span>';
+                            html += '<span style="color:var(--text-secondary,#888);font-size:12px;">(' + escapeHtml(lib.collectionType) + ')</span>';
+                            html += '</label>';
+                        });
+                        container.innerHTML = html;
+                    })
+                    .catch(function () {
+                        container.innerHTML = '<p style="color:var(--text-secondary,#888);">Failed to load libraries.</p>';
+                    });
+            }
+
+            function getSelectedLibraryIds() {
+                var ids = [];
+                document.querySelectorAll(".be-library-checkbox:checked").forEach(function (cb) {
+                    ids.push(cb.value);
+                });
+                return ids;
             }
 
             function renderDirectories(dirs) {
@@ -307,7 +647,6 @@
             function getCurrentDirectories() {
                 var dirs = [];
                 var container = document.getElementById("managedDirsContainer");
-                var rows = container.querySelectorAll("div[style]");
 
                 container.querySelectorAll(".dir-source").forEach(function (input, idx) {
                     var sourceInput = input;
@@ -324,11 +663,6 @@
                 return dirs;
             }
 
-            function escapeHtml(str) {
-                if (!str) return "";
-                return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-            }
-
             document.getElementById("btnAddDirectory").addEventListener("click", function () {
                 var dirs = getCurrentDirectories();
                 dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true });
@@ -340,12 +674,7 @@
                 btn.disabled = true;
                 btn.textContent = "Processing...";
 
-                var apiUrl = "Books/Grouping/Process";
-                if (window.ApiClient) {
-                    apiUrl = window.ApiClient.getUrl("Books/Grouping/Process");
-                }
-
-                fetch(apiUrl, { method: "POST" })
+                fetch(buildApiUrl("Books/Grouping/Process"), { method: "POST" })
                     .then(function (r) { return r.json(); })
                     .then(function (result) {
                         Dashboard.alert({
@@ -370,12 +699,7 @@
                 btn.disabled = true;
                 btn.textContent = "Scanning...";
 
-                var apiUrl = "Books/Ingestion/Scan";
-                if (window.ApiClient) {
-                    apiUrl = window.ApiClient.getUrl("Books/Ingestion/Scan");
-                }
-
-                fetch(apiUrl, { method: "POST" })
+                fetch(buildApiUrl("Books/Ingestion/Scan"), { method: "POST" })
                     .then(function (r) { return r.json(); })
                     .then(function (result) {
                         Dashboard.alert({
@@ -395,6 +719,32 @@
                     });
             });
 
+            document.getElementById("btnResetConfig").addEventListener("click", function () {
+                if (!confirm("Reset all plugin settings to defaults? This cannot be undone.")) return;
+
+                Dashboard.getPluginConfiguration(pluginId).then(function (config) {
+                    config.UnifiedMetadataEnabled = true;
+                    config.HardcoverEnabled = true;
+                    config.HardcoverApiKey = "";
+                    config.GoogleBooksEnabled = true;
+                    config.GoogleBooksApiKey = "";
+                    config.OpenLibraryEnabled = true;
+                    config.MatchThreshold = 0.85;
+                    config.EnableFormatGrouping = true;
+                    config.GroupingStrategy = "IsbnOnly";
+                    config.FormatPriority = JSON.parse(JSON.stringify(DefaultFormatPriority));
+                    config.CopyMode = false;
+                    config.IngestionFileExtensions = DefaultExtensions.slice();
+                    config.ManagedDirectories = [];
+                    config.AutoScanIntervalMinutes = 0;
+                    config.IncludedLibraryIds = [];
+
+                    Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
+                        window.location.reload();
+                    });
+                });
+            });
+
             function loadConfig() {
                 Dashboard.getPluginConfiguration(pluginId).then(function (config) {
                     document.getElementById("chkUnifiedMetadata").checked = config.UnifiedMetadataEnabled || false;
@@ -408,10 +758,32 @@
                     document.getElementById("chkEnableFormatGrouping").checked = config.EnableFormatGrouping !== false;
                     document.getElementById("selGroupingStrategy").value = config.GroupingStrategy || "IsbnOnly";
 
+                    renderFormatPriority(config.FormatPriority || DefaultFormatPriority);
+
                     document.getElementById("txtAutoScanInterval").value = config.AutoScanIntervalMinutes || 0;
 
                     renderDirectories(config.ManagedDirectories || []);
+                    renderLibraryList(config.IncludedLibraryIds || []);
+
+                    renderFileExtensions(config.IngestionFileExtensions || DefaultExtensions);
+
+                    if (config.CopyMode) {
+                        document.getElementById("radioCopyMode").checked = true;
+                    } else {
+                        document.getElementById("radioMoveMode").checked = true;
+                    }
                 });
+
+                fetch(buildApiUrl("Books/Config/Info"))
+                    .then(function (r) { return r.json(); })
+                    .then(function (info) {
+                        document.getElementById("bePluginInfo").innerHTML =
+                            '<p><strong>Name:</strong> ' + escapeHtml(info.name) + '</p>' +
+                            '<p><strong>Version:</strong> ' + escapeHtml(info.version) + '</p>';
+                    })
+                    .catch(function () {
+                        document.getElementById("bePluginInfo").innerHTML = '<p>Could not load plugin info.</p>';
+                    });
             }
 
             document.getElementById("pluginConfigForm").addEventListener("submit", function (e) {
@@ -429,8 +801,16 @@
                     config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;
                     config.GroupingStrategy = document.getElementById("selGroupingStrategy").value;
 
+                    config.FormatPriority = getCurrentFormatPriority();
+
+                    config.CopyMode = document.getElementById("radioCopyMode").checked;
+
+                    var exts = getSelectedExtensions();
+                    config.IngestionFileExtensions = exts.length > 0 ? exts : DefaultExtensions.slice();
+
                     config.AutoScanIntervalMinutes = parseInt(document.getElementById("txtAutoScanInterval").value) || 0;
                     config.ManagedDirectories = getCurrentDirectories();
+                    config.IncludedLibraryIds = getSelectedLibraryIds();
 
                     Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
                         Dashboard.processPluginConfigurationUpdateResult();

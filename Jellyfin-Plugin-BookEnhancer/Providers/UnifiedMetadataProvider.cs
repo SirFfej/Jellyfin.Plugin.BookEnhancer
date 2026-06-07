@@ -42,6 +42,9 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
         var config = Plugin.Instance?.Configuration;
         if (config == null || !config.UnifiedMetadataEnabled) return result;
 
+        if (!IsLibrarySelected(info.Path))
+            return result;
+
         try
         {
             var fileMeta = await ExtractFileMetadata(info.Path, cancellationToken);
@@ -255,5 +258,30 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
         return text.Length <= maxLen ? text : text[..maxLen] + "...";
+    }
+
+    private bool IsLibrarySelected(string itemPath)
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config == null || config.IncludedLibraryIds.Count == 0)
+            return true;
+
+        if (string.IsNullOrWhiteSpace(itemPath))
+            return true;
+
+        var folders = _libraryManager.GetVirtualFolders();
+        foreach (var folder in folders)
+        {
+            if (!config.IncludedLibraryIds.Contains(folder.ItemId.ToString()))
+                continue;
+
+            foreach (var location in folder.Locations)
+            {
+                if (itemPath.StartsWith(location, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
     }
 }

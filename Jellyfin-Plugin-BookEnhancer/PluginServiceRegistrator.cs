@@ -46,6 +46,8 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<BookIngestionService>();
         serviceCollection.AddTransient<GroupingController>();
         serviceCollection.AddTransient<IngestionController>();
+        serviceCollection.AddTransient<LibrariesController>();
+        serviceCollection.AddTransient<ConfigController>();
 
         serviceCollection.AddSingleton<IScheduledTask, IngestionScanTask>();
         serviceCollection.AddSingleton<IScheduledTask, GroupingProcessTask>();

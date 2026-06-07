@@ -38,7 +38,7 @@ public class LibraryOrganizationService
         return Path.Combine(formatsDir, fileName);
     }
 
-    public MoveResult MoveFile(string sourcePath, string targetPath)
+    public MoveResult MoveFile(string sourcePath, string targetPath, bool copy = false)
     {
         try
         {
@@ -56,9 +56,18 @@ public class LibraryOrganizationService
             }
 
             Directory.CreateDirectory(targetDir);
-            File.Move(sourcePath, targetPath);
 
-            _logger.LogInformation("Moved file: {Src} -> {Dst}", sourcePath, targetPath);
+            if (copy)
+            {
+                File.Copy(sourcePath, targetPath);
+                _logger.LogInformation("Copied file: {Src} -> {Dst}", sourcePath, targetPath);
+            }
+            else
+            {
+                File.Move(sourcePath, targetPath);
+                _logger.LogInformation("Moved file: {Src} -> {Dst}", sourcePath, targetPath);
+            }
+
             return MoveResult.CreateSuccess(targetPath);
         }
         catch (Exception ex)

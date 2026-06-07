@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
@@ -9,15 +10,6 @@ public class BookGroupingService
 {
     private readonly string _dbPath;
     private readonly ILogger<BookGroupingService> _logger;
-
-    private static readonly Dictionary<string, int> FormatPriority = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["EPUB"] = 0,
-        ["MOBI"] = 1,
-        ["PDF"] = 2,
-        ["Comic"] = 3,
-        ["Audio"] = 4,
-    };
 
     public BookGroupingService(string dbDirectory, ILogger<BookGroupingService> logger)
     {
@@ -61,6 +53,26 @@ public class BookGroupingService
             """;
 
         cmd.ExecuteNonQuery();
+    }
+
+    private static Dictionary<string, int> GetFormatPriorityMap()
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.FormatPriority == null || config.FormatPriority.Count == 0)
+        {
+            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["EPUB"] = 0,
+                ["MOBI"] = 1,
+                ["PDF"] = 2,
+                ["Comic"] = 3,
+                ["Audio"] = 4,
+            };
+        }
+
+        return config.FormatPriority
+            .Where(e => !string.IsNullOrWhiteSpace(e.FormatName))
+            .ToDictionary(e => e.FormatName, e => e.Priority, StringComparer.OrdinalIgnoreCase);
     }
 
     private SqliteConnection CreateConnection()
@@ -312,17 +324,18 @@ public class BookGroupingService
 
     public static int GetFormatPriority(string formatType)
     {
-        return FormatPriority.TryGetValue(formatType, out var priority) ? priority : 100;
+        var map = GetFormatPriorityMap();
+        return map.TryGetValue(formatType, out var priority) ? priority : 100;
     }
 
     public static int GetFormatPriorityFromExtension(string filePath)
     {
         var ext = Path.GetExtension(filePath)?.TrimStart('.').ToUpperInvariant();
-        if (ext == "EPUB") return 0;
-        if (ext == "MOBI") return 1;
-        if (ext == "PDF") return 2;
-        if (ext is "CBZ" or "CBR" or "CB7") return 3;
-        if (ext is "MP3" or "M4A" or "M4B" or "FLAC" or "OGG" or "WMA" or "OPUS" or "AIFF") return 4;
+        if (ext is "EPUB") return GetFormatPriority("EPUB");
+        if (ext is "MOBI") return GetFormatPriority("MOBI");
+        if (ext is "PDF") return GetFormatPriority("PDF");
+        if (ext is "CBZ" or "CBR" or "CB7") return GetFormatPriority("Comic");
+        if (ext is "MP3" or "M4A" or "M4B" or "FLAC" or "OGG" or "WMA" or "OPUS" or "AIFF") return GetFormatPriority("Audio");
         return 100;
     }
 
