@@ -1,7 +1,7 @@
 ---
 name: "BookEnhancers"
 guid: "66bc815f-035b-43a4-82ec-d1f39dfe988b"
-version: "0.1.1.0"
+version: "0.1.2.0"
 targetAbi: "10.11.8.0"
 framework: "net9.0"
 overview: "Unified ebook, audiobook, and comic metadata enrichment plugin"
@@ -14,6 +14,6 @@ owner: "SirFfej"
 artifacts:
   - "Jellyfin-Plugin-BookEnhancer.dll"
 changelog: >
-  v0.1.1.0 - Format grouping (single entry per title by ISBN);
-  Managed source directories with file ingestion/moving;
-  Format priority (EPUB &gt; MOBI &gt; PDF &gt; others).
+  v0.1.2.0 - Triggerable scheduled tasks (Ingestion Scan, Grouping Process,
+  Full Maintenance) with per-task log files; Full Maintenance auto-schedules
+  via AutoScanIntervalMinutes.

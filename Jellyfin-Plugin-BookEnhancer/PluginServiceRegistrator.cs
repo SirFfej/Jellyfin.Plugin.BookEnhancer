@@ -2,9 +2,11 @@ using Jellyfin.Plugin.BookEnhancer.Clients;
 using Jellyfin.Plugin.BookEnhancer.Controllers;
 using Jellyfin.Plugin.BookEnhancer.Logging;
 using Jellyfin.Plugin.BookEnhancer.Services;
+using Jellyfin.Plugin.BookEnhancer.Services.Tasks;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Model.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -44,5 +46,9 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<BookIngestionService>();
         serviceCollection.AddTransient<GroupingController>();
         serviceCollection.AddTransient<IngestionController>();
+
+        serviceCollection.AddSingleton<IScheduledTask, IngestionScanTask>();
+        serviceCollection.AddSingleton<IScheduledTask, GroupingProcessTask>();
+        serviceCollection.AddSingleton<IScheduledTask, FullMaintenanceTask>();
     }
 }
