@@ -1,6 +1,5 @@
 using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
-using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services;
 
@@ -9,18 +8,15 @@ public class LibraryCleanupService
     private readonly FileMetadataExtractor _fileExtractor;
     private readonly LibraryOrganizationService _organization;
     private readonly BookGroupingService _groupingService;
-    private readonly ILogger<LibraryCleanupService> _logger;
 
     public LibraryCleanupService(
         FileMetadataExtractor fileExtractor,
         LibraryOrganizationService organization,
-        BookGroupingService groupingService,
-        ILogger<LibraryCleanupService> logger)
+        BookGroupingService groupingService)
     {
         _fileExtractor = fileExtractor;
         _organization = organization;
         _groupingService = groupingService;
-        _logger = logger;
     }
 
     private static PluginConfiguration? Config => Plugin.Instance?.Configuration;
@@ -99,7 +95,7 @@ public class LibraryCleanupService
 
                 var dirToClean = Path.GetDirectoryName(file);
 
-                var moveResult = _organization.MoveFile(file, expectedPath, copy: false);
+                var moveResult = await _organization.MoveFile(file, expectedPath, copy: false, logCallback).ConfigureAwait(false);
                 if (moveResult.Success)
                 {
                     result.FilesMoved++;
@@ -121,7 +117,6 @@ public class LibraryCleanupService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error processing file during cleanup: {File}", file);
                 await logCallback($"Error processing {file}: {ex.Message}").ConfigureAwait(false);
                 result.Errors++;
             }
@@ -161,7 +156,7 @@ public class LibraryCleanupService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to remove empty directory: {Path}", startPath);
+            await logCallback($"Failed to remove empty directory {startPath}: {ex.Message}").ConfigureAwait(false);
         }
     }
 

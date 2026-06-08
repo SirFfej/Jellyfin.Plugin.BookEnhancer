@@ -1,7 +1,7 @@
 ---
 name: "BookEnhancers"
 guid: "66bc815f-035b-43a4-82ec-d1f39dfe988b"
-version: "0.1.9.9"
+version: "0.2.0.0"
 targetAbi: "10.11.8.0"
 framework: "net9.0"
 overview: "Unified ebook, audiobook, and comic metadata enrichment plugin"
@@ -14,4 +14,6 @@ owner: "SirFfej"
 artifacts:
   - "Jellyfin-Plugin-BookEnhancer.dll"
 changelog: >
-  v0.1.9.9 - Tasks write operational messages to own log files instead of main Jellyfin log. IngestionScan, GroupingProcess, and FullMaintenance now route all service-level log messages through their per-task log files via log callbacks.
+  v0.2.0.0 - All tasks now write exclusively to their own log files, not the main Jellyfin log.
+  LibraryOrganizationService.MoveFile and LibraryCleanupService now route all messages through log callbacks.
+  Removed remaining ILogger dependencies from LibraryCleanupService.

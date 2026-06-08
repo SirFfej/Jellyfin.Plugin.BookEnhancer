@@ -153,7 +153,7 @@ public class BookIngestionService
                     ? "{Author}/{Series}/{Title}"
                     : dir.OrganizeTemplate;
                 var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
-                var moveResult = _organization.MoveFile(file, targetPath, Config?.CopyMode == true);
+                var moveResult = await _organization.MoveFile(file, targetPath, Config?.CopyMode == true, _logCallback).ConfigureAwait(false);
 
                 if (moveResult.Success)
                 {

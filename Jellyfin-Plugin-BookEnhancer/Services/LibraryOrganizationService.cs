@@ -47,7 +47,7 @@ public class LibraryOrganizationService
             .Replace("{Publisher}", GetPublisherDirectoryName(metadata));
     }
 
-    public MoveResult MoveFile(string sourcePath, string targetPath, bool copy = false)
+    public async Task<MoveResult> MoveFile(string sourcePath, string targetPath, bool copy = false, Func<string, Task>? logCallback = null)
     {
         try
         {
@@ -60,7 +60,11 @@ public class LibraryOrganizationService
 
             if (File.Exists(targetPath))
             {
-                _logger.LogWarning("Target already exists, skipping: {Target}", targetPath);
+                if (logCallback is not null)
+                    await logCallback($"Target already exists, skipping: {targetPath}").ConfigureAwait(false);
+                else
+                    _logger.LogWarning("Target already exists, skipping: {Target}", targetPath);
+
                 return MoveResult.CreateSkipped("Target file already exists");
             }
 
@@ -69,19 +73,29 @@ public class LibraryOrganizationService
             if (copy)
             {
                 File.Copy(sourcePath, targetPath);
-                _logger.LogInformation("Copied file: {Src} -> {Dst}", sourcePath, targetPath);
+                if (logCallback is not null)
+                    await logCallback($"Copied file: {sourcePath} -> {targetPath}").ConfigureAwait(false);
+                else
+                    _logger.LogInformation("Copied file: {Src} -> {Dst}", sourcePath, targetPath);
             }
             else
             {
                 File.Move(sourcePath, targetPath);
-                _logger.LogInformation("Moved file: {Src} -> {Dst}", sourcePath, targetPath);
+                if (logCallback is not null)
+                    await logCallback($"Moved file: {sourcePath} -> {targetPath}").ConfigureAwait(false);
+                else
+                    _logger.LogInformation("Moved file: {Src} -> {Dst}", sourcePath, targetPath);
             }
 
             return MoveResult.CreateSuccess(targetPath);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to move file {Src} -> {Dst}", sourcePath, targetPath);
+            if (logCallback is not null)
+                await logCallback($"Failed to move file {sourcePath} -> {targetPath}: {ex.Message}").ConfigureAwait(false);
+            else
+                _logger.LogWarning(ex, "Failed to move file {Src} -> {Dst}", sourcePath, targetPath);
+
             return MoveResult.CreateError(ex.Message);
         }
     }
