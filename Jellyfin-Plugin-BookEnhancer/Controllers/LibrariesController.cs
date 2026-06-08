@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 using Microsoft.AspNetCore.Authorization;
@@ -37,8 +38,15 @@ public class LibrariesController : ControllerBase
 
 public class LibraryDto
 {
+    [JsonPropertyName("id")]
     public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("collectionType")]
     public string CollectionType { get; set; } = string.Empty;
+
+    [JsonPropertyName("locations")]
     public List<string> Locations { get; set; } = new();
 }

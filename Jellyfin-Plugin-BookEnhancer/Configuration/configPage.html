@@ -2,75 +2,66 @@
      data-require="emby-input,emby-button,emby-select,emby-checkbox,emby-collapse">
     <style>
         .be-tabs {
-            display:flex; gap:2px; margin-bottom:20px; border-bottom:2px solid #38c; flex-wrap:wrap;
+            display:flex; gap:2px; margin-bottom:15px; border-bottom:2px solid var(--accent-color,#00a4dc); flex-wrap:wrap;
         }
         .be-tab {
-            border-radius:4px 4px 0 0; margin:0 2px -2px 0; padding:0.6em 1.2em;
+            border-radius:3px 3px 0 0; margin:0 2px -2px 0; padding:0.45em 0.9em;
             border:0; border-bottom:2px solid transparent;
-            background:transparent; color:#888; cursor:pointer; font-size:inherit;
+            background:transparent; color:var(--text-secondary); cursor:pointer; font-size:0.95em;
             transition: color 0.15s, border-color 0.15s;
         }
-        .be-tab:hover {
-            color:#555;
-        }
         .be-tab.active {
-            color:#38c; border-bottom-color:#38c;
+            color:var(--accent-color,#00a4dc); border-bottom-color:var(--accent-color,#00a4dc);
         }
         .be-priority-row {
-            display:flex; align-items:center; gap:8px; padding:8px 10px;
-            border:1px solid var(--border-color,#ddd); border-radius:4px;
-            margin-bottom:4px; background:var(--card-background,#f9f9f9);
+            display:flex !important; align-items:center; gap:6px; padding:6px 8px;
+            border:1px solid var(--border-color); border-radius:4px;
+            margin-bottom:3px; background:var(--card-background);
         }
         .be-priority-row .be-drag-handle {
-            cursor:grab; color:#888; font-size:18px; user-select:none;
+            cursor:grab; color:var(--text-secondary); font-size:15px; user-select:none;
         }
         .be-priority-row .be-priority-badge {
-            display:inline-block; min-width:28px; text-align:center;
-            background:#38c; color:#fff; border-radius:10px; font-size:12px;
-            padding:2px 6px; font-weight:600;
+            display:inline-block; min-width:22px; text-align:center;
+            background:var(--accent-color,#00a4dc); color:#fff; border-radius:8px; font-size:11px;
+            padding:1px 5px; font-weight:600;
         }
         .be-ext-group {
-            display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 16px;
+            display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 12px;
         }
         .be-ext-group label {
-            display:flex; align-items:center; gap:4px;
-            padding:4px 10px; border:1px solid var(--border-color,#ddd);
-            border-radius:4px; cursor:pointer; font-size:13px;
-            background:var(--card-background,#f9f9f9);
+            display:flex; align-items:center; gap:3px;
+            padding:3px 8px; border:1px solid var(--border-color);
+            border-radius:3px; cursor:pointer; font-size:12px;
+            background:var(--card-background);
         }
         .be-test-result {
-            margin-top:4px; padding:4px 10px; border-radius:4px; font-size:13px;
-        }
-        .be-test-result.success {
-            background:#d4edda; color:#155724; border:1px solid #c3e6cb;
-        }
-        .be-test-result.fail {
-            background:#f8d7da; color:#721c24; border:1px solid #f5c6cb;
+            margin-top:3px; padding:3px 8px; border-radius:3px; font-size:12px;
         }
         .loading-spinner {
             display: inline-block;
-            width: 14px; height: 14px;
-            border: 2px solid rgba(255,255,255,0.2);
-            border-top-color: var(--accent-color, #00a0dc);
+            width: 12px; height: 12px;
+            border: 2px solid var(--border-color);
+            border-top-color: var(--accent-color,#00a4dc);
             border-radius: 50%;
             animation: loading-spin 0.8s linear infinite;
             vertical-align: middle;
-            margin-right: 6px;
+            margin-right: 4px;
         }
         @keyframes loading-spin { to { transform: rotate(360deg); } }
     </style>
 
     <div data-role="content">
         <div class="content-primary">
-            <div class="sectionTitleContainer" style="display:flex;align-items:center;margin-bottom:16px;">
-                <h2 class="sectionTitle">BookEnhancers Plugin Configuration</h2>
+            <div class="sectionTitleContainer" style="display:flex;align-items:center;margin-bottom:12px;">
+                <h2 class="sectionTitle" style="font-size:1.2em;">BookEnhancers Plugin Configuration</h2>
             </div>
 
-            <div class="be-tabs">
-                <button is="emby-button" type="button" class="be-tab active" data-tab="main">Main</button>
-                <button is="emby-button" type="button" class="be-tab" data-tab="metadata">Metadata</button>
-                <button is="emby-button" type="button" class="be-tab" data-tab="grouping">Grouping</button>
-                <button is="emby-button" type="button" class="be-tab" data-tab="ingestion">Ingestion</button>
+            <div class="be-tabs" style="display:flex;gap:2px;margin-bottom:15px;border-bottom:2px solid var(--accent-color,#00a4dc);flex-wrap:wrap;">
+                <button is="emby-button" type="button" class="be-tab active" data-tab="main" style="border-radius:3px 3px 0 0;margin:0 2px -2px 0;padding:0.45em 0.9em;border:0;border-bottom:2px solid var(--accent-color,#00a4dc);background:transparent;color:var(--accent-color,#00a4dc);cursor:pointer;font-size:0.95em;">Main</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="metadata" style="border-radius:3px 3px 0 0;margin:0 2px -2px 0;padding:0.45em 0.9em;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.95em;">Metadata</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="grouping" style="border-radius:3px 3px 0 0;margin:0 2px -2px 0;padding:0.45em 0.9em;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.95em;">Grouping</button>
+                <button is="emby-button" type="button" class="be-tab" data-tab="ingestion" style="border-radius:3px 3px 0 0;margin:0 2px -2px 0;padding:0.45em 0.9em;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:0.95em;">Ingestion</button>
             </div>
 
             <form id="pluginConfigForm" style="max-width:800px;">
@@ -84,9 +75,9 @@
                         <p style="color:var(--text-secondary,#888);">Loading libraries...</p>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
-                    <h3>General Settings</h3>
+                    <h3 style="font-size:1.1em;margin:12px 0 6px;">General Settings</h3>
 
                     <div class="inputContainer">
                         <input is="emby-input" id="txtMatchThreshold" type="number"
@@ -97,17 +88,17 @@
                         </div>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
-                    <h3>Plugin Info</h3>
+                    <h3 style="font-size:1.1em;margin:12px 0 6px;">Plugin Info</h3>
                     <div id="bePluginInfo" style="color:var(--text-secondary,#888);font-size:14px;">
                         <p>Loading...</p>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
                     <button is="emby-button" id="btnResetConfig" type="button" class="raised"
-                            style="background:#c33;color:#fff;">
+                            style="background:#c33;color:#fff;font-size:0.85em;padding:6px 14px;">
                         Reset All Settings to Defaults
                     </button>
                     <div class="fieldDescription" style="margin-top:4px;">
@@ -130,9 +121,9 @@
                         </label>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
-                    <h4 style="margin-bottom:4px;">Hardcover</h4>
+                    <h4 style="font-size:1em;margin:10px 0 3px;">Hardcover</h4>
                     <p class="fieldDescription">
                         Primary source — best quality metadata including authors, narrators,
                         translators, illustrators, series, genre tags, ratings, ASIN, and more.
@@ -159,8 +150,8 @@
                         </div>
                     </div>
 
-                    <details style="margin:12px 0;padding:12px;background:#f0f0f0;border-radius:6px;border:1px solid #ddd;">
-                        <summary style="cursor:pointer;font-weight:600;color:#00a4dc;">
+                    <details style="margin:12px 0;padding:12px;background:var(--card-background);border-radius:6px;border:1px solid var(--border-color);">
+                        <summary style="cursor:pointer;font-weight:600;color:var(--accent-color,#00a4dc);">
                             How to get a Hardcover API Key
                         </summary>
                         <ol style="margin-top:10px;padding-left:20px;line-height:1.8;">
@@ -173,13 +164,13 @@
                         </ol>
                     </details>
 
-                    <div class="fieldDescription" style="margin-top:8px;padding:8px;background:#fff3cd;border-radius:4px;border:1px solid #ffc107;color:#333;">
+                    <div class="fieldDescription" style="margin-top:8px;padding:8px;background:var(--card-background);border-radius:4px;border:1px solid var(--border-color);color:var(--text-color);">
                         A Hardcover API key is <strong>strongly recommended</strong> — it provides the best quality metadata (authors, narrators, series, genres). The plugin works without it by falling back to Google Books and OpenLibrary.
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
-                    <h4 style="margin-bottom:4px;">Google Books</h4>
+                    <h4 style="font-size:1em;margin:10px 0 3px;">Google Books</h4>
                     <p class="fieldDescription">
                         Fallback source — good metadata coverage.
                     </p>
@@ -208,9 +199,9 @@
                         </div>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
-                    <h4 style="margin-bottom:4px;">OpenLibrary</h4>
+                    <h4 style="font-size:1em;margin:10px 0 3px;">OpenLibrary</h4>
                     <p class="fieldDescription">
                         Final fallback — free, no API key required. Covers many public domain and
                         older titles not found in other sources.
@@ -225,7 +216,7 @@
                 </div>
 
                 <div class="tab-content" id="tab-grouping" style="display:none;">
-                    <h3>Format Grouping</h3>
+                    <h3 style="font-size:1.1em;margin:0 0 6px;">Format Grouping</h3>
                     <p class="fieldDescription">
                         Group multiple formats (EPUB, PDF, audiobook, comic) of the same book
                         under a single library entry. Library counts reflect unique titles, not files.
@@ -239,7 +230,7 @@
                         </label>
                     </div>
 
-                    <div class="inputContainer" style="margin-top:16px;">
+                    <div class="inputContainer" style="margin-top:8px;">
                         <select is="emby-select" id="selGroupingStrategy" label="Grouping Strategy">
                             <option value="IsbnOnly">ISBN only (exact match, recommended)</option>
                             <option value="TitleAuthor">Title + Author (fuzzy match)</option>
@@ -252,17 +243,18 @@
 
                     <hr style="margin:20px 0;" />
 
-                    <h4 style="margin-bottom:4px;">Format Priority</h4>
+                    <h4 style="font-size:1em;margin:8px 0 3px;">Format Priority</h4>
                     <p class="fieldDescription">
                         Drag to reorder, or use the arrow buttons. Higher-priority formats (top) become the primary library entry.
                         Changes take effect on the next grouping run.
                     </p>
-                    <div id="beFormatPriorityList" style="margin-top:8px;"></div>
+                    <div id="beFormatPriorityList" style="margin-top:6px;"></div>
                     <button is="emby-button" id="btnResetFormatPriority" type="button" class="raised"
-                            style="margin-top:8px;">Reset to Defaults</button>
+                            style="margin-top:6px;font-size:0.85em;">Reset to Defaults</button>
 
-                    <div style="margin-top:20px;">
-                        <button is="emby-button" id="btnProcessGroups" type="button" class="raised">
+                    <div style="margin-top:12px;">
+                        <button is="emby-button" id="btnProcessGroups" type="button" class="raised"
+                                style="font-size:0.85em;">
                             Process Groups Now
                         </button>
                         <div class="fieldDescription" style="margin-top:4px;">
@@ -272,7 +264,7 @@
                 </div>
 
                 <div class="tab-content" id="tab-ingestion" style="display:none;">
-                    <h3>Managed Directories</h3>
+                    <h3 style="font-size:1.1em;margin:0 0 6px;">Managed Directories</h3>
                     <p class="fieldDescription">
                         Configure external folders to scan for book files. Files are moved into
                         your Jellyfin library organized as <code>Author / Book Title / file</code>.
@@ -290,15 +282,15 @@
 
                     <hr style="margin:20px 0;" />
 
-                    <h4 style="margin-bottom:4px;">File Type Filters</h4>
+                    <h4 style="font-size:1em;margin:10px 0 3px;">File Type Filters</h4>
                     <p class="fieldDescription">
                         Select which file types to include when scanning source directories.
                     </p>
                     <div class="be-ext-group" id="beFileExtList"></div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
-                    <h4 style="margin-bottom:4px;">Ingestion Mode</h4>
+                    <h4 style="font-size:1em;margin:10px 0 3px;">Ingestion Mode</h4>
                     <p class="fieldDescription">
                         Choose whether files are moved (removed from source) or copied (left in place).
                     </p>
@@ -313,7 +305,7 @@
                         </label>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+                    <hr style="margin:15px 0;" />
 
                     <div class="inputContainer">
                         <input is="emby-input" id="txtAutoScanInterval" type="number"
@@ -323,8 +315,9 @@
                         </div>
                     </div>
 
-                    <div style="margin-top:20px;">
-                        <button is="emby-button" id="btnScanAll" type="button" class="raised button-submit">
+                    <div style="margin-top:12px;">
+                        <button is="emby-button" id="btnScanAll" type="button" class="raised button-submit"
+                                style="font-size:0.85em;">
                             Scan All Now
                         </button>
                         <div class="fieldDescription" style="margin-top:4px;">
@@ -335,8 +328,8 @@
 
 
 
-                <div style="margin-top:24px;">
-                    <button is="emby-button" type="submit" class="raised button-submit block">
+                <div style="margin-top:18px;">
+                    <button is="emby-button" type="submit" class="raised button-submit block" style="font-size:0.9em;padding:8px 16px;">
                         Save
                     </button>
                 </div>
@@ -360,9 +353,15 @@
 
                 document.querySelectorAll(".be-tab").forEach(function (btn) {
                     btn.classList.remove("active");
+                    btn.style.color = "var(--text-secondary)";
+                    btn.style.borderBottomColor = "transparent";
                 });
                 var activeBtn = document.querySelector('.be-tab[data-tab="' + tab + '"]');
-                if (activeBtn) activeBtn.classList.add("active");
+                if (activeBtn) {
+                    activeBtn.classList.add("active");
+                    activeBtn.style.color = "var(--accent-color,#00a4dc)";
+                    activeBtn.style.borderBottomColor = "var(--accent-color,#00a4dc)";
+                }
             }
 
             document.querySelectorAll(".be-tab").forEach(function (btn) {
@@ -427,7 +426,10 @@
             function showTestResult(containerId, success, message) {
                 var el = document.getElementById(containerId);
                 el.style.display = "block";
-                el.className = "be-test-result " + (success ? "success" : "fail");
+                el.className = "be-test-result";
+                el.style.color = "var(--text-color)";
+                el.style.background = success ? "var(--green-background,rgba(0,200,83,0.15))" : "var(--red-background,rgba(244,67,54,0.15))";
+                el.style.border = "1px solid " + (success ? "var(--green,#4caf50)" : "var(--red,#f44336)");
                 el.textContent = message;
             }
 
@@ -490,7 +492,7 @@
                 container.innerHTML = "";
 
                 if (!entries || entries.length === 0) {
-                    container.innerHTML = '<p style="color:#888;font-style:italic;">No format entries configured.</p>';
+                    container.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">No format entries configured.</p>';
                     return;
                 }
 
@@ -498,18 +500,19 @@
                     var row = document.createElement("div");
                     row.className = "be-priority-row";
                     row.setAttribute("data-idx", idx);
+                    row.setAttribute("style", "display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;margin-bottom:3px;background:var(--card-background);");
 
                     var isFirst = idx === 0;
                     var isLast = idx === entries.length - 1;
 
                     row.innerHTML =
-                        '<span class="be-drag-handle">&#x2630;</span>' +
-                        '<span class="be-priority-badge">' + (idx + 1) + '</span>' +
-                        '<span style="flex:1;font-weight:500;">' + escapeHtml(entry.FormatName) + '</span>' +
-                        '<span style="color:var(--text-secondary,#888);font-size:12px;">priority ' + entry.Priority + '</span>' +
-                        '<span style="display:flex;gap:4px;">' +
-                            '<button is="emby-button" type="button" class="raised be-priority-up" data-idx="' + idx + '"' + (isFirst ? ' disabled style="opacity:0.3;"' : '') + '>&#x25B2;</button>' +
-                            '<button is="emby-button" type="button" class="raised be-priority-down" data-idx="' + idx + '"' + (isLast ? ' disabled style="opacity:0.3;"' : '') + '>&#x25BC;</button>' +
+                        '<span class="be-drag-handle" style="cursor:grab;color:var(--text-secondary);font-size:15px;user-select:none;">&#x2630;</span>' +
+                        '<span class="be-priority-badge" style="display:inline-block;min-width:22px;text-align:center;background:var(--accent-color,#00a4dc);color:#fff;border-radius:8px;font-size:11px;padding:1px 5px;font-weight:600;">' + (idx + 1) + '</span>' +
+                        '<span style="flex:1;font-weight:500;color:var(--text-color);">' + escapeHtml(entry.FormatName) + '</span>' +
+                        '<span style="color:var(--text-secondary);font-size:11px;">priority ' + entry.Priority + '</span>' +
+                        '<span style="display:flex;gap:2px;">' +
+                            '<button is="emby-button" type="button" class="raised be-priority-up" data-idx="' + idx + '" style="font-size:11px;padding:2px 6px;' + (isFirst ? 'opacity:0.3;' : '') + '"' + (isFirst ? ' disabled' : '') + '>&#x25B2;</button>' +
+                            '<button is="emby-button" type="button" class="raised be-priority-down" data-idx="' + idx + '" style="font-size:11px;padding:2px 6px;' + (isLast ? 'opacity:0.3;' : '') + '"' + (isLast ? ' disabled' : '') + '>&#x25BC;</button>' +
                         '</span>';
 
                     container.appendChild(row);
@@ -573,9 +576,13 @@
                 allExts.forEach(function (ext) {
                     var label = document.createElement("label");
                     var isChecked = !selectedExts || set[ext.toLowerCase()];
+                    label.style.cssText = "display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border:1px solid var(--border-color);border-radius:3px;cursor:pointer;font-size:12px;background:var(--card-background);" + (isChecked ? "" : "opacity:0.55;");
                     label.innerHTML =
                         '<input type="checkbox" class="be-ext-checkbox" value="' + escapeHtml(ext) + '"' + (isChecked ? ' checked' : '') + ' />' +
-                        '<span>' + escapeHtml(ext) + '</span>';
+                        '<span style="color:var(--text-color);">' + escapeHtml(ext) + '</span>';
+                    label.querySelector("input").addEventListener("change", function () {
+                        label.style.opacity = this.checked ? "1" : "0.55";
+                    });
                     container.appendChild(label);
                 });
             }
@@ -638,7 +645,7 @@
                 container.innerHTML = "";
 
                 if (!dirs || dirs.length === 0) {
-                    container.innerHTML = '<p style="color:#888;font-style:italic;">No directories configured. Click "Add Directory" to add one.</p>';
+                    container.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;">No directories configured. Click "Add Directory" to add one.</p>';
                     return;
                 }
 
@@ -653,7 +660,7 @@
 
                 dirs.forEach(function (dir, idx) {
                     var row = document.createElement("div");
-                    row.style.cssText = "border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:8px;background:#f9f9f9;";
+                    row.style.cssText = "border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:8px;background:var(--card-background);";
 
                     var libOpts = '<option value="">-- Select Library --</option>';
                     availableLibs.forEach(function (lib) {

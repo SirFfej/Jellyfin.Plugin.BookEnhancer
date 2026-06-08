@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.9.1 - Full style audit: all elements use Jellyfin CSS variables for dark/light theme compatibility; inline style fallbacks for custom classes stripped by sanitizer; compact form layout; tab active state set via JS inline; test results use theme-aware colors; hardcoded colors replaced with var(--card-background), var(--border-color), etc.",
+        "checksum": "794df38dc5a89ac5737e5a38f507f14f",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.1/Jellyfin.Plugin.BookEnhancer_0.1.9.1.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.9.1"
+      },
+      {
         "changelog": "v0.1.7.0 - Managed directories connect to distinct libraries via Target Library dropdown; auto-fills LibraryPath from library location; Libraries API returns Locations; all fetch catch handlers log to console.error.",
         "checksum": "6e4c5a71201a838df4122ab52270bf03",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.7.0/Jellyfin.Plugin.BookEnhancer_0.1.7.0.zip",

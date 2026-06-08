@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Reflection;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -83,17 +84,24 @@ public class ConfigController : ControllerBase
 
 public class TestKeyRequest
 {
+    [JsonPropertyName("apiKey")]
     public string? ApiKey { get; set; }
 }
 
 public class TestResult
 {
+    [JsonPropertyName("success")]
     public bool Success { get; set; }
+
+    [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
 }
 
 public class PluginInfoResult
 {
+    [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
+
+    [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
 }
