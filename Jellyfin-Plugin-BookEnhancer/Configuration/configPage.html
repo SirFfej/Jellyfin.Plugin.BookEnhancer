@@ -796,7 +796,7 @@
             document.getElementById("btnResetConfig").addEventListener("click", function () {
                 if (!confirm("Reset all plugin settings to defaults? This cannot be undone.")) return;
 
-                Dashboard.getPluginConfiguration(pluginId).then(function (config) {
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     config.UnifiedMetadataEnabled = true;
                     config.HardcoverEnabled = true;
                     config.HardcoverApiKey = "";
@@ -813,14 +813,14 @@
                     config.AutoScanIntervalMinutes = 0;
                     config.IncludedLibraryIds = [];
 
-                    Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
+                    ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                         window.location.reload();
                     });
                 });
             });
 
             function loadConfig() {
-                Dashboard.getPluginConfiguration(pluginId).then(function (config) {
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     document.getElementById("chkUnifiedMetadata").checked = config.UnifiedMetadataEnabled || false;
                     document.getElementById("chkHardcoverEnabled").checked = config.HardcoverEnabled || false;
                     document.getElementById("txtHardcoverApiKey").value = config.HardcoverApiKey || "";
@@ -866,7 +866,7 @@
             document.getElementById("pluginConfigForm").addEventListener("submit", function (e) {
                 e.preventDefault();
 
-                Dashboard.getPluginConfiguration(pluginId).then(function (config) {
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;
                     config.HardcoverEnabled = document.getElementById("chkHardcoverEnabled").checked;
                     config.HardcoverApiKey = document.getElementById("txtHardcoverApiKey").value;
@@ -889,8 +889,8 @@
                     config.ManagedDirectories = getCurrentDirectories();
                     config.IncludedLibraryIds = getSelectedLibraryIds();
 
-                    Dashboard.updatePluginConfiguration(pluginId, config).then(function () {
-                        Dashboard.processPluginConfigurationUpdateResult();
+                    ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                        Dashboard.processPluginConfigurationUpdateResult(result);
                     }).catch(function (err) {
                         console.error("[BookEnhancers] Failed to save configuration:", err);
                         Dashboard.alert({ title: "Error", message: "Failed to save configuration." });
@@ -899,8 +899,6 @@
                     console.error("[BookEnhancers] Failed to read configuration for save:", err);
                 });
             });
-
-            loadConfig();
 
             if (!window._beListenersBound) {
                 window._beListenersBound = true;
