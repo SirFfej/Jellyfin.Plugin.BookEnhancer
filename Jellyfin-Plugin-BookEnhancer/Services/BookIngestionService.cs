@@ -122,7 +122,10 @@ public class BookIngestionService
                     metadata = enriched;
                 }
 
-                var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata);
+                var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
+                    ? "{Author}/{Series}/{Title}"
+                    : dir.OrganizeTemplate;
+                var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
                 var moveResult = _organization.MoveFile(file, targetPath, Config?.CopyMode == true);
 
                 if (moveResult.Success)

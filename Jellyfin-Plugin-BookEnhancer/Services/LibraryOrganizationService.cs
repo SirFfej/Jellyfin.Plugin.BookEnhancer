@@ -17,13 +17,34 @@ public class LibraryOrganizationService
         _logger = logger;
     }
 
-    public string BuildTargetPath(string libraryRoot, FileMetadata metadata)
+    public string BuildTargetPath(string libraryRoot, FileMetadata metadata, string template)
     {
-        var author = GetAuthorDirectoryName(metadata);
-        var title = GetTitleDirectoryName(metadata);
-        var fileName = GetFileName(metadata);
+        var path = ResolveTemplate(template, metadata);
+        return Path.Combine(libraryRoot, path);
+    }
 
-        return Path.Combine(libraryRoot, author, title, fileName);
+    public string ResolveTemplate(string template, FileMetadata metadata)
+    {
+        var components = template.Split('/', '\\')
+            .Select(part => SanitizePathComponent(ResolveToken(part.Trim(), metadata)))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
+
+        var fileName = GetFileName(metadata);
+        components.Add(fileName);
+        return Path.Combine(components.ToArray());
+    }
+
+    private static string ResolveToken(string part, FileMetadata metadata)
+    {
+        if (string.IsNullOrWhiteSpace(part))
+            return string.Empty;
+
+        return part
+            .Replace("{Author}", GetAuthorDirectoryName(metadata))
+            .Replace("{Series}", GetSeriesDirectoryName(metadata))
+            .Replace("{Title}", GetTitleDirectoryName(metadata))
+            .Replace("{Publisher}", GetPublisherDirectoryName(metadata));
     }
 
     public string BuildAlternateFormatPath(string primaryFilePath, FileMetadata metadata)
@@ -89,6 +110,18 @@ public class LibraryOrganizationService
         return "Unknown Author";
     }
 
+    private static string GetSeriesDirectoryName(FileMetadata metadata)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.SeriesName))
+        {
+            var series = SanitizePathComponent(metadata.SeriesName);
+            if (!string.IsNullOrWhiteSpace(series))
+                return series;
+        }
+
+        return "Standalone";
+    }
+
     private static string GetTitleDirectoryName(FileMetadata metadata)
     {
         var title = !string.IsNullOrWhiteSpace(metadata.Title)
@@ -99,6 +132,18 @@ public class LibraryOrganizationService
             title = Path.GetFileNameWithoutExtension(metadata.FilePath);
 
         return SanitizePathComponent(title) ?? "Untitled";
+    }
+
+    private static string GetPublisherDirectoryName(FileMetadata metadata)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.Publisher))
+        {
+            var publisher = SanitizePathComponent(metadata.Publisher);
+            if (!string.IsNullOrWhiteSpace(publisher))
+                return publisher;
+        }
+
+        return "Unknown Publisher";
     }
 
     private static string GetFileName(FileMetadata metadata)

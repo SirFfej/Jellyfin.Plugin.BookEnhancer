@@ -688,6 +688,10 @@
                         '<div class="inputContainer">' +
                             '<label class="inputLabel inputLabelUnfocused">Library Path (auto-filled from library)</label>' +
                             '<input is="emby-input" class="dir-library" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.LibraryPath || '') + '" />' +
+                        '</div>' +
+                        '<div class="inputContainer">' +
+                            '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {Publisher}</span></label>' +
+                            '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>';
 
                     container.appendChild(row);
@@ -706,19 +710,29 @@
                     input.addEventListener("change", function () { /* live update handled on save */ });
                 });
 
-                container.querySelectorAll(".dir-library-select").forEach(function (sel) {
-                    sel.addEventListener("change", function () {
-                        var idx = parseInt(this.getAttribute("data-idx"));
-                        var libId = this.value;
-                        var pathInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
-                        if (pathInput && libId && _beLibraries) {
-                            var lib = _beLibraries.filter(function (l) { return l.id === libId; });
-                            if (lib.length > 0 && lib[0].locations && lib[0].locations.length > 0) {
-                                pathInput.value = lib[0].locations[0];
-                            }
+            function defaultTemplateForCollectionType(collectionType) {
+                if (collectionType === "books") return "{Author}/{Series}/{Title}";
+                if (collectionType === "music") return "{Author}/{Series}/{Title}";
+                return "{Author}/{Series}/{Title}";
+            }
+
+            container.querySelectorAll(".dir-library-select").forEach(function (sel) {
+                sel.addEventListener("change", function () {
+                    var idx = parseInt(this.getAttribute("data-idx"));
+                    var libId = this.value;
+                    var pathInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
+                    var tmplInput = container.querySelector('.dir-template[data-idx="' + idx + '"]');
+                    if (pathInput && libId && _beLibraries) {
+                        var lib = _beLibraries.filter(function (l) { return l.id === libId; });
+                        if (lib.length > 0 && lib[0].locations && lib[0].locations.length > 0) {
+                            pathInput.value = lib[0].locations[0];
                         }
-                    });
+                        if (tmplInput && !tmplInput.value) {
+                            tmplInput.value = defaultTemplateForCollectionType(lib.length > 0 ? lib[0].collectionType : "");
+                        }
+                    }
                 });
+            });
             }
 
             function getCurrentDirectories() {
@@ -730,12 +744,14 @@
                     var libSelect = container.querySelector('.dir-library-select[data-idx="' + idx + '"]');
                     var libInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
                     var enabledInput = container.querySelector('.dir-enabled[data-idx="' + idx + '"]');
+                    var tmplInput = container.querySelector('.dir-template[data-idx="' + idx + '"]');
 
                     dirs.push({
                         SourcePath: sourceInput ? sourceInput.value : "",
                         LibraryPath: libInput ? libInput.value : "",
                         Enabled: enabledInput ? enabledInput.checked : true,
-                        LibraryId: libSelect ? libSelect.value : ""
+                        LibraryId: libSelect ? libSelect.value : "",
+                        OrganizeTemplate: tmplInput ? tmplInput.value : ""
                     });
                 });
 
