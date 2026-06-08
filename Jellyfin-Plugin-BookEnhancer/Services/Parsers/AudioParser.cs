@@ -45,7 +45,7 @@ public class AudioParser : IFileParser
                 if (file.Tag.Year != 0)
                 {
                     meta.PublishYear = (int)file.Tag.Year;
-                    try { meta.PublishDate = new DateTime((int)file.Tag.Year, 1, 1); } catch { }
+                    try { meta.PublishDate = new DateTime((int)file.Tag.Year, 1, 1); } catch { meta.PublishDate = null; }
                 }
 
                 if (file.Tag.Track != 0)

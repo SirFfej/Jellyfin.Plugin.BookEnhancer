@@ -213,6 +213,21 @@ public class BookGroupingService
         cmd.ExecuteNonQuery();
     }
 
+    public void UpdateFormatPath(string oldPath, string newPath)
+    {
+        using var conn = CreateConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE book_formats SET FilePath = @NewPath WHERE FilePath = @OldPath";
+        cmd.Parameters.AddWithValue("@OldPath", oldPath);
+        cmd.Parameters.AddWithValue("@NewPath", newPath);
+        var count = cmd.ExecuteNonQuery();
+
+        if (count > 0)
+            _logger.LogDebug("Updated format path in DB: {Old} -> {New}", oldPath, newPath);
+    }
+
     public void SetPrimaryFormat(string groupId, string formatId)
     {
         using var conn = CreateConnection();

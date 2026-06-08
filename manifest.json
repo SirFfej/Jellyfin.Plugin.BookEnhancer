@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.9.4 - Added Library Cleanup scheduled task (reorganizes files to match per-source organize template, removes empty directories); FilePath database updates after moves; empty catch blocks now log warnings; removed unused BooksFileLoggerProvider.",
+        "checksum": "95eedba00cbe6375b65052ac38a9d2c6",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.4/Jellyfin.Plugin.BookEnhancer_0.1.9.4.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.9.4"
+      },
+      {
         "changelog": "v0.1.9.3 - Added per-source organize template (configurable folder structure via {Author}/{Series}/{Title}/{Publisher} tokens); books/audiobooks default to {Author}/{Series}/{Title}, comics default to {Publisher}/{Series}; template field in Managed Directories UI with auto-fill on library selection.",
         "checksum": "d1342171312c51182fb201a8ea495188",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.3/Jellyfin.Plugin.BookEnhancer_0.1.9.3.zip",

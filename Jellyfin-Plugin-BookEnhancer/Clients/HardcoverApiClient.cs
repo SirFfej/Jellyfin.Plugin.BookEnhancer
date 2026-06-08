@@ -146,7 +146,7 @@ query($bookId: Int!) {
         return meta;
     }
 
-    private static void MapBook(BookResult book, FileMetadata meta)
+    private void MapBook(BookResult book, FileMetadata meta)
     {
         meta.Title ??= book.Title;
         meta.Subtitle ??= book.Subtitle;
@@ -183,7 +183,10 @@ query($bookId: Int!) {
                         meta.Tags.Add(tag);
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse Hardcover cached_tags for book {BookId}", book.Id);
+            }
         }
 
         if (book.Contributions != null)

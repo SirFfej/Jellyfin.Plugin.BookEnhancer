@@ -1,6 +1,5 @@
 using Jellyfin.Plugin.BookEnhancer.Clients;
 using Jellyfin.Plugin.BookEnhancer.Controllers;
-using Jellyfin.Plugin.BookEnhancer.Logging;
 using Jellyfin.Plugin.BookEnhancer.Services;
 using Jellyfin.Plugin.BookEnhancer.Services.Tasks;
 using MediaBrowser.Common.Configuration;
@@ -16,12 +15,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        serviceCollection.AddSingleton<ILoggerProvider>(sp =>
-        {
-            var paths = sp.GetRequiredService<IApplicationPaths>();
-            return new BooksFileLoggerProvider(paths.LogDirectoryPath);
-        });
-
         serviceCollection.AddMemoryCache();
         serviceCollection.AddHttpClient();
 
@@ -44,10 +37,12 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<GroupingPostProcessingService>();
         serviceCollection.AddSingleton<LibraryOrganizationService>();
         serviceCollection.AddTransient<BookIngestionService>();
+        serviceCollection.AddTransient<LibraryCleanupService>();
         // Controllers are auto-discovered by Jellyfin via GetApiPluginAssemblies()
 
         serviceCollection.AddSingleton<IScheduledTask, IngestionScanTask>();
         serviceCollection.AddSingleton<IScheduledTask, GroupingProcessTask>();
         serviceCollection.AddSingleton<IScheduledTask, FullMaintenanceTask>();
+        serviceCollection.AddSingleton<IScheduledTask, LibraryCleanupTask>();
     }
 }
