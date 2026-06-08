@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.9.8 - Full Grouping Preview endpoint review: fixed IsPartial never triggering for 500-file cap, ISBN normalization (strips non-digits for cross-format matching), added missing .mobi to default extensions, candidate limit (5 groups, 500 files max).",
+        "checksum": "96e9d9cf17d2a9a8b2927f207ee91cf6",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.8/Jellyfin.Plugin.BookEnhancer_0.1.9.8.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-08T00:00:00Z",
+        "version": "0.1.9.8"
+      },
+      {
         "changelog": "v0.1.9.7 - Grouping Preview directory enumeration wrapped in try/catch for better error resilience; error now logged at Error level with directory path.",
         "checksum": "e55ad148a4816c36e817c93cabe394db",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.7/Jellyfin.Plugin.BookEnhancer_0.1.9.7.zip",
