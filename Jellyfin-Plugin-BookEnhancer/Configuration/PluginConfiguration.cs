@@ -15,33 +15,16 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool EnableFormatGrouping { get; set; } = true;
     public string GroupingStrategy { get; set; } = "IsbnOnly";
 
-    public List<FormatPriorityEntry> FormatPriority { get; set; } = DefaultFormatPriority();
+    public List<FormatPriorityEntry> FormatPriority { get; set; } = new();
 
     public bool CopyMode { get; set; } = false;
 
-    public List<string> IngestionFileExtensions { get; set; } = new()
-    {
-        ".epub", ".pdf",
-        ".cbz", ".cbr", ".cb7",
-        ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
-    };
+    public List<string> IngestionFileExtensions { get; set; } = new();
 
     public List<ManagedSourceDirectory> ManagedDirectories { get; set; } = new();
     public int AutoScanIntervalMinutes { get; set; } = 0;
 
     public List<string> IncludedLibraryIds { get; set; } = new();
-
-    private static List<FormatPriorityEntry> DefaultFormatPriority()
-    {
-        return new List<FormatPriorityEntry>
-        {
-            new() { FormatName = "EPUB", Priority = 0 },
-            new() { FormatName = "MOBI", Priority = 1 },
-            new() { FormatName = "PDF", Priority = 2 },
-            new() { FormatName = "Comic", Priority = 3 },
-            new() { FormatName = "Audio", Priority = 4 },
-        };
-    }
 }
 
 public class FormatPriorityEntry

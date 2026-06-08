@@ -65,6 +65,8 @@ public class GroupingPostProcessingService
             return;
         }
 
+        _groupingService.UpdateFormatJellyfinId(primary.Id, primaryItem.Id.ToString("N"));
+
         var primaryDir = Path.GetDirectoryName(primary.FilePath);
         var formatsDir = primaryDir != null
             ? Path.Combine(primaryDir, ".formats")
@@ -118,6 +120,56 @@ public class GroupingPostProcessingService
             primaryItem.Id);
     }
 
+    public async Task<RepairResult> RepairFormatPathsAsync(CancellationToken ct = default)
+    {
+        var formats = _groupingService.GetAllFormats();
+        var result = new RepairResult
+        {
+            TotalFormats = formats.Count
+        };
+
+        _logger.LogInformation("Starting format path repair across {Count} formats", formats.Count);
+
+        foreach (var format in formats)
+        {
+            if (ct.IsCancellationRequested)
+                break;
+
+            var item = FindItemByPath(format.FilePath);
+            if (item != null)
+            {
+                var itemIdStr = item.Id.ToString("N");
+                if (format.JellyfinItemId != itemIdStr)
+                {
+                    _groupingService.UpdateFormatJellyfinId(format.Id, itemIdStr);
+                    result.Fixed++;
+                }
+                else
+                {
+                    result.Skipped++;
+                }
+            }
+            else
+            {
+                result.NotFound++;
+                result.StalePaths.Add(format.FilePath);
+                _logger.LogWarning(
+                    "Format {FormatId} points to path not found in Jellyfin library: {Path}",
+                    format.Id,
+                    format.FilePath);
+            }
+        }
+
+        _logger.LogInformation(
+            "Repair complete — Total: {Total}, Fixed: {Fixed}, Skipped (OK): {Skipped}, Not Found: {NotFound}",
+            result.TotalFormats,
+            result.Fixed,
+            result.Skipped,
+            result.NotFound);
+
+        return result;
+    }
+
     private BaseItem? FindItemByPath(string path)
     {
         try
@@ -130,4 +182,13 @@ public class GroupingPostProcessingService
             return null;
         }
     }
+}
+
+public class RepairResult
+{
+    public int TotalFormats { get; set; }
+    public int Fixed { get; set; }
+    public int Skipped { get; set; }
+    public int NotFound { get; set; }
+    public List<string> StalePaths { get; set; } = new();
 }

@@ -249,6 +249,9 @@
                         Changes take effect on the next grouping run.
                     </p>
                     <div id="beFormatPriorityList" style="margin-top:6px;"></div>
+                    <div id="bePriorityWarning" style="display:none;padding:8px 12px;margin-top:6px;border:1px solid var(--warning-color,#e8a838);border-radius:4px;background:color-mix(in srgb, var(--warning-color,#e8a838) 12%, transparent);color:var(--text-color);font-size:12px;">
+                        Duplicate format entries detected. Use <strong>Reset to Defaults</strong> to fix, or remove duplicates manually.
+                    </div>
                     <button is="emby-button" id="btnResetFormatPriority" type="button" class="raised"
                             style="margin-top:6px;font-size:0.85em;">Reset to Defaults</button>
 
@@ -259,6 +262,16 @@
                         </button>
                         <div class="fieldDescription" style="margin-top:4px;">
                             Merge existing duplicate entries into grouped entries. Run this after a library scan.
+                        </div>
+                    </div>
+
+                    <div style="margin-top:12px;">
+                        <button is="emby-button" id="btnRepairFormatPaths" type="button" class="raised"
+                                style="font-size:0.85em;">
+                            Repair Format Paths
+                        </button>
+                        <div class="fieldDescription" style="margin-top:4px;">
+                            Cross-reference book_formats against Jellyfin library items and populate missing item IDs. Reports any stale file paths.
                         </div>
                     </div>
                 </div>
@@ -545,6 +558,22 @@
                         }
                     });
                 });
+
+                validateFormatPriority();
+            }
+
+            function validateFormatPriority() {
+                var entries = getCurrentFormatPriority();
+                var names = {};
+                var hasDupes = false;
+                entries.forEach(function (e) {
+                    if (names[e.FormatName]) hasDupes = true;
+                    names[e.FormatName] = true;
+                });
+                var warning = document.getElementById("bePriorityWarning");
+                if (warning) {
+                    warning.style.display = hasDupes ? "block" : "none";
+                }
             }
 
             function getCurrentFormatPriority() {
@@ -790,6 +819,39 @@
                     });
             });
 
+            document.getElementById("btnRepairFormatPaths").addEventListener("click", function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Repairing...";
+
+                authFetch("Books/Grouping/Repair", { method: "POST" })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        var msg = "Total formats: " + result.totalFormats +
+                            "\nFixed (updated JellyfinItemId): " + result.fixed +
+                            "\nAlready correct: " + result.skipped +
+                            "\nNot found in library: " + result.notFound;
+                        if (result.stalePaths && result.stalePaths.length > 0) {
+                            msg += "\n\nStale paths (not found in Jellyfin):\n" + result.stalePaths.join("\n");
+                        }
+                        Dashboard.alert({
+                            title: "Repair Complete",
+                            message: msg
+                        });
+                    })
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Path repair failed:", err);
+                        Dashboard.alert({
+                            title: "Error",
+                            message: "Repair failed. Check server logs."
+                        });
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Repair Format Paths";
+                    });
+            });
+
             document.getElementById("btnScanAll").addEventListener("click", function () {
                 var btn = this;
                 btn.disabled = true;
@@ -855,7 +917,14 @@
                     document.getElementById("chkEnableFormatGrouping").checked = config.EnableFormatGrouping !== false;
                     document.getElementById("selGroupingStrategy").value = config.GroupingStrategy || "IsbnOnly";
 
-                    renderFormatPriority(config.FormatPriority || DefaultFormatPriority);
+                    var fp = (config.FormatPriority || DefaultFormatPriority);
+                    var seen = {};
+                    fp = fp.filter(function (e) {
+                        if (seen[e.FormatName]) return false;
+                        seen[e.FormatName] = true;
+                        return true;
+                    });
+                    renderFormatPriority(fp);
 
                     document.getElementById("txtAutoScanInterval").value = config.AutoScanIntervalMinutes || 0;
 
@@ -888,6 +957,21 @@
 
             document.getElementById("pluginConfigForm").addEventListener("submit", function (e) {
                 e.preventDefault();
+
+                var priorityEntries = getCurrentFormatPriority();
+                var seen = {};
+                var hasDupes = false;
+                priorityEntries.forEach(function (e) {
+                    if (seen[e.FormatName]) hasDupes = true;
+                    seen[e.FormatName] = true;
+                });
+                if (hasDupes) {
+                    Dashboard.alert({
+                        title: "Duplicate Format Priority Entries",
+                        message: "The format priority list contains duplicate entries. Click 'Reset to Defaults' to fix, then save again."
+                    });
+                    return;
+                }
 
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;

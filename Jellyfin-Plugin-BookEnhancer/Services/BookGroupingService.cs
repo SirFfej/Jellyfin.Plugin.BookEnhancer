@@ -303,6 +303,29 @@ public class BookGroupingService
         return formats;
     }
 
+    public List<BookFormat> GetAllFormats()
+    {
+        var formats = new List<BookFormat>();
+
+        using var conn = CreateConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt
+            FROM book_formats
+            ORDER BY AddedAt ASC
+            """;
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            formats.Add(ReadFormat(reader));
+        }
+
+        return formats;
+    }
+
     public List<BookGroup> GetAllGroupsWithMultipleFormats()
     {
         var groups = new List<BookGroup>();
