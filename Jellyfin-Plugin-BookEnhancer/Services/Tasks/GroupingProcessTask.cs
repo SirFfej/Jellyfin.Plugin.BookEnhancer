@@ -34,10 +34,16 @@ public class GroupingProcessTask : IScheduledTask
         var logDir = Path.Combine(_appPaths.DataPath, "plugins", "BookEnhancer", "logs");
         using var logger = new TaskLogger(logDir, "GroupingProcess");
 
+        Func<string, Task> logCallback = msg =>
+        {
+            logger.LogInformation(msg);
+            return Task.CompletedTask;
+        };
+
         try
         {
             logger.LogInformation("Starting grouping post-processing...");
-            await _groupingService.ProcessAllGroupsAsync(cancellationToken).ConfigureAwait(false);
+            await _groupingService.ProcessAllGroupsAsync(logCallback, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Grouping process complete");
             ((IProgress<double>)logger).Report(1.0);
         }

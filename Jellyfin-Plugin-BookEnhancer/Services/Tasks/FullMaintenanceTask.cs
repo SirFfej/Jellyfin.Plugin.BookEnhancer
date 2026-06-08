@@ -48,12 +48,18 @@ public class FullMaintenanceTask : IScheduledTask
         var logDir = Path.Combine(_appPaths.DataPath, "plugins", "BookEnhancer", "logs");
         using var logger = new TaskLogger(logDir, "FullMaintenance");
 
+        Func<string, Task> logCallback = msg =>
+        {
+            logger.LogInformation(msg);
+            return Task.CompletedTask;
+        };
+
         try
         {
             logger.LogInformation("Starting full maintenance — ingestion scan...");
             ((IProgress<double>)logger).Report(0.0);
 
-            var ingestionResult = await _ingestionService.ScanAllAsync(cancellationToken).ConfigureAwait(false);
+            var ingestionResult = await _ingestionService.ScanAllAsync(logCallback, cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
                 $"Ingestion complete — Found: {ingestionResult.FilesFound}, " +
                 $"Added: {ingestionResult.FilesAdded}, " +
@@ -61,7 +67,7 @@ public class FullMaintenanceTask : IScheduledTask
             ((IProgress<double>)logger).Report(0.5);
 
             logger.LogInformation("Starting grouping post-processing...");
-            await _groupingService.ProcessAllGroupsAsync(cancellationToken).ConfigureAwait(false);
+            await _groupingService.ProcessAllGroupsAsync(logCallback, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Grouping process complete");
             ((IProgress<double>)logger).Report(1.0);
         }

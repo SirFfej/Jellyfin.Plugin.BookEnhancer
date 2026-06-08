@@ -11,6 +11,7 @@ public class BookIngestionService
     private readonly BookGroupingService _groupingService;
     private readonly LibraryOrganizationService _organization;
     private readonly ILogger<BookIngestionService> _logger;
+    private Func<string, Task>? _logCallback;
 
     public BookIngestionService(
         FileMetadataExtractor fileExtractor,
@@ -35,7 +36,7 @@ public class BookIngestionService
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                ".epub", ".pdf",
+                ".epub", ".mobi", ".pdf",
                 ".cbz", ".cbr", ".cb7",
                 ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
             };
@@ -44,8 +45,10 @@ public class BookIngestionService
         return new HashSet<string>(config.IngestionFileExtensions, StringComparer.OrdinalIgnoreCase);
     }
 
-    public async Task<IngestionResult> ScanAllAsync(CancellationToken ct = default)
+    public async Task<IngestionResult> ScanAllAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
+        _logCallback = logCallback;
+
         var config = Plugin.Instance?.Configuration;
         if (config is null)
             return new IngestionResult { Errors = 1 };
@@ -57,7 +60,7 @@ public class BookIngestionService
 
         if (enabledDirs.Count == 0)
         {
-            _logger.LogInformation("No enabled source directories configured");
+            await LogInfoAsync("No enabled source directories configured").ConfigureAwait(false);
             return result;
         }
 
@@ -76,13 +79,37 @@ public class BookIngestionService
         return result;
     }
 
+    private async Task LogInfoAsync(string message)
+    {
+        if (_logCallback is not null)
+            await _logCallback(message).ConfigureAwait(false);
+        else
+            _logger.LogInformation("{Message}", message);
+    }
+
+    private async Task LogWarningAsync(string message)
+    {
+        if (_logCallback is not null)
+            await _logCallback(message).ConfigureAwait(false);
+        else
+            _logger.LogWarning("{Message}", message);
+    }
+
+    private async Task LogErrorAsync(Exception ex, string message)
+    {
+        if (_logCallback is not null)
+            await _logCallback($"{message} — {ex.Message}").ConfigureAwait(false);
+        else
+            _logger.LogWarning(ex, "{Message}", message);
+    }
+
     private async Task<IngestionResult> ScanDirectoryAsync(ManagedSourceDirectory dir, CancellationToken ct)
     {
         var result = new IngestionResult();
 
         if (!Directory.Exists(dir.SourcePath))
         {
-            _logger.LogWarning("Source directory does not exist: {Path}", dir.SourcePath);
+            await LogWarningAsync($"Source directory does not exist: {dir.SourcePath}").ConfigureAwait(false);
             result.Errors++;
             return result;
         }
@@ -93,7 +120,7 @@ public class BookIngestionService
             .ToList();
 
         result.FilesFound = files.Count;
-        _logger.LogInformation("Found {Count} files in {Path}", files.Count, dir.SourcePath);
+        await LogInfoAsync($"Found {files.Count} files in {dir.SourcePath}").ConfigureAwait(false);
 
         foreach (var file in files)
         {
@@ -139,11 +166,10 @@ public class BookIngestionService
                         ? _groupingService.GetGroupByIsbn(metadata.Isbn)
                         : null;
 
-                    if (existingGroup != null)
+                    if (existingGroup is not null)
                     {
                         _groupingService.AddFormatToGroup(
                             existingGroup.Id, targetPath, metadata.FileFormat, isPrimary: false);
-                        _logger.LogDebug("Registered alternate format for existing book: {Path}", targetPath);
                         result.FilesSkipped++;
                     }
                     else
@@ -153,13 +179,13 @@ public class BookIngestionService
                 }
                 else
                 {
-                    _logger.LogWarning("Failed to move file: {Path} - {Error}", file, moveResult.ErrorMessage);
+                    await LogWarningAsync($"Failed to move file: {file} — {moveResult.ErrorMessage}").ConfigureAwait(false);
                     result.Errors++;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Error processing file: {Path}", file);
+                await LogErrorAsync(ex, $"Error processing file: {file}").ConfigureAwait(false);
                 result.Errors++;
             }
         }
@@ -177,12 +203,10 @@ public class BookIngestionService
         {
             var group = _groupingService.CreateGroup(metadata);
             _groupingService.AddFormatToGroup(group.Id, path, metadata.FileFormat, isPrimary: true);
-            _logger.LogDebug("Created group for new book: {Title}", metadata.Title);
         }
-        else if (existingGroup != null && !isPrimary)
+        else if (existingGroup is not null && !isPrimary)
         {
             _groupingService.AddFormatToGroup(existingGroup.Id, path, metadata.FileFormat, isPrimary: false);
-            _logger.LogDebug("Added alternate format for existing book: {Title}", metadata.Title);
         }
     }
 

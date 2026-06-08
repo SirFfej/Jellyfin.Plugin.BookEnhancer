@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.9.9 - Tasks write operational messages to own log files instead of main Jellyfin log. IngestionScan, GroupingProcess, and FullMaintenance now route all service-level log messages through their per-task log files via log callbacks.",
+        "checksum": "a1105cae983795446fefe36078ba2d19",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.9/Jellyfin.Plugin.BookEnhancer_0.1.9.9.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-08T00:00:00Z",
+        "version": "0.1.9.9"
+      },
+      {
         "changelog": "v0.1.9.8 - Full Grouping Preview endpoint review: fixed IsPartial never triggering for 500-file cap, ISBN normalization (strips non-digits for cross-format matching), added missing .mobi to default extensions, candidate limit (5 groups, 500 files max).",
         "checksum": "96e9d9cf17d2a9a8b2927f207ee91cf6",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.8/Jellyfin.Plugin.BookEnhancer_0.1.9.8.zip",

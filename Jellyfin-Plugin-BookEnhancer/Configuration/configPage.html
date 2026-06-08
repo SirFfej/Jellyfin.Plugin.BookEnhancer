@@ -911,20 +911,25 @@
                 authFetch("Books/Grouping/Preview")
                     .then(function (r) { return r.json(); })
                     .then(function (result) {
-                        var msg = "Strategy: " + result.matchingStrategy +
-                            "\nTotal files: " + result.totalFiles +
-                            "\nWould be grouped: " + result.groupedCount + " (2+ formats each)" +
-                            "\nWould remain ungrouped: " + result.ungroupedCount;
+                        var parts = [
+                            "Strategy: " + result.matchingStrategy,
+                            "Files scanned: " + result.totalFiles,
+                            "Would be grouped: " + result.groupedCount + " (2+ formats each)",
+                            "Would remain ungrouped: " + result.ungroupedCount
+                        ];
+                        if (result.isPartial) {
+                            parts.push("\n(Preview limited to first " + result.groups.length + " candidates. Full scan recommended for complete results.)");
+                        }
                         if (result.groups && result.groups.length > 0) {
-                            msg += "\n\nGroups:\n";
+                            parts.push("\nGroups:");
                             result.groups.forEach(function (g) {
-                                msg += "  \"" + (g.title || "?") + "\" — " + g.formats.length + " formats\n";
-                                g.formats.forEach(function (f) { msg += "    " + f.formatType + " (" + f.filePath + ")\n"; });
+                                parts.push('  "' + (g.title || "?") + '" \u2014 ' + g.formats.length + " formats");
+                                g.formats.forEach(function (f) { parts.push("    " + f.formatType + " (" + f.filePath + ")"); });
                             });
                         }
                         Dashboard.alert({
                             title: "Grouping Preview",
-                            message: msg
+                            message: parts.join("\n")
                         });
                     })
                     .catch(function (err) {

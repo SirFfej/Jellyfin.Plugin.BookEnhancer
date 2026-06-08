@@ -6,6 +6,7 @@ public class GroupingPreviewResult
     public int TotalFiles { get; set; }
     public int GroupedCount { get; set; }
     public int UngroupedCount { get; set; }
+    public bool IsPartial { get; set; }
     public List<PreviewGroup> Groups { get; set; } = new();
 }
 

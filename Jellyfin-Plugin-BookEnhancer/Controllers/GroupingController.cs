@@ -40,7 +40,7 @@ public class GroupingController : ControllerBase
             TotalFormatsMerged = groups.Sum(g => g.Formats.Count(f => !f.IsPrimary))
         };
 
-        await _postProcessing.ProcessAllGroupsAsync(ct).ConfigureAwait(false);
+        await _postProcessing.ProcessAllGroupsAsync(ct: ct).ConfigureAwait(false);
 
         return Ok(result);
     }
@@ -49,6 +49,9 @@ public class GroupingController : ControllerBase
     [Authorize]
     public async Task<ActionResult<GroupingPreviewResult>> Preview(CancellationToken ct)
     {
+        const int maxCandidates = 5;
+        const int maxFilesToScan = 500;
+
         var config = Plugin.Instance?.Configuration;
         if (config is null)
             return BadRequest("Plugin not initialized.");
@@ -63,23 +66,70 @@ public class GroupingController : ControllerBase
             MatchingStrategy = config.GroupingStrategy ?? "IsbnOnly"
         };
 
-        var metadataList = new List<(FileMetadata Meta, string FilePath)>();
+        var groups = new List<PreviewGroup>();
+        var filesScanned = 0;
+        var candidatesFound = 0;
+        var totalFiles = 0;
 
         foreach (var dir in dirs)
         {
+            if (candidatesFound >= maxCandidates)
+                break;
+
             try
             {
                 var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
-                    .Where(f => supportedExts.Contains(Path.GetExtension(f)))
-                    .ToList();
+                    .Where(f => supportedExts.Contains(Path.GetExtension(f)));
 
                 foreach (var file in files)
                 {
+                    if (filesScanned >= maxFilesToScan || candidatesFound >= maxCandidates)
+                        break;
+
+                    totalFiles++;
+                    filesScanned++;
+
                     try
                     {
                         var meta = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
-                        if (meta != null)
-                            metadataList.Add((meta, file));
+                        if (meta is null)
+                            continue;
+
+                        var matchKey = BuildMatchKey(meta);
+                        var formatType = GetFormatType(file);
+                        var priority = BookGroupingService.GetFormatPriority(formatType);
+
+                        var existing = groups.Find(g => g.MatchKey == matchKey);
+                        if (existing is null)
+                        {
+                            groups.Add(new PreviewGroup
+                            {
+                                MatchKey = matchKey,
+                                Title = meta.Title,
+                                Author = meta.Authors.Count > 0 ? string.Join("; ", meta.Authors) : null,
+                                Formats = new List<PreviewFormat>
+                                {
+                                    new()
+                                    {
+                                        FilePath = file,
+                                        FormatType = formatType,
+                                        Priority = priority
+                                    }
+                                }
+                            });
+                        }
+                        else
+                        {
+                            existing.Formats.Add(new PreviewFormat
+                            {
+                                FilePath = file,
+                                FormatType = formatType,
+                                Priority = priority
+                            });
+
+                            if (existing.Formats.Count == 2)
+                                candidatesFound++;
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -93,47 +143,8 @@ public class GroupingController : ControllerBase
             }
         }
 
-        result.TotalFiles = metadataList.Count;
-
-        var groups = new List<PreviewGroup>();
-
-        foreach (var (meta, path) in metadataList)
-        {
-            var matchKey = BuildMatchKey(meta);
-            var existing = groups.FirstOrDefault(g => g.MatchKey == matchKey);
-
-            var formatType = GetFormatType(path);
-            var priority = BookGroupingService.GetFormatPriority(formatType);
-
-            if (existing != null)
-            {
-                existing.Formats.Add(new PreviewFormat
-                {
-                    FilePath = path,
-                    FormatType = formatType,
-                    Priority = priority
-                });
-            }
-            else
-            {
-                groups.Add(new PreviewGroup
-                {
-                    MatchKey = matchKey,
-                    Title = meta.Title,
-                    Author = meta.Authors.Count > 0 ? string.Join("; ", meta.Authors) : null,
-                    Formats = new List<PreviewFormat>
-                    {
-                        new()
-                        {
-                            FilePath = path,
-                            FormatType = formatType,
-                            Priority = priority
-                        }
-                    }
-                });
-            }
-        }
-
+        result.TotalFiles = totalFiles;
+        result.IsPartial = filesScanned >= maxFilesToScan || candidatesFound >= maxCandidates;
         result.Groups = groups.Where(g => g.Formats.Count > 1).ToList();
         result.GroupedCount = result.Groups.Count;
         result.UngroupedCount = groups.Count(g => g.Formats.Count == 1);
@@ -145,14 +156,14 @@ public class GroupingController : ControllerBase
     [Authorize]
     public async Task<ActionResult<RepairResult>> Repair(CancellationToken ct)
     {
-        var result = await _postProcessing.RepairFormatPathsAsync(ct).ConfigureAwait(false);
+        var result = await _postProcessing.RepairFormatPathsAsync(ct: ct).ConfigureAwait(false);
         return Ok(result);
     }
 
     private static string BuildMatchKey(FileMetadata meta)
     {
         if (!string.IsNullOrWhiteSpace(meta.Isbn))
-            return $"isbn:{meta.Isbn}";
+            return $"isbn:{new string(meta.Isbn.Where(char.IsDigit).ToArray())}";
 
         var title = meta.Title?.Trim().ToLowerInvariant() ?? "";
         var author = meta.Authors.Count > 0 ? meta.Authors[0].Trim().ToLowerInvariant() : "";
@@ -179,7 +190,7 @@ public class GroupingController : ControllerBase
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                ".epub", ".pdf",
+                ".epub", ".mobi", ".pdf",
                 ".cbz", ".cbr", ".cb7",
                 ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
             };

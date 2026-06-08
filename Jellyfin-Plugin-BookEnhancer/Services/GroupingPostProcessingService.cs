@@ -10,6 +10,7 @@ public class GroupingPostProcessingService
     private readonly BookGroupingService _groupingService;
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<GroupingPostProcessingService> _logger;
+    private Func<string, Task>? _logCallback;
 
     public GroupingPostProcessingService(
         BookGroupingService groupingService,
@@ -21,10 +22,36 @@ public class GroupingPostProcessingService
         _logger = logger;
     }
 
-    public async Task ProcessAllGroupsAsync(CancellationToken ct = default)
+    private async Task LogInfoAsync(string message)
     {
+        if (_logCallback is not null)
+            await _logCallback(message).ConfigureAwait(false);
+        else
+            _logger.LogInformation("{Message}", message);
+    }
+
+    private async Task LogWarningAsync(string message)
+    {
+        if (_logCallback is not null)
+            await _logCallback(message).ConfigureAwait(false);
+        else
+            _logger.LogWarning("{Message}", message);
+    }
+
+    private async Task LogWarningAsync(Exception ex, string message)
+    {
+        if (_logCallback is not null)
+            await _logCallback($"{message} — {ex.Message}").ConfigureAwait(false);
+        else
+            _logger.LogWarning(ex, "{Message}", message);
+    }
+
+    public async Task ProcessAllGroupsAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
+    {
+        _logCallback = logCallback;
+
         var groups = _groupingService.GetAllGroupsWithMultipleFormats();
-        _logger.LogInformation("Processing {Count} book groups with multiple formats", groups.Count);
+        await LogInfoAsync($"Processing {groups.Count} book groups with multiple formats").ConfigureAwait(false);
 
         foreach (var group in groups)
         {
@@ -40,11 +67,6 @@ public class GroupingPostProcessingService
         var best = group.Formats.OrderBy(f => BookGroupingService.GetFormatPriority(f.FormatType)).First();
         if (!best.IsPrimary)
         {
-            _logger.LogDebug(
-                "Reassigning primary from current to higher-priority format {Format} ({Path})",
-                best.FormatType,
-                best.FilePath);
-
             _groupingService.SetPrimaryFormat(group.Id, best.Id);
             group.Formats = _groupingService.GetFormatsForGroup(group.Id);
         }
@@ -58,17 +80,14 @@ public class GroupingPostProcessingService
         var primaryItem = FindItemByPath(primary.FilePath);
         if (primaryItem is null)
         {
-            _logger.LogWarning(
-                "Primary item not found in library for group {GroupId} at {Path}",
-                group.Id,
-                primary.FilePath);
+            await LogWarningAsync($"Primary item not found in library for group {group.Id} at {primary.FilePath}").ConfigureAwait(false);
             return;
         }
 
         _groupingService.UpdateFormatJellyfinId(primary.Id, primaryItem.Id.ToString("N"));
 
         var primaryDir = Path.GetDirectoryName(primary.FilePath);
-        var formatsDir = primaryDir != null
+        var formatsDir = primaryDir is not null
             ? Path.Combine(primaryDir, ".formats")
             : null;
 
@@ -79,20 +98,15 @@ public class GroupingPostProcessingService
             try
             {
                 var altItem = FindItemByPath(alternate.FilePath);
-                if (altItem != null)
+                if (altItem is not null)
                 {
-                    _logger.LogDebug(
-                        "Removing duplicate item {ItemId} for {Path}",
-                        altItem.Id,
-                        alternate.FilePath);
-
                     _libraryManager.DeleteItem(
                         altItem,
                         new DeleteOptions { DeleteFileLocation = false },
                         false);
                 }
 
-                if (formatsDir != null && File.Exists(alternate.FilePath))
+                if (formatsDir is not null && File.Exists(alternate.FilePath))
                 {
                     Directory.CreateDirectory(formatsDir);
                     var fileName = Path.GetFileName(alternate.FilePath);
@@ -101,7 +115,6 @@ public class GroupingPostProcessingService
                     if (!File.Exists(destPath))
                     {
                         File.Move(alternate.FilePath, destPath);
-                        _logger.LogDebug("Moved {Src} -> {Dst}", alternate.FilePath, destPath);
                     }
                 }
 
@@ -109,26 +122,24 @@ public class GroupingPostProcessingService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to process alternate format {Path}", alternate.FilePath);
+                await LogWarningAsync(ex, $"Failed to process alternate format {alternate.FilePath}").ConfigureAwait(false);
             }
         }
 
-        _logger.LogInformation(
-            "Merged {Count} alternate formats into primary item '{Title}' (ID: {ItemId})",
-            alternates.Count,
-            primaryItem.Name,
-            primaryItem.Id);
+        await LogInfoAsync($"Merged {alternates.Count} alternate formats into primary item '{primaryItem.Name}' (ID: {primaryItem.Id})").ConfigureAwait(false);
     }
 
-    public async Task<RepairResult> RepairFormatPathsAsync(CancellationToken ct = default)
+    public async Task<RepairResult> RepairFormatPathsAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
+        _logCallback = logCallback;
+
         var formats = _groupingService.GetAllFormats();
         var result = new RepairResult
         {
             TotalFormats = formats.Count
         };
 
-        _logger.LogInformation("Starting format path repair across {Count} formats", formats.Count);
+        await LogInfoAsync($"Starting format path repair across {formats.Count} formats").ConfigureAwait(false);
 
         foreach (var format in formats)
         {
@@ -136,7 +147,7 @@ public class GroupingPostProcessingService
                 break;
 
             var item = FindItemByPath(format.FilePath);
-            if (item != null)
+            if (item is not null)
             {
                 var itemIdStr = item.Id.ToString("N");
                 if (format.JellyfinItemId != itemIdStr)
@@ -153,19 +164,11 @@ public class GroupingPostProcessingService
             {
                 result.NotFound++;
                 result.StalePaths.Add(format.FilePath);
-                _logger.LogWarning(
-                    "Format {FormatId} points to path not found in Jellyfin library: {Path}",
-                    format.Id,
-                    format.FilePath);
+                await LogWarningAsync($"Format {format.Id} points to path not found in Jellyfin library: {format.FilePath}").ConfigureAwait(false);
             }
         }
 
-        _logger.LogInformation(
-            "Repair complete — Total: {Total}, Fixed: {Fixed}, Skipped (OK): {Skipped}, Not Found: {NotFound}",
-            result.TotalFormats,
-            result.Fixed,
-            result.Skipped,
-            result.NotFound);
+        await LogInfoAsync($"Repair complete — Total: {result.TotalFormats}, Fixed: {result.Fixed}, Skipped (OK): {result.Skipped}, Not Found: {result.NotFound}").ConfigureAwait(false);
 
         return result;
     }

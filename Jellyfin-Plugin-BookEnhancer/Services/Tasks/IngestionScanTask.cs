@@ -34,10 +34,16 @@ public class IngestionScanTask : IScheduledTask
         var logDir = Path.Combine(_appPaths.DataPath, "plugins", "BookEnhancer", "logs");
         using var logger = new TaskLogger(logDir, "IngestionScan");
 
+        Func<string, Task> logCallback = msg =>
+        {
+            logger.LogInformation(msg);
+            return Task.CompletedTask;
+        };
+
         try
         {
             logger.LogInformation("Starting ingestion scan...");
-            var result = await _ingestionService.ScanAllAsync(cancellationToken).ConfigureAwait(false);
+            var result = await _ingestionService.ScanAllAsync(logCallback, cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
                 $"Scan complete — Found: {result.FilesFound}, Added: {result.FilesAdded}, " +
                 $"Skipped: {result.FilesSkipped}, Errors: {result.Errors}");

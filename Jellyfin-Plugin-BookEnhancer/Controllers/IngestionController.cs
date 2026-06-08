@@ -18,7 +18,7 @@ public class IngestionController : ControllerBase
     [HttpPost("Scan")]
     public async Task<ActionResult<ScanResult>> Scan(CancellationToken ct)
     {
-        var result = await _ingestion.ScanAllAsync(ct).ConfigureAwait(false);
+        var result = await _ingestion.ScanAllAsync(ct: ct).ConfigureAwait(false);
 
         return Ok(new ScanResult
         {
