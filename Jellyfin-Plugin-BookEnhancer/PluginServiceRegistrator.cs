@@ -44,10 +44,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<GroupingPostProcessingService>();
         serviceCollection.AddSingleton<LibraryOrganizationService>();
         serviceCollection.AddTransient<BookIngestionService>();
-        serviceCollection.AddTransient<GroupingController>();
-        serviceCollection.AddTransient<IngestionController>();
-        serviceCollection.AddTransient<LibrariesController>();
-        serviceCollection.AddTransient<ConfigController>();
+        // Controllers are auto-discovered by Jellyfin via GetApiPluginAssemblies()
 
         serviceCollection.AddSingleton<IScheduledTask, IngestionScanTask>();
         serviceCollection.AddSingleton<IScheduledTask, GroupingProcessTask>();

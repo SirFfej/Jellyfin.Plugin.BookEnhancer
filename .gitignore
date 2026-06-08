@@ -27,3 +27,6 @@ release/
 
 # Test data
 test-data/
+
+# AI agent instructions
+AGENTS.md
