@@ -67,22 +67,29 @@ public class GroupingController : ControllerBase
 
         foreach (var dir in dirs)
         {
-            var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
-                .Where(f => supportedExts.Contains(Path.GetExtension(f)))
-                .ToList();
-
-            foreach (var file in files)
+            try
             {
-                try
+                var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
+                    .Where(f => supportedExts.Contains(Path.GetExtension(f)))
+                    .ToList();
+
+                foreach (var file in files)
                 {
-                    var meta = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
-                    if (meta != null)
-                        metadataList.Add((meta, file));
+                    try
+                    {
+                        var meta = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
+                        if (meta != null)
+                            metadataList.Add((meta, file));
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Skipping file (metadata extraction failed): {File}", file);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Skipping file (metadata extraction failed): {File}", file);
-                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error scanning directory for preview: {Path}", dir.LibraryPath);
             }
         }
 
