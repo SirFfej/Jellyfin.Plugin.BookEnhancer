@@ -50,7 +50,7 @@ public class LibraryCleanupTask : IScheduledTask
                 logBuffer.AppendLine(message);
             }
 
-            var result = await _cleanupService.RunCleanupAsync(progress, LogCallback, cancellationToken);
+            var result = await _cleanupService.RunCleanupAsync(progress, LogCallback, cancellationToken).ConfigureAwait(false);
 
             logBuffer.AppendLine();
             logBuffer.AppendLine("=== Summary ===");
@@ -62,7 +62,7 @@ public class LibraryCleanupTask : IScheduledTask
             logBuffer.AppendLine($"Completed at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
             var logPath = Path.Combine(logDir, $"LibraryCleanup-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
-            await File.WriteAllTextAsync(logPath, logBuffer.ToString(), cancellationToken);
+            await File.WriteAllTextAsync(logPath, logBuffer.ToString(), cancellationToken).ConfigureAwait(false);
 
             logger.LogInformation($"Cleanup complete. Summary written to: {logPath}");
             ((IProgress<double>)logger).Report(1.0);

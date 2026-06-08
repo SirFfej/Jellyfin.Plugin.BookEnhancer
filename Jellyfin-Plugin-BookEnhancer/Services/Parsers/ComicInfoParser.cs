@@ -30,7 +30,7 @@ public class ComicInfoParser : IFileParser
                 _ => null
             };
 
-            if (doc == null) return Task.FromResult<FileMetadata?>(null);
+            if (doc is null) return Task.FromResult<FileMetadata?>(null);
             return Task.FromResult<FileMetadata?>(ParseComicInfo(doc, filePath));
         }
         catch
@@ -44,7 +44,7 @@ public class ComicInfoParser : IFileParser
         using var stream = File.OpenRead(filePath);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
         var entry = archive.GetEntry(entryName);
-        if (entry == null) return null;
+        if (entry is null) return null;
         using var entryStream = entry.Open();
         return XDocument.Load(entryStream);
     }
@@ -54,7 +54,7 @@ public class ComicInfoParser : IFileParser
         using var archive = ArchiveFactory.Open(filePath);
         var entry = archive.Entries.FirstOrDefault(e =>
             string.Equals(e.Key, entryName, StringComparison.OrdinalIgnoreCase));
-        if (entry == null) return null;
+        if (entry is null) return null;
         using var ms = new MemoryStream();
         entry.WriteTo(ms);
         ms.Position = 0;
@@ -64,7 +64,7 @@ public class ComicInfoParser : IFileParser
     private static FileMetadata ParseComicInfo(XDocument doc, string filePath)
     {
         var root = doc.Root;
-        if (root == null) throw new InvalidDataException("Empty ComicInfo.xml");
+        if (root is null) throw new InvalidDataException("Empty ComicInfo.xml");
 
         var meta = new FileMetadata
         {

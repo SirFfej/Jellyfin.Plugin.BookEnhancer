@@ -31,7 +31,7 @@ public class GroupingPostProcessingService
             if (ct.IsCancellationRequested)
                 break;
 
-            await ProcessGroupAsync(group, ct);
+            await ProcessGroupAsync(group, ct).ConfigureAwait(false);
         }
     }
 
@@ -52,11 +52,11 @@ public class GroupingPostProcessingService
         var primary = group.Formats.FirstOrDefault(f => f.IsPrimary);
         var alternates = group.Formats.Where(f => !f.IsPrimary).ToList();
 
-        if (primary == null || alternates.Count == 0)
+        if (primary is null || alternates.Count == 0)
             return;
 
         var primaryItem = FindItemByPath(primary.FilePath);
-        if (primaryItem == null)
+        if (primaryItem is null)
         {
             _logger.LogWarning(
                 "Primary item not found in library for group {GroupId} at {Path}",

@@ -37,7 +37,7 @@ public class IngestionScanTask : IScheduledTask
         try
         {
             logger.LogInformation("Starting ingestion scan...");
-            var result = await _ingestionService.ScanAllAsync(cancellationToken);
+            var result = await _ingestionService.ScanAllAsync(cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
                 $"Scan complete — Found: {result.FilesFound}, Added: {result.FilesAdded}, " +
                 $"Skipped: {result.FilesSkipped}, Errors: {result.Errors}");

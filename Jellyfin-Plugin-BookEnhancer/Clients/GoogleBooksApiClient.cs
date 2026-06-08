@@ -20,7 +20,7 @@ public class GoogleBooksApiClient
     public async Task<FileMetadata?> SearchByIsbnAsync(string isbn, string? apiKey, CancellationToken ct = default)
     {
         var cleanIsbn = CleanIsbn(isbn);
-        if (cleanIsbn == null) return null;
+        if (cleanIsbn is null) return null;
 
         try
         {
@@ -32,9 +32,9 @@ public class GoogleBooksApiClient
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
 
-            var response = await client.GetFromJsonAsync<VolumeResponse>(url, ct);
+            var response = await client.GetFromJsonAsync<VolumeResponse>(url, ct).ConfigureAwait(false);
             var volume = response?.Items?.FirstOrDefault();
-            if (volume?.VolumeInfo == null) return null;
+            if (volume?.VolumeInfo is null) return null;
 
             return MapVolume(volume.VolumeInfo, cleanIsbn);
         }

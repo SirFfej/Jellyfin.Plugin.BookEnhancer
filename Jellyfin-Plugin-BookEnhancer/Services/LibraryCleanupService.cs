@@ -28,7 +28,7 @@ public class LibraryCleanupService
     public async Task<CleanupResult> RunCleanupAsync(IProgress<double> progress, Func<string, Task> logCallback, CancellationToken ct)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null)
+        if (config is null)
             return new CleanupResult { Errors = 1 };
 
         var result = new CleanupResult();
@@ -38,7 +38,7 @@ public class LibraryCleanupService
 
         if (dirs.Count == 0)
         {
-            await logCallback("No enabled source directories with library paths configured.");
+            await logCallback("No enabled source directories with library paths configured.").ConfigureAwait(false);
             return result;
         }
 
@@ -52,7 +52,7 @@ public class LibraryCleanupService
         {
             if (!Directory.Exists(dir.LibraryPath))
             {
-                await logCallback($"Library path does not exist, skipping: {dir.LibraryPath}");
+                await logCallback($"Library path does not exist, skipping: {dir.LibraryPath}").ConfigureAwait(false);
                 continue;
             }
 
@@ -64,14 +64,14 @@ public class LibraryCleanupService
             allFiles.AddRange(files.Select(f => (f, dir)));
         }
 
-        await logCallback($"Found {totalFiles} files to check across {dirs.Count} directories.");
+        await logCallback($"Found {totalFiles} files to check across {dirs.Count} directories.").ConfigureAwait(false);
         progress.Report(0.0);
 
         foreach (var (file, dir) in allFiles)
         {
             if (ct.IsCancellationRequested)
             {
-                await logCallback("Cleanup cancelled.");
+                await logCallback("Cleanup cancelled.").ConfigureAwait(false);
                 break;
             }
 
@@ -79,8 +79,8 @@ public class LibraryCleanupService
 
             try
             {
-                var metadata = await _fileExtractor.ExtractAsync(file, ct);
-                if (metadata == null)
+                var metadata = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
+                if (metadata is null)
                 {
                     metadata = CreateMinimalMetadata(file);
                 }
@@ -103,11 +103,11 @@ public class LibraryCleanupService
                 if (moveResult.Success)
                 {
                     result.FilesMoved++;
-                    await logCallback($"Moved: {file} -> {expectedPath}");
+                    await logCallback($"Moved: {file} -> {expectedPath}").ConfigureAwait(false);
 
                     _groupingService.UpdateFormatPath(file, expectedPath);
 
-                    CleanupEmptyDirectories(dirToClean, result, logCallback);
+                    await CleanupEmptyDirectories(dirToClean, result, logCallback).ConfigureAwait(false);
                 }
                 else if (moveResult.Skipped)
                 {
@@ -115,14 +115,14 @@ public class LibraryCleanupService
                 }
                 else
                 {
-                    await logCallback($"Failed to move {file}: {moveResult.ErrorMessage}");
+                    await logCallback($"Failed to move {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
                     result.Errors++;
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Error processing file during cleanup: {File}", file);
-                await logCallback($"Error processing {file}: {ex.Message}");
+                await logCallback($"Error processing {file}: {ex.Message}").ConfigureAwait(false);
                 result.Errors++;
             }
 
@@ -133,14 +133,14 @@ public class LibraryCleanupService
         await logCallback(
             $"Cleanup complete — Checked: {totalFiles}, Moved: {result.FilesMoved}, " +
             $"Already correct: {result.FilesSkipped}, Errors: {result.Errors}, " +
-            $"Empty dirs removed: {result.EmptyDirectoriesRemoved}");
-        await logCallback("IMPORTANT: Run a Jellyfin library scan to re-link moved files to library items.");
+            $"Empty dirs removed: {result.EmptyDirectoriesRemoved}").ConfigureAwait(false);
+        await logCallback("IMPORTANT: Run a Jellyfin library scan to re-link moved files to library items.").ConfigureAwait(false);
 
         progress.Report(1.0);
         return result;
     }
 
-    private void CleanupEmptyDirectories(string? startPath, CleanupResult result, Func<string, Task> logCallback)
+    private async Task CleanupEmptyDirectories(string? startPath, CleanupResult result, Func<string, Task> logCallback)
     {
         if (string.IsNullOrWhiteSpace(startPath) || !Directory.Exists(startPath))
             return;
@@ -155,7 +155,7 @@ public class LibraryCleanupService
 
                 dir.Delete();
                 result.EmptyDirectoriesRemoved++;
-                logCallback($"Removed empty directory: {dir.FullName}");
+                await logCallback($"Removed empty directory: {dir.FullName}").ConfigureAwait(false);
                 dir = dir.Parent;
             }
         }
@@ -167,7 +167,7 @@ public class LibraryCleanupService
 
     private static HashSet<string> GetSupportedExtensions(PluginConfiguration config)
     {
-        if (config.IngestionFileExtensions == null || config.IngestionFileExtensions.Count == 0)
+        if (config.IngestionFileExtensions is null || config.IngestionFileExtensions.Count == 0)
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {

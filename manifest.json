@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.9.6 - Source path validation inline OK/Not found status; per-row Create directory buttons; Grouping Preview + Repair endpoints (populates JellyfinItemId, reports stale paths); loadConfig fix (config page no longer blank on load); ConfigureAwait(false) added to all awaits; TaskLogger double-dispose guard; private field naming convention fixes; == null to is null throughout.",
+        "checksum": "1cb8592edaa3eac0e1fcdad7db71a596",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.6/Jellyfin.Plugin.BookEnhancer_0.1.9.6.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.9.6"
+      },
+      {
         "changelog": "v0.1.9.5 - Fixed FormatPriority duplication (XML serializer appending to non-empty default list); added duplicate validation and warning on config page; added GET Books/Grouping/Preview endpoint (dry-run grouping simulation); added POST Books/Grouping/Repair endpoint (cross-references book_formats against Jellyfin library items, populates JellyfinItemId column, reports stale paths); ProcessGroupAsync now stores primary item's JellyfinItemId; Repair Format Paths button on config page.",
         "checksum": "3d6088cbe76d7a0e6205d9f087c31d1d",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.5/Jellyfin.Plugin.BookEnhancer_0.1.9.5.zip",

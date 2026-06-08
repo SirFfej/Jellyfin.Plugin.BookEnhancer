@@ -31,7 +31,7 @@ public class BookIngestionService
     private static HashSet<string> GetSupportedExtensions()
     {
         var config = Plugin.Instance?.Configuration;
-        if (config?.IngestionFileExtensions == null || config.IngestionFileExtensions.Count == 0)
+        if (config?.IngestionFileExtensions is null || config.IngestionFileExtensions.Count == 0)
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -47,7 +47,7 @@ public class BookIngestionService
     public async Task<IngestionResult> ScanAllAsync(CancellationToken ct = default)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null)
+        if (config is null)
             return new IngestionResult { Errors = 1 };
 
         var result = new IngestionResult();
@@ -66,7 +66,7 @@ public class BookIngestionService
             if (ct.IsCancellationRequested)
                 break;
 
-            var dirResult = await ScanDirectoryAsync(dir, ct);
+            var dirResult = await ScanDirectoryAsync(dir, ct).ConfigureAwait(false);
             result.FilesFound += dirResult.FilesFound;
             result.FilesAdded += dirResult.FilesAdded;
             result.FilesSkipped += dirResult.FilesSkipped;
@@ -102,8 +102,8 @@ public class BookIngestionService
 
             try
             {
-                var metadata = await _fileExtractor.ExtractAsync(file, ct);
-                if (metadata == null)
+                var metadata = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
+                if (metadata is null)
                 {
                     metadata = CreateMinimalMetadata(file);
                 }
@@ -117,7 +117,7 @@ public class BookIngestionService
                         Config.HardcoverEnabled,
                         Config.GoogleBooksEnabled,
                         Config.OpenLibraryEnabled,
-                        ct);
+                        ct).ConfigureAwait(false);
 
                     metadata = enriched;
                 }
@@ -173,7 +173,7 @@ public class BookIngestionService
             ? _groupingService.GetGroupByIsbn(metadata.Isbn)
             : null;
 
-        if (existingGroup == null && isPrimary)
+        if (existingGroup is null && isPrimary)
         {
             var group = _groupingService.CreateGroup(metadata);
             _groupingService.AddFormatToGroup(group.Id, path, metadata.FileFormat, isPrimary: true);

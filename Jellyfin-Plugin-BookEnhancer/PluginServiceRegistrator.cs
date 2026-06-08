@@ -32,8 +32,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             return new BookGroupingService(dbDir, logger);
         });
 
-        serviceCollection.AddSingleton<MetadataAggregationService>();
-
         serviceCollection.AddTransient<GroupingPostProcessingService>();
         serviceCollection.AddSingleton<LibraryOrganizationService>();
         serviceCollection.AddTransient<BookIngestionService>();

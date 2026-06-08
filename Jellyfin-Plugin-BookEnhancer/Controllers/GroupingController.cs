@@ -31,7 +31,7 @@ public class GroupingController : ControllerBase
 
     [HttpPost("Process")]
     [Authorize]
-    public async Task<ActionResult<GroupingProcessResult>> Process()
+    public async Task<ActionResult<GroupingProcessResult>> Process(CancellationToken ct)
     {
         var groups = _groupingService.GetAllGroupsWithMultipleFormats();
         var result = new GroupingProcessResult
@@ -40,7 +40,7 @@ public class GroupingController : ControllerBase
             TotalFormatsMerged = groups.Sum(g => g.Formats.Count(f => !f.IsPrimary))
         };
 
-        await _postProcessing.ProcessAllGroupsAsync();
+        await _postProcessing.ProcessAllGroupsAsync(ct).ConfigureAwait(false);
 
         return Ok(result);
     }
@@ -50,7 +50,7 @@ public class GroupingController : ControllerBase
     public async Task<ActionResult<GroupingPreviewResult>> Preview(CancellationToken ct)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null)
+        if (config is null)
             return BadRequest("Plugin not initialized.");
 
         var dirs = config.ManagedDirectories
@@ -75,7 +75,7 @@ public class GroupingController : ControllerBase
             {
                 try
                 {
-                    var meta = await _fileExtractor.ExtractAsync(file, ct);
+                    var meta = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
                     if (meta != null)
                         metadataList.Add((meta, file));
                 }
@@ -138,7 +138,7 @@ public class GroupingController : ControllerBase
     [Authorize]
     public async Task<ActionResult<RepairResult>> Repair(CancellationToken ct)
     {
-        var result = await _postProcessing.RepairFormatPathsAsync(ct);
+        var result = await _postProcessing.RepairFormatPathsAsync(ct).ConfigureAwait(false);
         return Ok(result);
     }
 
@@ -168,7 +168,7 @@ public class GroupingController : ControllerBase
 
     private static HashSet<string> GetSupportedExtensions(PluginConfiguration config)
     {
-        if (config.IngestionFileExtensions == null || config.IngestionFileExtensions.Count == 0)
+        if (config.IngestionFileExtensions is null || config.IngestionFileExtensions.Count == 0)
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {

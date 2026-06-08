@@ -23,7 +23,7 @@ public class FileMetadataExtractor
         foreach (var parser in _parsers)
         {
             if (parser.CanParse(filePath))
-                return await parser.ExtractAsync(filePath, ct);
+                return await parser.ExtractAsync(filePath, ct).ConfigureAwait(false);
         }
         return null;
     }

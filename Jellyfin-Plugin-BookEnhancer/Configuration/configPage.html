@@ -265,6 +265,16 @@
                         </div>
                     </div>
 
+                    <div style="margin-top:6px;">
+                        <button is="emby-button" id="btnGroupingPreview" type="button" class="raised"
+                                style="font-size:0.85em;">
+                            Grouping Preview
+                        </button>
+                        <div class="fieldDescription" style="margin-top:4px;">
+                            Dry-run grouping simulation: scans managed directories and shows which files would be grouped.
+                        </div>
+                    </div>
+
                     <div style="margin-top:12px;">
                         <button is="emby-button" id="btnRepairFormatPaths" type="button" class="raised"
                                 style="font-size:0.85em;">
@@ -708,7 +718,11 @@
                         '</div>' +
                         '<div class="inputContainer" style="margin-bottom:4px;">' +
                             '<label class="inputLabel inputLabelUnfocused">Source Path (where files originate)</label>' +
-                            '<input is="emby-input" class="dir-source" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.SourcePath || '') + '" />' +
+                            '<div style="display:flex;gap:4px;align-items:center;">' +
+                                '<input is="emby-input" class="dir-source" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.SourcePath || '') + '" style="flex:1;" />' +
+                                '<button is="emby-button" type="button" class="raised btn-create-dir" data-idx="' + idx + '" style="font-size:11px;padding:2px 8px;">Create</button>' +
+                                '<span class="dir-status" data-idx="' + idx + '" style="font-size:11px;white-space:nowrap;"></span>' +
+                            '</div>' +
                         '</div>' +
                         '<div class="inputContainer">' +
                             '<label class="inputLabel inputLabelUnfocused">Target Library</label>' +
@@ -737,6 +751,43 @@
 
                 container.querySelectorAll(".dir-enabled, .dir-source, .dir-library").forEach(function (input) {
                     input.addEventListener("change", function () { /* live update handled on save */ });
+                });
+
+                container.querySelectorAll(".btn-create-dir").forEach(function (btn) {
+                    btn.addEventListener("click", function () {
+                        var idx = parseInt(this.getAttribute("data-idx"));
+                        var dirs = getCurrentDirectories();
+                        var dir = dirs[idx];
+                        if (!dir || !dir.SourcePath || !dir.SourcePath.trim()) {
+                            Dashboard.alert({ title: "No Path", message: "Enter a source path first." });
+                            return;
+                        }
+                        btn.disabled = true;
+                        var origText = btn.textContent;
+                        btn.textContent = "...";
+                        authFetch("Books/Config/ValidateDirectory", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ path: dir.SourcePath, createIfMissing: true })
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (result) {
+                            Dashboard.alert({
+                                title: result.created ? "Created" : (result.exists ? "Already Exists" : "Failed"),
+                                message: result.created ? ("Created:\n" + dir.SourcePath)
+                                    : (result.exists ? ("Already exists:\n" + dir.SourcePath)
+                                    : ("Could not create:\n" + dir.SourcePath + "\n" + result.message))
+                            });
+                        })
+                        .catch(function (err) {
+                            console.error("[BookEnhancers] Failed to create directory:", err);
+                            Dashboard.alert({ title: "Error", message: "Failed to create directory." });
+                        })
+                        .finally(function () {
+                            btn.disabled = false;
+                            btn.textContent = origText;
+                        });
+                    });
                 });
 
             function defaultTemplateForCollectionType(collectionType) {
@@ -852,6 +903,43 @@
                     });
             });
 
+            document.getElementById("btnGroupingPreview").addEventListener("click", function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Scanning...";
+
+                authFetch("Books/Grouping/Preview")
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        var msg = "Strategy: " + result.matchingStrategy +
+                            "\nTotal files: " + result.totalFiles +
+                            "\nWould be grouped: " + result.groupedCount + " (2+ formats each)" +
+                            "\nWould remain ungrouped: " + result.ungroupedCount;
+                        if (result.groups && result.groups.length > 0) {
+                            msg += "\n\nGroups:\n";
+                            result.groups.forEach(function (g) {
+                                msg += "  \"" + (g.title || "?") + "\" — " + g.formats.length + " formats\n";
+                                g.formats.forEach(function (f) { msg += "    " + f.formatType + " (" + f.filePath + ")\n"; });
+                            });
+                        }
+                        Dashboard.alert({
+                            title: "Grouping Preview",
+                            message: msg
+                        });
+                    })
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Grouping preview failed:", err);
+                        Dashboard.alert({
+                            title: "Error",
+                            message: "Preview failed. Check server logs."
+                        });
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Grouping Preview";
+                    });
+            });
+
             document.getElementById("btnScanAll").addEventListener("click", function () {
                 var btn = this;
                 btn.disabled = true;
@@ -955,6 +1043,8 @@
                     });
             }
 
+            var _beLibraries = [];
+
             document.getElementById("pluginConfigForm").addEventListener("submit", function (e) {
                 e.preventDefault();
 
@@ -973,38 +1063,99 @@
                     return;
                 }
 
-                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
-                    config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;
-                    config.HardcoverEnabled = document.getElementById("chkHardcoverEnabled").checked;
-                    config.HardcoverApiKey = document.getElementById("txtHardcoverApiKey").value;
-                    config.GoogleBooksEnabled = document.getElementById("chkGoogleBooksEnabled").checked;
-                    config.GoogleBooksApiKey = document.getElementById("txtGoogleBooksApiKey").value;
-                    config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
-                    config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
+                var dirs = getCurrentDirectories();
+                var container = document.getElementById("managedDirsContainer");
+                var hasMissing = false;
 
-                    config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;
-                    config.GroupingStrategy = document.getElementById("selGroupingStrategy").value;
+                function clearStatuses() {
+                    container.querySelectorAll(".dir-status").forEach(function (s) { s.textContent = ""; s.style.color = ""; });
+                }
 
-                    config.FormatPriority = getCurrentFormatPriority();
-
-                    config.CopyMode = document.getElementById("radioCopyMode").checked;
-
-                    var exts = getSelectedExtensions();
-                    config.IngestionFileExtensions = exts.length > 0 ? exts : DefaultExtensions.slice();
-
-                    config.AutoScanIntervalMinutes = parseInt(document.getElementById("txtAutoScanInterval").value) || 0;
-                    config.ManagedDirectories = getCurrentDirectories();
-                    config.IncludedLibraryIds = getSelectedLibraryIds();
-
-                    ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
-                        Dashboard.processPluginConfigurationUpdateResult(result);
-                    }).catch(function (err) {
-                        console.error("[BookEnhancers] Failed to save configuration:", err);
-                        Dashboard.alert({ title: "Error", message: "Failed to save configuration." });
+                function checkAllPaths() {
+                    clearStatuses();
+                    var dirs = getCurrentDirectories();
+                    var entries = [];
+                    dirs.forEach(function (d, idx) {
+                        if (d.Enabled && d.SourcePath && d.SourcePath.trim() !== "")
+                            entries.push({ idx: idx, path: d.SourcePath });
                     });
-                }).catch(function (err) {
-                    console.error("[BookEnhancers] Failed to read configuration for save:", err);
-                });
+
+                    function checkNext() {
+                        if (entries.length === 0) {
+                            if (hasMissing) {
+                                Dashboard.alert({
+                                    title: "Missing Source Directories",
+                                    message: "Some source paths don't exist. Use each row's Create button to create them."
+                                });
+                                return;
+                            }
+                            doSave();
+                            return;
+                        }
+
+                        var entry = entries.shift();
+                        var statusEl = container.querySelector('.dir-status[data-idx="' + entry.idx + '"]');
+                        authFetch("Books/Config/ValidateDirectory", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ path: entry.path, createIfMissing: false })
+                        })
+                        .then(function (r) { return r.json(); })
+                        .then(function (result) {
+                            if (!result.exists) {
+                                hasMissing = true;
+                                if (statusEl) {
+                                    statusEl.textContent = "Not found";
+                                    statusEl.style.color = "var(--warning-color,#e8a838)";
+                                }
+                            } else if (statusEl) {
+                                statusEl.textContent = "OK";
+                                statusEl.style.color = "var(--green,#4caf50)";
+                            }
+                            checkNext();
+                        })
+                        .catch(function () { checkNext(); });
+                    }
+
+                    checkNext();
+                }
+
+                function doSave() {
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;
+                        config.HardcoverEnabled = document.getElementById("chkHardcoverEnabled").checked;
+                        config.HardcoverApiKey = document.getElementById("txtHardcoverApiKey").value;
+                        config.GoogleBooksEnabled = document.getElementById("chkGoogleBooksEnabled").checked;
+                        config.GoogleBooksApiKey = document.getElementById("txtGoogleBooksApiKey").value;
+                        config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
+                        config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
+
+                        config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;
+                        config.GroupingStrategy = document.getElementById("selGroupingStrategy").value;
+
+                        config.FormatPriority = getCurrentFormatPriority();
+
+                        config.CopyMode = document.getElementById("radioCopyMode").checked;
+
+                        var exts = getSelectedExtensions();
+                        config.IngestionFileExtensions = exts.length > 0 ? exts : DefaultExtensions.slice();
+
+                        config.AutoScanIntervalMinutes = parseInt(document.getElementById("txtAutoScanInterval").value) || 0;
+                        config.ManagedDirectories = getCurrentDirectories();
+                        config.IncludedLibraryIds = getSelectedLibraryIds();
+
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        }).catch(function (err) {
+                            console.error("[BookEnhancers] Failed to save configuration:", err);
+                            Dashboard.alert({ title: "Error", message: "Failed to save configuration." });
+                        });
+                    }).catch(function (err) {
+                        console.error("[BookEnhancers] Failed to read configuration for save:", err);
+                    });
+                }
+
+                checkAllPaths();
             });
 
             if (!window._beListenersBound) {
@@ -1022,6 +1173,8 @@
                 document.removeEventListener("viewshow", onView);
                 loadConfig();
             });
+
+            loadConfig();
         })();
     </script>
 </div>

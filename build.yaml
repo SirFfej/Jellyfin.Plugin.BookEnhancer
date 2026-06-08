@@ -1,7 +1,7 @@
 ---
 name: "BookEnhancers"
 guid: "66bc815f-035b-43a4-82ec-d1f39dfe988b"
-version: "0.1.2.0"
+version: "0.1.9.6"
 targetAbi: "10.11.8.0"
 framework: "net9.0"
 overview: "Unified ebook, audiobook, and comic metadata enrichment plugin"
@@ -14,6 +14,8 @@ owner: "SirFfej"
 artifacts:
   - "Jellyfin-Plugin-BookEnhancer.dll"
 changelog: >
-  v0.1.2.0 - Triggerable scheduled tasks (Ingestion Scan, Grouping Process,
-  Full Maintenance) with per-task log files; Full Maintenance auto-schedules
-  via AutoScanIntervalMinutes.
+  v0.1.9.6 - Source path validation inline OK/Not found status; per-row Create
+  directory buttons; Grouping Preview + Repair endpoints (populates JellyfinItemId,
+  reports stale paths); loadConfig fix (config page no longer blank on load);
+  ConfigureAwait(false) added to all awaits; TaskLogger double-dispose guard;
+  private field naming convention fixes; == null → is null throughout.

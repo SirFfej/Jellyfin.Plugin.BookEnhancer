@@ -37,7 +37,7 @@ public class GroupingProcessTask : IScheduledTask
         try
         {
             logger.LogInformation("Starting grouping post-processing...");
-            await _groupingService.ProcessAllGroupsAsync(cancellationToken);
+            await _groupingService.ProcessAllGroupsAsync(cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Grouping process complete");
             ((IProgress<double>)logger).Report(1.0);
         }

@@ -24,18 +24,18 @@ public class HardcoverApiClient
         if (string.IsNullOrWhiteSpace(apiKey)) return null;
 
         var cleanIsbn = CleanIsbn(isbn);
-        if (cleanIsbn == null) return null;
+        if (cleanIsbn is null) return null;
 
         try
         {
-            var editionData = await QueryEditionByIsbn(cleanIsbn, apiKey, ct);
-            if (editionData == null) return null;
+            var editionData = await QueryEditionByIsbn(cleanIsbn, apiKey, ct).ConfigureAwait(false);
+            if (editionData is null) return null;
 
             var meta = MapEdition(editionData);
 
             if (editionData.BookId > 0)
             {
-                var bookData = await QueryBookById(editionData.BookId, apiKey, ct);
+                var bookData = await QueryBookById(editionData.BookId, apiKey, ct).ConfigureAwait(false);
                 if (bookData != null)
                     MapBook(bookData, meta);
             }
@@ -70,7 +70,7 @@ query($isbn: String!) {
   }
 }";
         var body = new { query, variables = new { isbn } };
-        var response = await SendGraphQlAsync<EditionResponse>(body, apiKey, ct);
+        var response = await SendGraphQlAsync<EditionResponse>(body, apiKey, ct).ConfigureAwait(false);
         return response?.Data?.Editions?.FirstOrDefault();
     }
 
@@ -100,7 +100,7 @@ query($bookId: Int!) {
   }
 }";
         var body = new { query, variables = new { bookId } };
-        var response = await SendGraphQlAsync<BookResponse>(body, apiKey, ct);
+        var response = await SendGraphQlAsync<BookResponse>(body, apiKey, ct).ConfigureAwait(false);
         return response?.Data?.Books?.FirstOrDefault();
     }
 
@@ -111,9 +111,9 @@ query($bookId: Int!) {
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
 
-        var httpResponse = await client.PostAsJsonAsync(GraphQlEndpoint, body, ct);
+        var httpResponse = await client.PostAsJsonAsync(GraphQlEndpoint, body, ct).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
-        return await httpResponse.Content.ReadFromJsonAsync<GraphQlResponse<T>>(ct);
+        return await httpResponse.Content.ReadFromJsonAsync<GraphQlResponse<T>>(ct).ConfigureAwait(false);
     }
 
     private static FileMetadata MapEdition(EditionResult ed)
@@ -153,16 +153,16 @@ query($bookId: Int!) {
         meta.Description ??= book.Description;
         meta.PublishYear ??= book.ReleaseYear;
 
-        if (book.ReleaseDate != null && meta.PublishDate == null &&
+        if (book.ReleaseDate != null && meta.PublishDate is null &&
             DateTime.TryParse(book.ReleaseDate, out var dt))
             meta.PublishDate = dt;
 
-        if (book.Headline != null && meta.Subtitle == null)
+        if (book.Headline != null && meta.Subtitle is null)
             meta.Subtitle = book.Headline;
 
         if (book.Rating.HasValue && book.Rating.Value > 0)
         {
-            if (meta.Tags == null) meta.Tags = new();
+            if (meta.Tags is null) meta.Tags = new();
             meta.Tags.Add($"HardcoverRating:{(decimal)book.Rating:F1}");
         }
 
@@ -175,7 +175,7 @@ query($bookId: Int!) {
                 {
                     var tag = element.TryGetProperty("tag", out var t) ? t.GetString() : null;
                     var category = element.TryGetProperty("tag_category", out var c) ? c.GetString() : null;
-                    if (tag == null) continue;
+                    if (tag is null) continue;
 
                     if (category == "genre")
                         meta.Genres.Add(tag);
@@ -193,7 +193,7 @@ query($bookId: Int!) {
         {
             foreach (var c in book.Contributions)
             {
-                if (c.Author?.Name == null) continue;
+                if (c.Author?.Name is null) continue;
                 var mappedRole = NormalizeRole(c.Contribution);
 
                 if (mappedRole == "Narrator")
@@ -211,7 +211,7 @@ query($bookId: Int!) {
             if (primary != null)
             {
                 meta.SeriesName ??= primary.Series?.Name;
-                if (primary.Position.HasValue && meta.SeriesIndex == null)
+                if (primary.Position.HasValue && meta.SeriesIndex is null)
                     meta.SeriesIndex = (float)primary.Position.Value;
             }
         }

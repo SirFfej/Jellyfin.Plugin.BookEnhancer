@@ -4,7 +4,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Services.Parsers;
 
 public class AudioParser : IFileParser
 {
-    private static readonly HashSet<string> Extensions = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> _extensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
     };
@@ -12,7 +12,7 @@ public class AudioParser : IFileParser
     public bool CanParse(string filePath)
     {
         var ext = Path.GetExtension(filePath);
-        return !string.IsNullOrEmpty(ext) && Extensions.Contains(ext);
+        return !string.IsNullOrEmpty(ext) && _extensions.Contains(ext);
     }
 
     public Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)

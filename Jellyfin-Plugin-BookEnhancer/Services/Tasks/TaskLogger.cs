@@ -8,6 +8,7 @@ public sealed class TaskLogger : IProgress<double>, IDisposable
     private readonly StreamWriter _writer;
     private readonly object _lock = new();
     private int _lastReportedPercent = -1;
+    private bool _disposed;
 
     public TaskLogger(string logDirectory, string taskName)
     {
@@ -61,14 +62,22 @@ public sealed class TaskLogger : IProgress<double>, IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+            return;
+
+        _disposed = true;
         Write(LogLevel.Information, "Task completed");
         _writer.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     private void Write(LogLevel level, string message)
     {
         lock (_lock)
         {
+            if (_disposed)
+                return;
+
             _writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level,-11}] {message}");
         }
     }

@@ -7,7 +7,7 @@ public class LibraryOrganizationService
 {
     private readonly ILogger<LibraryOrganizationService> _logger;
 
-    private static readonly HashSet<string> InvalidPathChars = new(
+    private static readonly HashSet<string> _invalidPathChars = new(
         Path.GetInvalidFileNameChars()
             .Concat(Path.GetInvalidPathChars())
             .Select(c => c.ToString()));
@@ -47,18 +47,6 @@ public class LibraryOrganizationService
             .Replace("{Publisher}", GetPublisherDirectoryName(metadata));
     }
 
-    public string BuildAlternateFormatPath(string primaryFilePath, FileMetadata metadata)
-    {
-        var primaryDir = Path.GetDirectoryName(primaryFilePath);
-        if (primaryDir == null)
-            throw new InvalidOperationException("Primary file path has no directory");
-
-        var formatsDir = Path.Combine(primaryDir, ".formats");
-        var fileName = GetFileName(metadata);
-
-        return Path.Combine(formatsDir, fileName);
-    }
-
     public MoveResult MoveFile(string sourcePath, string targetPath, bool copy = false)
     {
         try
@@ -67,7 +55,7 @@ public class LibraryOrganizationService
                 return MoveResult.CreateError("Source file no longer exists");
 
             var targetDir = Path.GetDirectoryName(targetPath);
-            if (targetDir == null)
+            if (targetDir is null)
                 return MoveResult.CreateError("Invalid target path");
 
             if (File.Exists(targetPath))
@@ -163,7 +151,7 @@ public class LibraryOrganizationService
 
         input = input.Trim();
 
-        foreach (var c in InvalidPathChars)
+        foreach (var c in _invalidPathChars)
         {
             input = input.Replace(c, "_");
         }

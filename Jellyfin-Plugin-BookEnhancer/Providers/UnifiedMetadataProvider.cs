@@ -40,15 +40,15 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
     {
         var result = new MetadataResult<Book>();
         var config = Plugin.Instance?.Configuration;
-        if (config == null || !config.UnifiedMetadataEnabled) return result;
+        if (config is null || !config.UnifiedMetadataEnabled) return result;
 
         if (!IsLibrarySelected(info.Path))
             return result;
 
         try
         {
-            var fileMeta = await ExtractFileMetadata(info.Path, cancellationToken);
-            if (fileMeta == null) return result;
+            var fileMeta = await ExtractFileMetadata(info.Path, cancellationToken).ConfigureAwait(false);
+            if (fileMeta is null) return result;
 
             var enriched = await _enrichment.EnrichAsync(
                 fileMeta,
@@ -57,7 +57,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 config.HardcoverEnabled,
                 config.GoogleBooksEnabled,
                 config.OpenLibraryEnabled,
-                cancellationToken);
+                cancellationToken).ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(enriched.Title)) return result;
 
@@ -66,7 +66,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 var formatType = enriched.FileFormat;
                 var existingGroup = _grouping.GetGroupByIsbn(enriched.Isbn);
 
-                if (existingGroup == null)
+                if (existingGroup is null)
                 {
                     var group = _grouping.CreateGroup(enriched);
                     _grouping.AddFormatToGroup(group.Id, info.Path, formatType, isPrimary: true);
@@ -106,13 +106,13 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
     {
         var results = new List<RemoteSearchResult>();
         var config = Plugin.Instance?.Configuration;
-        if (config == null || !config.UnifiedMetadataEnabled) return results;
+        if (config is null || !config.UnifiedMetadataEnabled) return results;
 
         try
         {
             if (!string.IsNullOrWhiteSpace(searchInfo.Name))
             {
-                var localMeta = await ExtractFileMetadata(searchInfo.Path, cancellationToken);
+                var localMeta = await ExtractFileMetadata(searchInfo.Path, cancellationToken).ConfigureAwait(false);
                 if (localMeta?.Isbn != null)
                 {
                     var enriched = await _enrichment.EnrichAsync(
@@ -122,7 +122,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                         config.HardcoverEnabled,
                         config.GoogleBooksEnabled,
                         config.OpenLibraryEnabled,
-                        cancellationToken);
+                        cancellationToken).ConfigureAwait(false);
 
                     if (!string.IsNullOrWhiteSpace(enriched.Title))
                     {
@@ -151,7 +151,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
 
         try
         {
-            return await _fileExtractor.ExtractAsync(path, cancellationToken);
+            return await _fileExtractor.ExtractAsync(path, cancellationToken).ConfigureAwait(false);
         }
         catch
         {
@@ -263,7 +263,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
     private bool IsLibrarySelected(string itemPath)
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null || config.IncludedLibraryIds.Count == 0)
+        if (config is null || config.IncludedLibraryIds.Count == 0)
             return true;
 
         if (string.IsNullOrWhiteSpace(itemPath))

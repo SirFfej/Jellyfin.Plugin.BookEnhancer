@@ -20,7 +20,7 @@ public class OpenLibraryApiClient
     public async Task<FileMetadata?> SearchByIsbnAsync(string isbn, CancellationToken ct = default)
     {
         var cleanIsbn = CleanIsbn(isbn);
-        if (cleanIsbn == null) return null;
+        if (cleanIsbn is null) return null;
 
         try
         {
@@ -30,11 +30,11 @@ public class OpenLibraryApiClient
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
 
-            var response = await client.GetFromJsonAsync<Dictionary<string, OlBookEntry>>(url, ct);
-            if (response == null) return null;
+            var response = await client.GetFromJsonAsync<Dictionary<string, OlBookEntry>>(url, ct).ConfigureAwait(false);
+            if (response is null) return null;
 
             var key = $"ISBN:{cleanIsbn}";
-            if (!response.TryGetValue(key, out var entry) || entry?.Details == null)
+            if (!response.TryGetValue(key, out var entry) || entry?.Details is null)
                 return null;
 
             return MapEntry(entry, cleanIsbn);

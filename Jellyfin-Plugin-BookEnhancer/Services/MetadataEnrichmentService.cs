@@ -42,7 +42,7 @@ public class MetadataEnrichmentService
         // Tier 1: Hardcover (highest quality, most fields)
         if (hardcoverEnabled && !string.IsNullOrWhiteSpace(hardcoverApiKey))
         {
-            var hcMeta = await _hardcover.SearchByIsbnAsync(isbn, hardcoverApiKey, ct);
+            var hcMeta = await _hardcover.SearchByIsbnAsync(isbn, hardcoverApiKey, ct).ConfigureAwait(false);
             if (hcMeta != null)
             {
                 MergeSource(source, hcMeta);
@@ -56,7 +56,7 @@ public class MetadataEnrichmentService
         // Tier 2: Google Books (good fallback)
         if (googleBooksEnabled)
         {
-            var gbMeta = await _googleBooks.SearchByIsbnAsync(isbn, googleBooksApiKey, ct);
+            var gbMeta = await _googleBooks.SearchByIsbnAsync(isbn, googleBooksApiKey, ct).ConfigureAwait(false);
             if (gbMeta != null)
             {
                 MergeNulls(source, gbMeta);
@@ -70,7 +70,7 @@ public class MetadataEnrichmentService
         // Tier 3: OpenLibrary (always available, no key needed)
         if (openLibraryEnabled)
         {
-            var olMeta = await _openLibrary.SearchByIsbnAsync(isbn, ct);
+            var olMeta = await _openLibrary.SearchByIsbnAsync(isbn, ct).ConfigureAwait(false);
             if (olMeta != null)
             {
                 MergeNulls(source, olMeta);

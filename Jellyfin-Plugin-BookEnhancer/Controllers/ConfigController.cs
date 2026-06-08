@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +15,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Controllers;
 [Route("Books/Config")]
 public class ConfigController : ControllerBase
 {
-    private static readonly Uri HardcoverGraphQlEndpoint = new("https://api.hardcover.app/v1/graphql");
+    private static readonly Uri _hardcoverGraphQlEndpoint = new("https://api.hardcover.app/v1/graphql");
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ConfigController> _logger;
 
@@ -36,14 +37,14 @@ public class ConfigController : ControllerBase
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
             var payload = JsonSerializer.Serialize(new { query = "query { me { id } }" });
-            var httpReq = new HttpRequestMessage(HttpMethod.Post, HardcoverGraphQlEndpoint)
+            var httpReq = new HttpRequestMessage(HttpMethod.Post, _hardcoverGraphQlEndpoint)
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
             httpReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", request.ApiKey);
 
-            var resp = await client.SendAsync(httpReq, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
+            var resp = await client.SendAsync(httpReq, ct).ConfigureAwait(false);
+            var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
             if (resp.IsSuccessStatusCode)
             {
@@ -73,7 +74,7 @@ public class ConfigController : ControllerBase
                 ? "https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1"
                 : $"https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1&key={request.ApiKey}";
 
-            var resp = await client.GetAsync(url, ct);
+            var resp = await client.GetAsync(url, ct).ConfigureAwait(false);
 
             if (resp.IsSuccessStatusCode)
             {
@@ -102,6 +103,37 @@ public class ConfigController : ControllerBase
             Name = plugin?.Name ?? "BookEnhancers"
         });
     }
+
+    [HttpPost("ValidateDirectory")]
+    [Authorize]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Authorized endpoint used for user-configured source directories only.")]
+    public ActionResult<ValidateDirectoryResult> ValidateDirectory([FromBody] ValidateDirectoryRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.Path))
+            return Ok(new ValidateDirectoryResult { Exists = false, Message = "No path provided." });
+
+        try
+        {
+            var fullPath = Path.GetFullPath(request.Path);
+            var exists = Directory.Exists(fullPath);
+            if (exists)
+                return Ok(new ValidateDirectoryResult { Exists = true, Message = "Directory exists." });
+
+            if (request.CreateIfMissing)
+            {
+                Directory.CreateDirectory(fullPath);
+                _logger.LogInformation("Created directory: {Path}", fullPath);
+                return Ok(new ValidateDirectoryResult { Exists = true, Created = true, Message = "Directory created." });
+            }
+
+            return Ok(new ValidateDirectoryResult { Exists = false, Message = "Directory does not exist." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to validate directory: {Path}", request.Path);
+            return Ok(new ValidateDirectoryResult { Exists = false, Message = $"Error: {ex.Message}" });
+        }
+    }
 }
 
 public class TestKeyRequest
@@ -126,4 +158,25 @@ public class PluginInfoResult
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+}
+
+public class ValidateDirectoryRequest
+{
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = string.Empty;
+
+    [JsonPropertyName("createIfMissing")]
+    public bool CreateIfMissing { get; set; }
+}
+
+public class ValidateDirectoryResult
+{
+    [JsonPropertyName("exists")]
+    public bool Exists { get; set; }
+
+    [JsonPropertyName("created")]
+    public bool Created { get; set; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
 }

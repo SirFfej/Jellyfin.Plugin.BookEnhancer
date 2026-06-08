@@ -58,7 +58,7 @@ public class BookGroupingService
     private static Dictionary<string, int> GetFormatPriorityMap()
     {
         var config = Plugin.Instance?.Configuration;
-        if (config?.FormatPriority == null || config.FormatPriority.Count == 0)
+        if (config?.FormatPriority is null || config.FormatPriority.Count == 0)
         {
             return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
             {
@@ -143,30 +143,6 @@ public class BookGroupingService
         _logger.LogDebug("Created book group {GroupId} for ISBN {Isbn}", group.Id, group.Isbn);
         return group;
     }
-
-    public void UpdateGroup(BookGroup group)
-    {
-        group.UpdatedAt = DateTime.UtcNow;
-
-        using var conn = CreateConnection();
-        conn.Open();
-
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            UPDATE book_groups
-            SET Title = @Title, Author = @Author, Isbn = @Isbn, UpdatedAt = @UpdatedAt
-            WHERE Id = @Id
-            """;
-
-        cmd.Parameters.AddWithValue("@Id", group.Id);
-        cmd.Parameters.AddWithValue("@Title", (object?)group.Title ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@Author", (object?)group.Author ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@Isbn", (object?)group.Isbn ?? DBNull.Value);
-        cmd.Parameters.AddWithValue("@UpdatedAt", group.UpdatedAt.ToString("O"));
-
-        cmd.ExecuteNonQuery();
-    }
-
     public BookFormat AddFormatToGroup(string groupId, string filePath, string formatType, bool isPrimary = false)
     {
         using var conn = CreateConnection();
@@ -253,28 +229,6 @@ public class BookGroupingService
         cmd.CommandText = "DELETE FROM book_formats WHERE Id = @Id";
         cmd.Parameters.AddWithValue("@Id", formatId);
         cmd.ExecuteNonQuery();
-    }
-
-    public BookFormat? GetPrimaryFormat(string groupId)
-    {
-        using var conn = CreateConnection();
-        conn.Open();
-
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = """
-            SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt
-            FROM book_formats
-            WHERE GroupId = @GroupId AND IsPrimary = 1
-            LIMIT 1
-            """;
-
-        cmd.Parameters.AddWithValue("@GroupId", groupId);
-
-        using var reader = cmd.ExecuteReader();
-        if (!reader.Read())
-            return null;
-
-        return ReadFormat(reader);
     }
 
     public List<BookFormat> GetFormatsForGroup(string groupId)
@@ -364,17 +318,6 @@ public class BookGroupingService
     {
         var map = GetFormatPriorityMap();
         return map.TryGetValue(formatType, out var priority) ? priority : 100;
-    }
-
-    public static int GetFormatPriorityFromExtension(string filePath)
-    {
-        var ext = Path.GetExtension(filePath)?.TrimStart('.').ToUpperInvariant();
-        if (ext is "EPUB") return GetFormatPriority("EPUB");
-        if (ext is "MOBI") return GetFormatPriority("MOBI");
-        if (ext is "PDF") return GetFormatPriority("PDF");
-        if (ext is "CBZ" or "CBR" or "CB7") return GetFormatPriority("Comic");
-        if (ext is "MP3" or "M4A" or "M4B" or "FLAC" or "OGG" or "WMA" or "OPUS" or "AIFF") return GetFormatPriority("Audio");
-        return 100;
     }
 
     private static BookFormat ReadFormat(SqliteDataReader reader)

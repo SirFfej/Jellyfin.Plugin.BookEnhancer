@@ -30,7 +30,7 @@ public class FullMaintenanceTask : IScheduledTask
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
         var config = Plugin.Instance?.Configuration;
-        if (config == null || config.AutoScanIntervalMinutes <= 0)
+        if (config is null || config.AutoScanIntervalMinutes <= 0)
             return [];
 
         return
@@ -53,7 +53,7 @@ public class FullMaintenanceTask : IScheduledTask
             logger.LogInformation("Starting full maintenance — ingestion scan...");
             ((IProgress<double>)logger).Report(0.0);
 
-            var ingestionResult = await _ingestionService.ScanAllAsync(cancellationToken);
+            var ingestionResult = await _ingestionService.ScanAllAsync(cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
                 $"Ingestion complete — Found: {ingestionResult.FilesFound}, " +
                 $"Added: {ingestionResult.FilesAdded}, " +
@@ -61,7 +61,7 @@ public class FullMaintenanceTask : IScheduledTask
             ((IProgress<double>)logger).Report(0.5);
 
             logger.LogInformation("Starting grouping post-processing...");
-            await _groupingService.ProcessAllGroupsAsync(cancellationToken);
+            await _groupingService.ProcessAllGroupsAsync(cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Grouping process complete");
             ((IProgress<double>)logger).Report(1.0);
         }

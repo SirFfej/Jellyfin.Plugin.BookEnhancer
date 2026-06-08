@@ -6,9 +6,9 @@ namespace Jellyfin.Plugin.BookEnhancer.Services.Parsers;
 
 public class EpubParser : IFileParser
 {
-    private static readonly XNamespace Dc = "http://purl.org/dc/elements/1.1/";
-    private static readonly XNamespace Opf = "http://www.idpf.org/2007/opf";
+    private static readonly XNamespace _dc = "http://purl.org/dc/elements/1.1/";
 
+    private static readonly XNamespace _opf = "http://www.idpf.org/2007/opf";
     public bool CanParse(string filePath)
     {
         return filePath.EndsWith(".epub", StringComparison.OrdinalIgnoreCase);
@@ -21,16 +21,16 @@ public class EpubParser : IFileParser
             using var stream = File.OpenRead(filePath);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
 
-            var opfPath = ResolveOpfPath(archive);
-            if (opfPath == null) return null;
+            var opfPath = Resolve_opfPath(archive);
+            if (opfPath is null) return null;
 
             var opfEntry = archive.GetEntry(opfPath);
-            if (opfEntry == null) return null;
+            if (opfEntry is null) return null;
 
             using var opfStream = opfEntry.Open();
-            var opfDoc = await XDocument.LoadAsync(opfStream, LoadOptions.None, ct);
+            var opfDoc = await XDocument.LoadAsync(opfStream, LoadOptions.None, ct).ConfigureAwait(false);
 
-            var meta = ParseOpf(opfDoc, filePath);
+            var meta = Parse_opf(opfDoc, filePath);
             ExtractCover(meta, archive, opfDoc, opfPath);
             return meta;
         }
@@ -40,10 +40,10 @@ public class EpubParser : IFileParser
         }
     }
 
-    private static string? ResolveOpfPath(ZipArchive archive)
+    private static string? Resolve_opfPath(ZipArchive archive)
     {
         var containerEntry = archive.GetEntry("META-INF/container.xml");
-        if (containerEntry == null) return null;
+        if (containerEntry is null) return null;
 
         using var stream = containerEntry.Open();
         var container = XDocument.Load(stream);
@@ -59,7 +59,7 @@ public class EpubParser : IFileParser
         return rootfile?.Attribute("full-path")?.Value;
     }
 
-    private static FileMetadata ParseOpf(XDocument opf, string filePath)
+    private static FileMetadata Parse_opf(XDocument opf, string filePath)
     {
         var meta = new FileMetadata
         {
@@ -67,25 +67,25 @@ public class EpubParser : IFileParser
             FileFormat = "EPUB"
         };
 
-        var metadataEl = opf.Root?.Element(Opf + "metadata");
-        if (metadataEl == null) return meta;
+        var metadataEl = opf.Root?.Element(_opf + "metadata");
+        if (metadataEl is null) return meta;
 
-        meta.Title = metadataEl.Element(Dc + "title")?.Value;
+        meta.Title = metadataEl.Element(_dc + "title")?.Value;
 
-        var subtitleMeta = metadataEl.Elements(Opf + "meta")
+        var subtitleMeta = metadataEl.Elements(_opf + "meta")
             .FirstOrDefault(e => e.Attribute("name")?.Value == "subtitle");
         meta.Subtitle = subtitleMeta?.Attribute("content")?.Value;
 
-        foreach (var creator in metadataEl.Elements(Dc + "creator"))
+        foreach (var creator in metadataEl.Elements(_dc + "creator"))
         {
             var name = creator.Value?.Trim();
             if (!string.IsNullOrWhiteSpace(name))
                 meta.Authors.Add(name);
         }
 
-        foreach (var contributor in metadataEl.Elements(Dc + "contributor"))
+        foreach (var contributor in metadataEl.Elements(_dc + "contributor"))
         {
-            var role = contributor.Attribute(Opf + "role")?.Value;
+            var role = contributor.Attribute(_opf + "role")?.Value;
             var name = contributor.Value?.Trim();
             if (string.IsNullOrWhiteSpace(name)) continue;
 
@@ -106,26 +106,26 @@ public class EpubParser : IFileParser
         }
 
         meta.Isbn = ExtractIsbn(metadataEl);
-        meta.Publisher = metadataEl.Element(Dc + "publisher")?.Value;
+        meta.Publisher = metadataEl.Element(_dc + "publisher")?.Value;
 
-        var dateStr = metadataEl.Element(Dc + "date")?.Value;
+        var dateStr = metadataEl.Element(_dc + "date")?.Value;
         if (dateStr != null && DateTime.TryParse(dateStr, out var date))
         {
             meta.PublishDate = date;
             meta.PublishYear = date.Year;
         }
 
-        meta.Language = metadataEl.Element(Dc + "language")?.Value;
-        meta.Description = metadataEl.Element(Dc + "description")?.Value;
+        meta.Language = metadataEl.Element(_dc + "language")?.Value;
+        meta.Description = metadataEl.Element(_dc + "description")?.Value;
 
-        foreach (var subject in metadataEl.Elements(Dc + "subject"))
+        foreach (var subject in metadataEl.Elements(_dc + "subject"))
         {
             var val = subject.Value?.Trim();
             if (!string.IsNullOrWhiteSpace(val))
                 meta.Tags.Add(val);
         }
 
-        foreach (var met in metadataEl.Elements(Opf + "meta"))
+        foreach (var met in metadataEl.Elements(_opf + "meta"))
         {
             var name = met.Attribute("name")?.Value;
             var content = met.Attribute("content")?.Value;
@@ -141,9 +141,9 @@ public class EpubParser : IFileParser
 
     private static string? ExtractIsbn(XElement metadataEl)
     {
-        foreach (var id in metadataEl.Elements(Dc + "identifier"))
+        foreach (var id in metadataEl.Elements(_dc + "identifier"))
         {
-            var scheme = id.Attribute(Opf + "scheme")?.Value;
+            var scheme = id.Attribute(_opf + "scheme")?.Value;
             if (string.Equals(scheme, "ISBN", StringComparison.OrdinalIgnoreCase))
             {
                 var val = id.Value?.Trim();
@@ -152,24 +152,24 @@ public class EpubParser : IFileParser
             }
         }
 
-        foreach (var id in metadataEl.Elements(Dc + "identifier"))
+        foreach (var id in metadataEl.Elements(_dc + "identifier"))
         {
             var val = id.Value?.Trim();
-            if (val == null) continue;
+            if (val is null) continue;
             if (val.StartsWith("urn:isbn:", StringComparison.OrdinalIgnoreCase))
                 return CleanIsbn(val["urn:isbn:".Length..]);
             if (val.StartsWith("isbn:", StringComparison.OrdinalIgnoreCase))
                 return CleanIsbn(val["isbn:".Length..]);
         }
 
-        foreach (var meta in metadataEl.Elements(Opf + "meta"))
+        foreach (var meta in metadataEl.Elements(_opf + "meta"))
         {
             if (meta.Attribute("property")?.Value == "identifier-type" &&
                 meta.Value?.Trim().Equals("ISBN", StringComparison.OrdinalIgnoreCase) == true)
             {
                 var refines = meta.Attribute("refines")?.Value?.TrimStart('#');
-                if (refines == null) continue;
-                var id = metadataEl.Elements(Dc + "identifier")
+                if (refines is null) continue;
+                var id = metadataEl.Elements(_dc + "identifier")
                     .FirstOrDefault(e => e.Attribute("id")?.Value == refines);
                 if (id != null)
                     return CleanIsbn(id.Value?.Trim());
@@ -190,27 +190,27 @@ public class EpubParser : IFileParser
     {
         try
         {
-            var metadataEl = opf.Root?.Element(Opf + "metadata");
-            var manifestEl = opf.Root?.Element(Opf + "manifest");
-            if (metadataEl == null || manifestEl == null) return;
+            var metadataEl = opf.Root?.Element(_opf + "metadata");
+            var manifestEl = opf.Root?.Element(_opf + "manifest");
+            if (metadataEl is null || manifestEl is null) return;
 
-            var coverMeta = metadataEl.Elements(Opf + "meta")
+            var coverMeta = metadataEl.Elements(_opf + "meta")
                 .FirstOrDefault(e => e.Attribute("name")?.Value == "cover");
             var coverId = coverMeta?.Attribute("content")?.Value;
-            if (coverId == null) return;
+            if (coverId is null) return;
 
-            var coverItem = manifestEl.Elements(Opf + "item")
+            var coverItem = manifestEl.Elements(_opf + "item")
                 .FirstOrDefault(e => e.Attribute("id")?.Value == coverId);
             var href = coverItem?.Attribute("href")?.Value;
             var mediaType = coverItem?.Attribute("media-type")?.Value;
-            if (href == null) return;
+            if (href is null) return;
 
             var opfDir = Path.GetDirectoryName(opfPath)?.Replace('\\', '/');
             var coverPath = opfDir != null ? $"{opfDir}/{href}" : href;
             coverPath = coverPath.Replace("//", "/").TrimStart('/');
 
             var coverEntry = archive.GetEntry(coverPath);
-            if (coverEntry == null) return;
+            if (coverEntry is null) return;
 
             using var coverStream = coverEntry.Open();
             using var ms = new MemoryStream();
