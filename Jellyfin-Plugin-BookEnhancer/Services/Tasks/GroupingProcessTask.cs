@@ -31,7 +31,7 @@ public class GroupingProcessTask : IScheduledTask
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var logDir = Path.Combine(_appPaths.DataPath, "plugins", "BookEnhancer", "logs");
+        var logDir = _appPaths.LogDirectoryPath;
         using var logger = new TaskLogger(logDir, "GroupingProcess");
 
         Func<string, Task> logCallback = msg =>

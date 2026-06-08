@@ -32,8 +32,8 @@ public class LibraryCleanupTask : IScheduledTask
 
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
-        var logDir = Path.Combine(_appPaths.DataPath, "plugins", "BookEnhancer", "logs");
-        using var logger = new TaskLogger(logDir, "LibraryCleanup");
+        var logDir = _appPaths.LogDirectoryPath;
+        using var logger = new TaskLogger(logDir, "log_LibraryCleanup");
 
         var logBuffer = new StringBuilder();
 
@@ -61,7 +61,7 @@ public class LibraryCleanupTask : IScheduledTask
             logBuffer.AppendLine($"Empty dirs removed: {result.EmptyDirectoriesRemoved}");
             logBuffer.AppendLine($"Completed at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
-            var logPath = Path.Combine(logDir, $"LibraryCleanup-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
+            var logPath = Path.Combine(logDir, $"log_LibraryCleanup-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
             await File.WriteAllTextAsync(logPath, logBuffer.ToString(), cancellationToken).ConfigureAwait(false);
 
             logger.LogInformation($"Cleanup complete. Summary written to: {logPath}");

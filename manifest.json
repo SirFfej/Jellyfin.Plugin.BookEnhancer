@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.2.0.1 - Log files now written to Jellyfin LogDirectoryPath (visible in Dashboard Logs UI). Library Cleanup log files prefixed with 'log_' so server retention policy applies. Added retry with exponential backoff around DeleteItem for 'database is locked' errors.",
+        "checksum": "82a75775f836f5c9e666d48a775459a4",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.2.0.1/Jellyfin.Plugin.BookEnhancer_0.2.0.1.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-08T00:00:00Z",
+        "version": "0.2.0.1"
+      },
+      {
         "changelog": "v0.2.0.0 - All tasks now write exclusively to their own log files, not the main Jellyfin log. LibraryOrganizationService.MoveFile and LibraryCleanupService now route all messages through log callbacks. Remaining ILogger dependencies removed from LibraryCleanupService.",
         "checksum": "43e7805859a4f08ab7b8b65520025c18",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.2.0.0/Jellyfin.Plugin.BookEnhancer_0.2.0.0.zip",

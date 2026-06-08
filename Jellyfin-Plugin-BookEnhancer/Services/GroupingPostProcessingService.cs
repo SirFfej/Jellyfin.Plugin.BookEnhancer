@@ -7,6 +7,9 @@ namespace Jellyfin.Plugin.BookEnhancer.Services;
 
 public class GroupingPostProcessingService
 {
+    private const int MaxDeleteRetries = 5;
+    private const int DeleteRetryBaseDelayMs = 200;
+
     private readonly BookGroupingService _groupingService;
     private readonly ILibraryManager _libraryManager;
     private readonly ILogger<GroupingPostProcessingService> _logger;
@@ -100,10 +103,7 @@ public class GroupingPostProcessingService
                 var altItem = FindItemByPath(alternate.FilePath);
                 if (altItem is not null)
                 {
-                    _libraryManager.DeleteItem(
-                        altItem,
-                        new DeleteOptions { DeleteFileLocation = false },
-                        false);
+                    await DeleteItemWithRetryAsync(altItem, ct).ConfigureAwait(false);
                 }
 
                 if (formatsDir is not null && File.Exists(alternate.FilePath))
@@ -183,6 +183,35 @@ public class GroupingPostProcessingService
         {
             _logger.LogWarning(ex, "Failed to find item by path: {Path}", path);
             return null;
+        }
+    }
+
+    private async Task DeleteItemWithRetryAsync(BaseItem item, CancellationToken ct)
+    {
+        var attempt = 0;
+        while (true)
+        {
+            attempt++;
+            try
+            {
+                _libraryManager.DeleteItem(
+                    item,
+                    new DeleteOptions { DeleteFileLocation = false },
+                    false);
+
+                return;
+            }
+            catch (Exception ex) when (attempt <= MaxDeleteRetries)
+            {
+                var isLocked = ex.GetType().Name == "SqliteException" && ex.Message.Contains("database is locked");
+                if (!isLocked)
+                    throw;
+
+                await LogWarningAsync($"Database locked, retrying delete (attempt {attempt}/{MaxDeleteRetries})").ConfigureAwait(false);
+
+                var delay = DeleteRetryBaseDelayMs * (int)Math.Pow(2, attempt - 1);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+            }
         }
     }
 }
