@@ -1,9 +1,12 @@
 using System.Net.Http;
 using System.Reflection;
+using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Controllers;
 
@@ -11,11 +14,14 @@ namespace Jellyfin.Plugin.BookEnhancer.Controllers;
 [Route("Books/Config")]
 public class ConfigController : ControllerBase
 {
+    private static readonly Uri HardcoverGraphQlEndpoint = new("https://api.hardcover.app/v1/graphql");
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<ConfigController> _logger;
 
-    public ConfigController(IHttpClientFactory httpClientFactory)
+    public ConfigController(IHttpClientFactory httpClientFactory, ILogger<ConfigController> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _logger = logger;
     }
 
     [HttpPost("TestHardcover")]
@@ -27,16 +33,30 @@ public class ConfigController : ControllerBase
         try
         {
             var client = _httpClientFactory.CreateClient();
-            client.DefaultRequestHeaders.Add("Authorization", $"Bearer {request.ApiKey}");
-            var resp = await client.GetAsync("https://api.hardcover.app/v1/me", ct);
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var payload = JsonSerializer.Serialize(new { query = "query { me { id } }" });
+            var httpReq = new HttpRequestMessage(HttpMethod.Post, HardcoverGraphQlEndpoint)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            httpReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", request.ApiKey);
+
+            var resp = await client.SendAsync(httpReq, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
 
             if (resp.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Hardcover API test succeeded");
                 return Ok(new TestResult { Success = true, Message = "Hardcover API key is valid." });
+            }
 
+            _logger.LogWarning("Hardcover API test failed: {StatusCode} {Body}", resp.StatusCode, body);
             return Ok(new TestResult { Success = false, Message = $"Hardcover API returned {resp.StatusCode}. Check your key." });
         }
         catch (System.Exception ex)
         {
+            _logger.LogError(ex, "Hardcover API test connection failed");
             return Ok(new TestResult { Success = false, Message = $"Connection failed: {ex.Message}" });
         }
     }
@@ -47,6 +67,8 @@ public class ConfigController : ControllerBase
         try
         {
             var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
             var url = string.IsNullOrWhiteSpace(request.ApiKey)
                 ? "https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1"
                 : $"https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1&key={request.ApiKey}";

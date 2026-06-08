@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.1.9.2 - Fixed Hardcover API test endpoint (was using REST GET on GraphQL-only API); added ILogger to ConfigController; added 15s timeout + User-Agent header to both test endpoints.",
+        "checksum": "133020898a734b6d92909431ff38c20b",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.2/Jellyfin.Plugin.BookEnhancer_0.1.9.2.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-07T00:00:00Z",
+        "version": "0.1.9.2"
+      },
+      {
         "changelog": "v0.1.9.1 - Full style audit: all elements use Jellyfin CSS variables for dark/light theme compatibility; inline style fallbacks for custom classes stripped by sanitizer; compact form layout; tab active state set via JS inline; test results use theme-aware colors; hardcoded colors replaced with var(--card-background), var(--border-color), etc.",
         "checksum": "794df38dc5a89ac5737e5a38f507f14f",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.1.9.1/Jellyfin.Plugin.BookEnhancer_0.1.9.1.zip",
