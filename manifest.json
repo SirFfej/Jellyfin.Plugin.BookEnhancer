@@ -9,12 +9,20 @@
     "owner": "SirFfej",
     "versions": [
       {
-        "changelog": "v0.2.0.3 - Fixed 'NotSupported' status (missing meta.json), cleanup now enriches missing metadata before re-org, stale duplicate source files removed when target exists with same size.",
+        "changelog": "v0.2.0.3 - Added meta.json with targetAbi (fixes NotSupported on load), cleanup now enriches missing metadata before re-org.",
         "checksum": "fcb193e2c7e8ae2f9ec7f6db76e87310",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.2.0.3/Jellyfin.Plugin.BookEnhancer_0.2.0.3.zip",
         "targetAbi": "10.11.8.0",
         "timestamp": "2026-06-10T00:00:00Z",
         "version": "0.2.0.3"
+      },
+      {
+        "changelog": "v0.2.0.4 - Removed Microsoft.Extensions.* DLLs from plugin ZIP to fix type identity conflict (IServiceCollection) causing 'RegisterServices not implemented' error at load.",
+        "checksum": "bba7ff47197de4c06c6b00ff053688b4",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.2.0.4/Jellyfin.Plugin.BookEnhancer_0.2.0.4.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-10T00:00:00Z",
+        "version": "0.2.0.4"
       },
       {
         "changelog": "v0.2.0.2 - Added CopyLocalLockFileAssemblies to csproj so NuGet dependencies (UglyToad.PdfPig, SharpCompress, TagLibSharp, etc.) are now included in the build output and release ZIP. Fixes PdfPig missing assembly error — PDF parsing now works in deployed plugin.",

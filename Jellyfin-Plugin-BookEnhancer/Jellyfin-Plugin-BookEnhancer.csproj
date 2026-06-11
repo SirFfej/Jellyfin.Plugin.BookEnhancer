@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <Version>0.2.0.3</Version>
-    <AssemblyVersion>0.2.0.3</AssemblyVersion>
-    <FileVersion>0.2.0.3</FileVersion>
+    <Version>0.2.0.4</Version>
+    <AssemblyVersion>0.2.0.4</AssemblyVersion>
+    <FileVersion>0.2.0.4</FileVersion>
     <RootNamespace>Jellyfin.Plugin.BookEnhancer</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -54,6 +54,17 @@
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
   </ItemGroup>
+
+  <!-- Remove Microsoft.Extensions.* assemblies that the Jellyfin server already provides in its default load context.
+       Bundling them causes type identity conflicts (e.g. IServiceCollection from two different assemblies) which
+       makes the runtime think interface methods like IPluginServiceRegistrator.RegisterServices() are unimplemented. -->
+  <Target Name="RemoveServerProvidedAssemblies" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+    <ItemGroup>
+      <ServerProvidedDll Include="$(TargetDir)Microsoft.Extensions.*.dll" />
+    </ItemGroup>
+    <Delete Files="@(ServerProvidedDll)" />
+    <Message Text="Removed @(ServerProvidedDll->Count()) server-provided assemblies from plugin output" Importance="High" />
+  </Target>
 
   <Target Name="GenerateMetaJson" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
     <PropertyGroup>
