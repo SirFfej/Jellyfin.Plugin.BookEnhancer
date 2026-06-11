@@ -42,5 +42,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IScheduledTask, GroupingProcessTask>();
         serviceCollection.AddSingleton<IScheduledTask, FullMaintenanceTask>();
         serviceCollection.AddSingleton<IScheduledTask, LibraryCleanupTask>();
+        serviceCollection.AddSingleton<IScheduledTask, MetadataEnrichmentTask>();
     }
 }

@@ -67,8 +67,14 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 ### Library Cleanup
 - **Reorganize files** — moves files to match the current organize template if the source directory structure has changed
 - **Metadata enrichment pass** — files with missing template fields (author, publisher, series) are queued for online enrichment before reorganization
+- **Enrichment safety guard** — if enrichment cannot resolve required template fields, files are left in place and logged to an enrichment-issues file (prevents moving to `Unknown/` paths)
 - **Empty directory removal** — automatically cleans up empty directories left after moves
 - **Deduplication** — when target file already exists with identical content, the stale source is removed silently
+
+### Metadata Enrichment Report
+- **Scan all library files** — iterates all managed directories, extracts metadata, attempts online enrichment cascade
+- **Reports unenrichable items** — produces a summary log listing files with no ISBN, no online match, or extraction errors
+- **Per-file progress** — main task log shows each file's enrichment status
 
 ### Config Page (Dashboard → Plugins → BookEnhancers)
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
@@ -80,6 +86,7 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Per-task log files** — each scheduled task writes to its own log file in the Jellyfin Logs directory (visible in Dashboard → Logs)
 - **Ingestion scan** — daily log file appended across same-day runs (`IngestionScan-{yyyyMMdd}.log`)
 - **Library Cleanup** — log files prefixed with `log_` so they are retained by the server's log retention policy
+- **Enrichment issues** — files with metadata gaps that online enrichment could not resolve are logged to `log_LibraryCleanup-{yyyyMMdd}-enrichment-issues.log`
 
 ## Configuration
 
@@ -100,6 +107,7 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Grouping Process** — groups book formats by ISBN, links to Jellyfin library items
 - **Full Maintenance** — runs both ingestion and grouping in sequence
 - **Library Cleanup** — reorganizes files to match current templates, enriches missing metadata, removes stale duplicates and empty directories
+- **Metadata Enrichment** — scans all library files, attempts online enrichment, reports items that could not be enriched (no ISBN, no match, errors)
 
 ## Build from Source
 

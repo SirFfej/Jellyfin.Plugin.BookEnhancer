@@ -1,5 +1,6 @@
 using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using MediaBrowser.Common.Configuration;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services;
 
@@ -9,17 +10,20 @@ public class LibraryCleanupService
     private readonly MetadataEnrichmentService _enrichment;
     private readonly LibraryOrganizationService _organization;
     private readonly BookGroupingService _groupingService;
+    private readonly IApplicationPaths _appPaths;
 
     public LibraryCleanupService(
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
         LibraryOrganizationService organization,
-        BookGroupingService groupingService)
+        BookGroupingService groupingService,
+        IApplicationPaths appPaths)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
         _organization = organization;
         _groupingService = groupingService;
+        _appPaths = appPaths;
     }
 
     private static PluginConfiguration? Config => Plugin.Instance?.Configuration;
@@ -134,6 +138,8 @@ public class LibraryCleanupService
                 progress.Report((double)processed / totalFiles);
         }
 
+        var enrichmentIssues = new List<string>();
+
         if (enrichmentQueue.Count > 0)
         {
             await logCallback($"Metadata missing for {enrichmentQueue.Count} files. Starting enrichment pass...").ConfigureAwait(false);
@@ -160,6 +166,14 @@ public class LibraryCleanupService
                     var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
                         ? "{Author}/{Series}/{Title}"
                         : dir.OrganizeTemplate;
+
+                    if (NeedsEnrichment(enriched, template))
+                    {
+                        enrichmentIssues.Add(file);
+                        result.FilesSkipped++;
+                        await logCallback($"Enrichment could not resolve template fields, skipped: {file}").ConfigureAwait(false);
+                        continue;
+                    }
 
                     var expectedPath = _organization.BuildTargetPath(dir.LibraryPath, enriched, template);
 
@@ -196,7 +210,20 @@ public class LibraryCleanupService
                 }
             }
 
-            await logCallback($"Enrichment pass complete — {enrichmentQueue.Count} files processed.").ConfigureAwait(false);
+            if (enrichmentIssues.Count > 0)
+            {
+                var appPaths = _appPaths;
+                if (appPaths is not null)
+                {
+                    var summaryPath = Path.Combine(
+                        appPaths.LogDirectoryPath,
+                        $"log_LibraryCleanup-{DateTime.Now:yyyyMMdd}-enrichment-issues.log");
+                    await File.WriteAllLinesAsync(summaryPath, enrichmentIssues, ct).ConfigureAwait(false);
+                    await logCallback($"Wrote enrichment issues log ({enrichmentIssues.Count} files): {summaryPath}").ConfigureAwait(false);
+                }
+            }
+
+            await logCallback($"Enrichment pass complete — {enrichmentQueue.Count} files processed, {enrichmentIssues.Count} skipped due to unresolved fields.").ConfigureAwait(false);
         }
 
         await logCallback(
