@@ -10,12 +10,14 @@ public sealed class TaskLogger : IProgress<double>, IDisposable
     private int _lastReportedPercent = -1;
     private bool _disposed;
 
-    public TaskLogger(string logDirectory, string taskName)
+    public TaskLogger(string logDirectory, string taskName, bool useDailyFile = false)
     {
         Directory.CreateDirectory(logDirectory);
 
-        var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        _logFilePath = Path.Combine(logDirectory, $"{taskName}-{timestamp}.log");
+        var suffix = useDailyFile
+            ? DateTime.Now.ToString("yyyyMMdd")
+            : DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        _logFilePath = Path.Combine(logDirectory, $"{taskName}-{suffix}.log");
         _writer = new StreamWriter(_logFilePath, append: true, Encoding.UTF8) { AutoFlush = true };
 
         Write(LogLevel.Information, "Task started");

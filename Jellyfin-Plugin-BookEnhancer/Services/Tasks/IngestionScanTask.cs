@@ -32,7 +32,7 @@ public class IngestionScanTask : IScheduledTask
     public async Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var logDir = _appPaths.LogDirectoryPath;
-        using var logger = new TaskLogger(logDir, "IngestionScan");
+        using var logger = new TaskLogger(logDir, "IngestionScan", useDailyFile: true);
 
         Func<string, Task> logCallback = msg =>
         {

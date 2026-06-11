@@ -30,3 +30,6 @@ test-data/
 
 # AI agent instructions
 AGENTS.md
+
+# opencode config
+opencode.json
