@@ -6,15 +6,18 @@ namespace Jellyfin.Plugin.BookEnhancer.Services;
 public class LibraryCleanupService
 {
     private readonly FileMetadataExtractor _fileExtractor;
+    private readonly MetadataEnrichmentService _enrichment;
     private readonly LibraryOrganizationService _organization;
     private readonly BookGroupingService _groupingService;
 
     public LibraryCleanupService(
         FileMetadataExtractor fileExtractor,
+        MetadataEnrichmentService enrichment,
         LibraryOrganizationService organization,
         BookGroupingService groupingService)
     {
         _fileExtractor = fileExtractor;
+        _enrichment = enrichment;
         _organization = organization;
         _groupingService = groupingService;
     }
@@ -63,6 +66,8 @@ public class LibraryCleanupService
         await logCallback($"Found {totalFiles} files to check across {dirs.Count} directories.").ConfigureAwait(false);
         progress.Report(0.0);
 
+        var enrichmentQueue = new List<(string FilePath, ManagedSourceDirectory Dir, FileMetadata Metadata)>();
+
         foreach (var (file, dir) in allFiles)
         {
             if (ct.IsCancellationRequested)
@@ -77,13 +82,17 @@ public class LibraryCleanupService
             {
                 var metadata = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
                 if (metadata is null)
-                {
                     metadata = CreateMinimalMetadata(file);
-                }
 
                 var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
                     ? "{Author}/{Series}/{Title}"
                     : dir.OrganizeTemplate;
+
+                if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
+                {
+                    enrichmentQueue.Add((file, dir, metadata));
+                    continue;
+                }
 
                 var expectedPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
 
@@ -125,6 +134,71 @@ public class LibraryCleanupService
                 progress.Report((double)processed / totalFiles);
         }
 
+        if (enrichmentQueue.Count > 0)
+        {
+            await logCallback($"Metadata missing for {enrichmentQueue.Count} files. Starting enrichment pass...").ConfigureAwait(false);
+
+            foreach (var (file, dir, rawMetadata) in enrichmentQueue)
+            {
+                if (ct.IsCancellationRequested)
+                {
+                    await logCallback("Enrichment pass cancelled.").ConfigureAwait(false);
+                    break;
+                }
+
+                try
+                {
+                    var enriched = await _enrichment.EnrichAsync(
+                        rawMetadata,
+                        config.HardcoverApiKey,
+                        config.GoogleBooksApiKey,
+                        config.HardcoverEnabled,
+                        config.GoogleBooksEnabled,
+                        config.OpenLibraryEnabled,
+                        ct).ConfigureAwait(false);
+
+                    var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
+                        ? "{Author}/{Series}/{Title}"
+                        : dir.OrganizeTemplate;
+
+                    var expectedPath = _organization.BuildTargetPath(dir.LibraryPath, enriched, template);
+
+                    if (string.Equals(file, expectedPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.FilesSkipped++;
+                        continue;
+                    }
+
+                    var dirToClean = Path.GetDirectoryName(file);
+                    var moveResult = await _organization.MoveFile(file, expectedPath, copy: false, logCallback).ConfigureAwait(false);
+
+                    if (moveResult.Success)
+                    {
+                        result.FilesMoved++;
+                        await logCallback($"Moved (enriched): {file} -> {expectedPath}").ConfigureAwait(false);
+                        _groupingService.UpdateFormatPath(file, expectedPath);
+                        await CleanupEmptyDirectories(dirToClean, result, logCallback).ConfigureAwait(false);
+                    }
+                    else if (moveResult.Skipped)
+                    {
+                        result.FilesSkipped++;
+                    }
+                    else
+                    {
+                        await logCallback($"Failed to move (enriched) {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
+                        result.Errors++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await logCallback($"Error enriching {file}: {ex.Message}").ConfigureAwait(false);
+                    result.Errors++;
+                }
+            }
+
+            await logCallback($"Enrichment pass complete — {enrichmentQueue.Count} files processed.").ConfigureAwait(false);
+        }
+
         await logCallback(
             $"Cleanup complete — Checked: {totalFiles}, Moved: {result.FilesMoved}, " +
             $"Already correct: {result.FilesSkipped}, Errors: {result.Errors}, " +
@@ -158,6 +232,43 @@ public class LibraryCleanupService
         {
             await logCallback($"Failed to remove empty directory {startPath}: {ex.Message}").ConfigureAwait(false);
         }
+    }
+
+    private static bool NeedsEnrichment(FileMetadata metadata, string template)
+    {
+        var tokens = ExtractTemplateTokens(template);
+
+        if (tokens.Contains("Author") &&
+            (metadata.Authors.Count == 0 || string.IsNullOrWhiteSpace(metadata.Authors[0])))
+            return true;
+
+        if (tokens.Contains("Series") &&
+            string.IsNullOrWhiteSpace(metadata.SeriesName))
+            return true;
+
+        if (tokens.Contains("Publisher") &&
+            string.IsNullOrWhiteSpace(metadata.Publisher))
+            return true;
+
+        return false;
+    }
+
+    private static HashSet<string> ExtractTemplateTokens(string template)
+    {
+        var tokens = new HashSet<string>();
+        for (var i = 0; i < template.Length; i++)
+        {
+            if (template[i] == '{')
+            {
+                var end = template.IndexOf('}', i + 1);
+                if (end > i + 1)
+                {
+                    tokens.Add(template.AsSpan(i + 1, end - i - 1).ToString());
+                    i = end;
+                }
+            }
+        }
+        return tokens;
     }
 
     private static HashSet<string> GetSupportedExtensions(PluginConfiguration config)

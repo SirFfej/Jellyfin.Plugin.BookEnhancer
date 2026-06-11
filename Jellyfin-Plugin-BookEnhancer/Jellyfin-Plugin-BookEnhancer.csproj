@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <Version>0.2.0.2</Version>
-    <AssemblyVersion>0.2.0.2</AssemblyVersion>
-    <FileVersion>0.2.0.2</FileVersion>
+    <Version>0.2.0.3</Version>
+    <AssemblyVersion>0.2.0.3</AssemblyVersion>
+    <FileVersion>0.2.0.3</FileVersion>
     <RootNamespace>Jellyfin.Plugin.BookEnhancer</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -54,5 +54,25 @@
     <None Remove="Configuration\configPage.html" />
     <EmbeddedResource Include="Configuration\configPage.html" />
   </ItemGroup>
+
+  <Target Name="GenerateMetaJson" AfterTargets="Build" Condition="'$(TargetFramework)' != ''">
+    <PropertyGroup>
+      <PluginGuid>66bc815f-035b-43a4-82ec-d1f39dfe988b</PluginGuid>
+      <PluginName>BookEnhancers</PluginName>
+      <PluginDescription>Unified ebook, audiobook, and comic metadata enrichment plugin.</PluginDescription>
+      <TargetAbi>10.11.8.0</TargetAbi>
+    </PropertyGroup>
+    <ItemGroup>
+      <MetaJsonLine Include="{"/>
+      <MetaJsonLine Include="  &quot;guid&quot;: &quot;$(PluginGuid)&quot;,"/>
+      <MetaJsonLine Include="  &quot;name&quot;: &quot;$(PluginName)&quot;,"/>
+      <MetaJsonLine Include="  &quot;description&quot;: &quot;$(PluginDescription)&quot;,"/>
+      <MetaJsonLine Include="  &quot;version&quot;: &quot;$(Version)&quot;,"/>
+      <MetaJsonLine Include="  &quot;targetAbi&quot;: &quot;$(TargetAbi)&quot;"/>
+      <MetaJsonLine Include="}"/>
+    </ItemGroup>
+    <WriteLinesToFile File="$(TargetDir)meta.json" Lines="@(MetaJsonLine)" Overwrite="true" />
+    <Message Text="Generated meta.json with targetAbi=$(TargetAbi)" Importance="High" />
+  </Target>
 
 </Project>
