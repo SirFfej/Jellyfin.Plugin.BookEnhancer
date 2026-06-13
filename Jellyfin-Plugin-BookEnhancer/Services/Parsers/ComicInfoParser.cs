@@ -74,7 +74,7 @@ public class ComicInfoParser : IFileParser
         };
 
         if (string.IsNullOrWhiteSpace(meta.Title))
-            meta.Title = Path.GetFileNameWithoutExtension(filePath);
+            meta.Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(filePath));
 
         meta.SeriesName = root.Element("Series")?.Value;
         meta.SeriesNumber = root.Element("Number")?.Value;

@@ -145,7 +145,7 @@ public class LibraryOrganizationService
             : null;
 
         if (string.IsNullOrWhiteSpace(title))
-            title = Path.GetFileNameWithoutExtension(metadata.FilePath);
+            title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(metadata.FilePath));
 
         return SanitizePathComponent(title) ?? "Untitled";
     }
@@ -166,7 +166,7 @@ public class LibraryOrganizationService
     {
         var baseName = !string.IsNullOrWhiteSpace(metadata.Title)
             ? SanitizePathComponent(metadata.Title)
-            : Path.GetFileNameWithoutExtension(metadata.FilePath);
+            : SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(metadata.FilePath));
 
         var ext = Path.GetExtension(metadata.FilePath);
         return (baseName ?? "book") + ext;

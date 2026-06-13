@@ -155,7 +155,7 @@
                             How to get a Hardcover API Key
                         </summary>
                         <ol style="margin-top:10px;padding-left:20px;line-height:1.8;">
-                            <li>Go to <a href="https://hardcover.app/account/api" target="_blank" rel="noopener">hardcover.app/account/api</a></li>
+                            <li>Go to <a href="https://hardcover.app/account/api" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">hardcover.app/account/api</a></li>
                             <li>Sign in to your Hardcover account (or create one — it's free, no subscription required)</li>
                             <li>Click <strong>Generate API Key</strong></li>
                             <li>Copy the generated key and paste it in the field above</li>
@@ -193,7 +193,7 @@
                         <div class="fieldDescription">
                             <strong>You do NOT need an API key</strong> — the plugin works without one (IP-based rate limiting applies).
                             If you have a key:
-                            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">
+                            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
                                 Get one at Google Cloud Console
                             </a>, enable the Books API, then paste it here for a higher rate limit (1,000 requests/day).
                         </div>
@@ -212,6 +212,36 @@
                             <input is="emby-checkbox" id="chkOpenLibraryEnabled" type="checkbox" checked />
                             <span>Enable OpenLibrary metadata lookup</span>
                         </label>
+                    </div>
+
+                    <hr style="margin:15px 0;" />
+
+                    <h4 style="font-size:1em;margin:10px 0 3px;">Comic Vine</h4>
+                    <p class="fieldDescription">
+                        Comic-specific metadata source — ideal for single-issue comics. Provides creative team
+                        (penciller, inker, colorist, etc.), characters, story arcs, cover art, and publisher info.
+                        Free API key required.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkComicVineEnabled" type="checkbox" />
+                            <span>Enable Comic Vine metadata lookup</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtComicVineApiKey" type="password"
+                                   label="Comic Vine API Key" style="flex:1;" />
+                        </div>
+                        <div id="testComicVineResult" class="be-test-result" style="display:none;"></div>
+                        <div class="fieldDescription">
+                            Paste your Comic Vine API key here.
+                            <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
+                                Get one at Comic Vine
+                            </a>
+                        </div>
                     </div>
 
                     <hr style="margin:15px 0;" />
@@ -1078,6 +1108,8 @@
                     document.getElementById("chkGoogleBooksEnabled").checked = config.GoogleBooksEnabled || false;
                     document.getElementById("txtGoogleBooksApiKey").value = config.GoogleBooksApiKey || "";
                     document.getElementById("chkOpenLibraryEnabled").checked = config.OpenLibraryEnabled || false;
+                    document.getElementById("chkComicVineEnabled").checked = config.ComicVineEnabled || false;
+                    document.getElementById("txtComicVineApiKey").value = config.ComicVineApiKey || "";
                     document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
 
                     document.getElementById("chkEnableFormatGrouping").checked = config.EnableFormatGrouping !== false;
@@ -1206,6 +1238,8 @@
                         config.GoogleBooksEnabled = document.getElementById("chkGoogleBooksEnabled").checked;
                         config.GoogleBooksApiKey = document.getElementById("txtGoogleBooksApiKey").value;
                         config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
+                        config.ComicVineEnabled = document.getElementById("chkComicVineEnabled").checked;
+                        config.ComicVineApiKey = document.getElementById("txtComicVineApiKey").value;
                         config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
 
                         config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;

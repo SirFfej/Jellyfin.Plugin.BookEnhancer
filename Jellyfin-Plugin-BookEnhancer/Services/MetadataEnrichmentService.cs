@@ -9,17 +9,20 @@ public class MetadataEnrichmentService
     private readonly HardcoverApiClient _hardcover;
     private readonly GoogleBooksApiClient _googleBooks;
     private readonly OpenLibraryApiClient _openLibrary;
+    private readonly ComicVineApiClient _comicVine;
     private readonly ILogger<MetadataEnrichmentService> _logger;
 
     public MetadataEnrichmentService(
         HardcoverApiClient hardcover,
         GoogleBooksApiClient googleBooks,
         OpenLibraryApiClient openLibrary,
+        ComicVineApiClient comicVine,
         ILogger<MetadataEnrichmentService> logger)
     {
         _hardcover = hardcover;
         _googleBooks = googleBooks;
         _openLibrary = openLibrary;
+        _comicVine = comicVine;
         _logger = logger;
     }
 
@@ -30,6 +33,8 @@ public class MetadataEnrichmentService
         bool hardcoverEnabled,
         bool googleBooksEnabled,
         bool openLibraryEnabled,
+        bool comicVineEnabled = false,
+        string comicVineApiKey = "",
         bool titleAuthorSearchEnabled = true,
         string? title = null,
         string? author = null,
@@ -52,6 +57,11 @@ public class MetadataEnrichmentService
                 _logger.LogDebug("ISBN lookup returned no data, falling back to title/author search");
                 apiMatchFound = await SearchByTitleAuthorCascade(source, searchTitle, searchAuthor, hardcoverApiKey, googleBooksApiKey, hardcoverEnabled, googleBooksEnabled, openLibraryEnabled, ct).ConfigureAwait(false);
             }
+        }
+
+        if (!apiMatchFound && comicVineEnabled && !string.IsNullOrWhiteSpace(comicVineApiKey))
+        {
+            apiMatchFound = await SearchByComicVineCascade(source, comicVineApiKey, ct).ConfigureAwait(false);
         }
 
         return new EnrichmentResult
@@ -167,6 +177,59 @@ public class MetadataEnrichmentService
         }
 
         return anyApiReturnedData;
+    }
+
+    private async Task<bool> SearchByComicVineCascade(
+        FileMetadata source,
+        string comicVineApiKey,
+        CancellationToken ct)
+    {
+        var query = BuildComicQuery(source);
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            _logger.LogDebug("No series/issue info available for Comic Vine search, skipping");
+            return false;
+        }
+
+        var results = await _comicVine.SearchIssuesAsync(query, comicVineApiKey, ct).ConfigureAwait(false);
+        if (results.Count == 0)
+        {
+            _logger.LogDebug("Comic Vine returned no results for query {Query}", query);
+            return false;
+        }
+
+        var best = results[0];
+        var detail = await _comicVine.GetIssueDetailAsync(best.Id, comicVineApiKey, ct).ConfigureAwait(false);
+        if (detail is null)
+        {
+            _logger.LogDebug("Comic Vine issue detail returned null for ID {Id}", best.Id);
+            return false;
+        }
+
+        MergeNulls(source, detail);
+        if (!string.IsNullOrWhiteSpace(best.PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
+            source.Publisher = best.PublisherName;
+
+        _logger.LogDebug("Comic Vine enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+        return true;
+    }
+
+    private static string? BuildComicQuery(FileMetadata source)
+    {
+        var series = source.SeriesName;
+        var issue = source.SeriesNumber;
+        var title = source.Title;
+
+        if (!string.IsNullOrWhiteSpace(series) && !string.IsNullOrWhiteSpace(issue))
+            return $"{series} {issue}";
+
+        if (!string.IsNullOrWhiteSpace(series))
+            return series;
+
+        if (!string.IsNullOrWhiteSpace(title))
+            return title;
+
+        return null;
     }
 
     private static void MergeSource(FileMetadata target, FileMetadata source)

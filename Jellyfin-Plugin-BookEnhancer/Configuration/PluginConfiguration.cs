@@ -10,6 +10,8 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool GoogleBooksEnabled { get; set; } = true;
     public string GoogleBooksApiKey { get; set; } = string.Empty;
     public bool OpenLibraryEnabled { get; set; } = true;
+    public bool ComicVineEnabled { get; set; } = false;
+    public string ComicVineApiKey { get; set; } = string.Empty;
     public double MatchThreshold { get; set; } = 0.85;
 
     public bool EnableFormatGrouping { get; set; } = true;

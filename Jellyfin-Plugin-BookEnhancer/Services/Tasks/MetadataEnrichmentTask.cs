@@ -51,7 +51,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                 return;
             }
 
-            if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled))
+            if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled))
             {
                 logger.LogWarning("Online enrichment is disabled in plugin configuration");
                 return;
@@ -96,7 +96,8 @@ public class MetadataEnrichmentTask : IScheduledTask
             logger.LogInformation(
                 $"Enrichment cascade — Hardcover: {(config.HardcoverEnabled && !string.IsNullOrWhiteSpace(config.HardcoverApiKey) ? "enabled" : "disabled")}, " +
                 $"Google Books: {(config.GoogleBooksEnabled ? "enabled" : "disabled")}, " +
-                $"OpenLibrary: {(config.OpenLibraryEnabled ? "enabled" : "disabled")}");
+                $"OpenLibrary: {(config.OpenLibraryEnabled ? "enabled" : "disabled")}, " +
+                $"Comic Vine: {(config.ComicVineEnabled && !string.IsNullOrWhiteSpace(config.ComicVineApiKey) ? "enabled" : "disabled")}");
 
             summaryBuffer.AppendLine("=== Metadata Enrichment Report ===");
             summaryBuffer.AppendLine($"Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -138,6 +139,8 @@ public class MetadataEnrichmentTask : IScheduledTask
                         config.HardcoverEnabled,
                         config.GoogleBooksEnabled,
                         config.OpenLibraryEnabled,
+                        comicVineEnabled: config.ComicVineEnabled,
+                        comicVineApiKey: config.ComicVineApiKey ?? "",
                         ct: cancellationToken).ConfigureAwait(false);
 
                     var enrichedMeta = result.Metadata;

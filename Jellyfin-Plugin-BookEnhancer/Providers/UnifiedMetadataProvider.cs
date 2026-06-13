@@ -64,6 +64,8 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 config.HardcoverEnabled,
                 config.GoogleBooksEnabled,
                 config.OpenLibraryEnabled,
+                comicVineEnabled: config.ComicVineEnabled,
+                comicVineApiKey: config.ComicVineApiKey ?? "",
                 titleAuthorSearchEnabled: titleAuthorEnabled,
                 title: fileMeta.Title,
                 author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
@@ -128,22 +130,49 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             if (!string.IsNullOrWhiteSpace(searchInfo.Name))
             {
                 var localMeta = await ExtractFileMetadata(searchInfo.Path, cancellationToken).ConfigureAwait(false);
-                if (localMeta?.Isbn != null)
+                if (localMeta is not null)
                 {
-                    var enrichmentResult = await _enrichment.EnrichAsync(
-                        localMeta,
-                        config.HardcoverApiKey,
-                        config.GoogleBooksApiKey,
-                        config.HardcoverEnabled,
-                        config.GoogleBooksEnabled,
-                        config.OpenLibraryEnabled,
-                        title: searchInfo.Name,
-                        ct: cancellationToken).ConfigureAwait(false);
-
-                    if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
+                    if (localMeta.Isbn is not null)
                     {
-                        results.Add(MapSearchResult(enrichmentResult.Metadata));
-                        return results;
+                        var enrichmentResult = await _enrichment.EnrichAsync(
+                            localMeta,
+                            config.HardcoverApiKey,
+                            config.GoogleBooksApiKey,
+                            config.HardcoverEnabled,
+                            config.GoogleBooksEnabled,
+                            config.OpenLibraryEnabled,
+                            comicVineEnabled: config.ComicVineEnabled,
+                            comicVineApiKey: config.ComicVineApiKey ?? "",
+                            title: searchInfo.Name,
+                            ct: cancellationToken).ConfigureAwait(false);
+
+                        if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
+                        {
+                            results.Add(MapSearchResult(enrichmentResult.Metadata));
+                            return results;
+                        }
+                    }
+
+                    if (HasComicMetadata(localMeta))
+                    {
+                        var enriched = await _enrichment.EnrichAsync(
+                            localMeta,
+                            config.HardcoverApiKey,
+                            config.GoogleBooksApiKey,
+                            config.HardcoverEnabled,
+                            config.GoogleBooksEnabled,
+                            config.OpenLibraryEnabled,
+                            comicVineEnabled: config.ComicVineEnabled,
+                            comicVineApiKey: config.ComicVineApiKey ?? "",
+                            titleAuthorSearchEnabled: false,
+                            title: searchInfo.Name,
+                            ct: cancellationToken).ConfigureAwait(false);
+
+                        if (!string.IsNullOrWhiteSpace(enriched.Metadata.Title))
+                        {
+                            results.Add(MapSearchResult(enriched.Metadata));
+                            return results;
+                        }
                     }
                 }
             }
@@ -274,6 +303,13 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
     {
         if (string.IsNullOrWhiteSpace(text)) return null;
         return text.Length <= maxLen ? text : text[..maxLen] + "...";
+    }
+
+    private static bool HasComicMetadata(FileMetadata meta)
+    {
+        return !string.IsNullOrWhiteSpace(meta.SeriesName) ||
+               !string.IsNullOrWhiteSpace(meta.SeriesNumber) ||
+               meta.ComicPeople.Count > 0;
     }
 
     private bool IsLibrarySelected(string itemPath)

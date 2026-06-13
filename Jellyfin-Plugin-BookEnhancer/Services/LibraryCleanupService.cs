@@ -226,6 +226,8 @@ public class LibraryCleanupService
                             config.HardcoverEnabled,
                             config.GoogleBooksEnabled,
                             config.OpenLibraryEnabled,
+                            comicVineEnabled: config.ComicVineEnabled,
+                            comicVineApiKey: config.ComicVineApiKey ?? "",
                             titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
                             title: rawMetadata.Title,
                             author: rawMetadata.Authors.Count > 0 ? rawMetadata.Authors[0] : null,
@@ -637,7 +639,7 @@ public class LibraryCleanupService
         {
             FilePath = filePath,
             FileFormat = Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant(),
-            Title = Path.GetFileNameWithoutExtension(filePath)
+            Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(filePath))
         };
     }
 }

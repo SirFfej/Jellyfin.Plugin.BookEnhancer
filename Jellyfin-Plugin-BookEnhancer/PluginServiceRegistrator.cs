@@ -22,6 +22,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<HardcoverApiClient>();
         serviceCollection.AddTransient<GoogleBooksApiClient>();
         serviceCollection.AddTransient<OpenLibraryApiClient>();
+        serviceCollection.AddTransient<ComicVineApiClient>();
         serviceCollection.AddSingleton<MetadataEnrichmentService>();
 
         serviceCollection.AddSingleton<BookGroupingService>(sp =>

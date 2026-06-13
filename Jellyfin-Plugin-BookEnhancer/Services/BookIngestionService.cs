@@ -147,6 +147,8 @@ public class BookIngestionService
                         Config.HardcoverEnabled,
                         Config.GoogleBooksEnabled,
                         Config.OpenLibraryEnabled,
+                        comicVineEnabled: Config.ComicVineEnabled,
+                        comicVineApiKey: Config.ComicVineApiKey ?? "",
                         titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
                         title: metadata.Title,
                         author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
@@ -205,7 +207,7 @@ public class BookIngestionService
         {
             FilePath = filePath,
             FileFormat = Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant(),
-            Title = Path.GetFileNameWithoutExtension(filePath)
+            Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(filePath))
         };
     }
 }

@@ -50,18 +50,25 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 1. **Hardcover** (tier 1) — highest quality via GraphQL API. Free API key required.
 2. **Google Books** (tier 2) — good coverage. Optional API key for higher rate limits.
 3. **OpenLibrary** (tier 3) — free, no key. Covers public domain and older titles.
+4. **Comic Vine** (tier 4) — comic-specific enrichment via search by series + issue number. Free API key required.
 
 Unified enrichment can be toggled on/off per source directory. When off, only raw file metadata is used.
 
 ### Network Diagnostics
-- **Test Enrichment Connectivity** button on the Metadata config tab — pings all 3 enrichment APIs (Hardcover, Google Books, OpenLibrary) and reports reachability, status codes, and error details per service
+- **Test Enrichment Connectivity** button on the Metadata config tab — pings all 4 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
 
-### Enrichment Cascade (v0.6.0)
-- **Rate limiting** — 250ms delay between API calls to prevent hitting rate limits on all 3 services
+### Enrichment Cascade (v0.7.0)
+- **Comic Vine API** — final cascade tier enriches single-issue comics by series name + issue number; returns writer, penciller, inker, colorist, letterer, cover artist, editor, translator credits; character tags; publisher; cover date; description
+- **Comic Vine in Identify window** — files with `SeriesName`/`SeriesNumber` in ComicInfo.xml trigger Comic Vine enrichment even without ISBN
+- **Rate limiting** — 250ms delay between API calls to prevent hitting rate limits on all services
 - **Google Books API key guard** — unauthenticated requests no longer sent when no key is configured
-- **Accurate match reporting** — cascade now returns whether any API actually responded with data, independent of whether local metadata was already complete (fixes "No enrichment found" for files with rich embedded metadata)
+- **Accurate match reporting** — cascade returns whether any API actually responded with data, independent of whether local metadata was already complete (fixes "No enrichment found" for files with rich embedded metadata)
 - **Ingestion folder protection** — cleanup no longer scans or removes directories from source/ingestion paths, only from library paths
+
+### Scene Tag Cleaning
+- **Automatic scene tag stripping** — parenthetical groups (e.g. `(Digital)`, `(Kileko-Empire)`, `(2026)`), bracketed tags, and uppercase release group tags are cleaned from fallback filenames when ComicInfo.xml has no `<Title>` element
+- Applied to ingestion, library cleanup, organization, and ComicInfo parser fallback paths
 
 ### Ingestion
 - **Managed source directories** — configure source folders → organize into library paths
@@ -98,7 +105,7 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
 - **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons
 - **Grouping** — Preview, Process, and Repair Format Paths buttons with results display
-- **Metadata** — Test Enrichment Connectivity button with per-service reachability results
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine toggle and API key input
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging
@@ -116,9 +123,10 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
    - **Target Library**: pick the Jellyfin library to organize into (auto-fills Library Path)
    - **Organize Template**: customize folder structure (optional)
    - Click **Create** to create the target directory if it doesn't exist
-4. Go to the **Ingestion** tab to configure format priority and enrichment settings:
-   - **Hardcover API Key** (required for enrichment) — get one free at https://hardcover.app/account/api
-   - **Google Books API Key** (optional) — get one at https://console.cloud.google.com/apis/credentials
+ 4. Go to the **Ingestion** tab to configure format priority and enrichment settings:
+    - **Hardcover API Key** (required for enrichment) — get one free at https://hardcover.app/account/api
+    - **Google Books API Key** (optional) — get one at https://console.cloud.google.com/apis/credentials
+    - **Comic Vine API Key** (optional) — enable on the **Metadata** tab; get a key at https://comicvine.gamespot.com/api
 5. Run the scheduled task **Ingestion Scan** from Dashboard → Scheduled Tasks
 
 ## Scheduled Tasks
