@@ -7,7 +7,8 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 
 public class VerseDbApiClient
 {
-    private static readonly Uri BaseUrl = new("https://versedb.com/api");
+    private static readonly Uri BaseUrl = new("https://www.versedb.app/api");
+    private static readonly SimpleRateLimiter _rateLimiter = new(30, TimeSpan.FromMinutes(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<VerseDbApiClient> _logger;
 
@@ -22,6 +23,7 @@ public class VerseDbApiClient
         try
         {
             var url = $"{BaseUrl}/issues?search={Uri.EscapeDataString(query)}";
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -47,6 +49,7 @@ public class VerseDbApiClient
         try
         {
             var url = $"{BaseUrl}/issues/{issueId}";
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");

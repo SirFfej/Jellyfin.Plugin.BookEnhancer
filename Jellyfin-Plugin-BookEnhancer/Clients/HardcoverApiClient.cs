@@ -9,7 +9,8 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 
 public class HardcoverApiClient
 {
-    private static readonly Uri GraphQlEndpoint = new("https://api.hardcover.app/v1/graphql");
+    private static readonly Uri BaseUrl = new("https://api.hardcover.app/v1/graphql");
+    private static readonly SimpleRateLimiter _rateLimiter = new(60, TimeSpan.FromMinutes(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<HardcoverApiClient> _logger;
 
@@ -204,12 +205,13 @@ query($bookId: Int!) {
 
     private async Task<GraphQlResponse<T>?> SendGraphQlAsync<T>(object body, string apiKey, CancellationToken ct)
     {
+        await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
         using var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(15);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
 
-        var httpResponse = await client.PostAsJsonAsync(GraphQlEndpoint, body, ct).ConfigureAwait(false);
+        var httpResponse = await client.PostAsJsonAsync(BaseUrl, body, ct).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
         return await httpResponse.Content.ReadFromJsonAsync<GraphQlResponse<T>>(ct).ConfigureAwait(false);
     }

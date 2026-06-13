@@ -10,6 +10,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 public class MetronApiClient
 {
     private static readonly Uri BaseUrl = new("https://metron.cloud/api");
+    private static readonly SimpleRateLimiter _rateLimiter = new(20, TimeSpan.FromMinutes(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<MetronApiClient> _logger;
 
@@ -31,6 +32,7 @@ public class MetronApiClient
         {
             var query = $"?series_name={Uri.EscapeDataString(seriesName)}&number={Uri.EscapeDataString(issueNumber)}&limit=5";
             var url = $"{BaseUrl}/issue/{query}";
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -56,6 +58,7 @@ public class MetronApiClient
         try
         {
             var url = $"{BaseUrl}/issue/{issueId}/";
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");

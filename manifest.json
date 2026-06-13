@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.7.0.5 - Client-side per-API rate limiting via SimpleRateLimiter (sliding-window): GCD 80 req/hr, Comic Vine 180 req/hr, Metron 20 req/min, VerseDB 30 req/min, Hardcover 60 req/min, Google Books 60 req/min, OpenLibrary 100 req/min. Rate limiter static across transient instances, called before every HTTP request. Fixed: Hardcover GraphQlEndpoint → BaseUrl. Build: 0W/0E.",
+        "checksum": "8eac88698646024f9a5c02a3c2937a95",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.5/Jellyfin.Plugin.BookEnhancer_0.7.0.5.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.7.0.5"
+      },
+      {
         "changelog": "v0.7.0.4 - Fix: GCD CoverUrl now populated from API response (was only setting HasCover=true). Fix: GCD test button JSON key casing mismatch (Username/Password → username/password) causing test to always fail. Fix: Metron auth changed from Bearer token to HTTP Basic Auth (username/password). Logging cleanup: GrandComicsDB → GrandComicsDb. Removed 5 unused GCD DTO fields. Build: 0W/0E.",
         "checksum": "95e7041c71785f0a4c2c8df242b468f6",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.4/Jellyfin.Plugin.BookEnhancer_0.7.0.4.zip",

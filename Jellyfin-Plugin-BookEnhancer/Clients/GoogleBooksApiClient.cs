@@ -8,6 +8,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 public class GoogleBooksApiClient
 {
     private static readonly Uri BaseUrl = new("https://www.googleapis.com/books/v1");
+    private static readonly SimpleRateLimiter _rateLimiter = new(60, TimeSpan.FromMinutes(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<GoogleBooksApiClient> _logger;
 
@@ -53,6 +54,7 @@ public class GoogleBooksApiClient
             if (!string.IsNullOrWhiteSpace(apiKey))
                 url += $"&key={apiKey}";
 
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");

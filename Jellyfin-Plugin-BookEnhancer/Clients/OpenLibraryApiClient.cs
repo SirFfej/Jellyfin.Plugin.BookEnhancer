@@ -8,6 +8,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 public class OpenLibraryApiClient
 {
     private static readonly Uri BaseUrl = new("https://openlibrary.org");
+    private static readonly SimpleRateLimiter _rateLimiter = new(100, TimeSpan.FromMinutes(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OpenLibraryApiClient> _logger;
 
@@ -23,6 +24,7 @@ public class OpenLibraryApiClient
         {
             var query = $"{BaseUrl}/search.json?q={Uri.EscapeDataString(title)}+{Uri.EscapeDataString(author)}&limit=5";
 
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -83,6 +85,7 @@ public class OpenLibraryApiClient
         {
             var url = $"{BaseUrl}api/books?bibkeys=ISBN:{cleanIsbn}&jscmd=data&format=json";
 
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");

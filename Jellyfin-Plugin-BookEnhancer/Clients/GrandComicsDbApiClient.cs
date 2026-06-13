@@ -10,6 +10,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 public class GrandComicsDbApiClient
 {
     private static readonly Uri BaseUrl = new("https://www.comics.org/api");
+    private static readonly SimpleRateLimiter _rateLimiter = new(80, TimeSpan.FromHours(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<GrandComicsDbApiClient> _logger;
 
@@ -58,6 +59,7 @@ public class GrandComicsDbApiClient
     {
         try
         {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             var url = $"{BaseUrl}/issue/{issueId}/";
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -83,6 +85,7 @@ public class GrandComicsDbApiClient
     private async Task<string?> FindIssueBySeriesAndNumberAsync(
         string seriesName, string issueNumber, string username, string password, CancellationToken ct)
     {
+        await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
         using var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(15);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");

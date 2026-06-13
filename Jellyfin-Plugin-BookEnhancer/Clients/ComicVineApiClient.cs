@@ -8,6 +8,7 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 public class ComicVineApiClient
 {
     private static readonly Uri BaseUrl = new("https://comicvine.gamespot.com/api");
+    private static readonly SimpleRateLimiter _rateLimiter = new(180, TimeSpan.FromHours(1));
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ComicVineApiClient> _logger;
 
@@ -22,6 +23,7 @@ public class ComicVineApiClient
         try
         {
             var url = $"{BaseUrl}/search/?api_key={apiKey}&format=json&resources=issue&query={Uri.EscapeDataString(query)}&field_list=id,name,issue_number,image,volume,cover_date,description,publisher";
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -46,6 +48,7 @@ public class ComicVineApiClient
         try
         {
             var url = $"{BaseUrl}/issue/4000-{issueId}/?api_key={apiKey}&format=json&field_list=id,name,issue_number,volume,cover_date,description,publisher,person_credits,character_credits,image";
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
