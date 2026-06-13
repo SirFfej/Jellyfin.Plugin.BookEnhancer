@@ -151,36 +151,46 @@ public class BookIngestionService
                     metadata = CreateMinimalMetadata(file);
                 }
 
+                var enrichmentAttempted = false;
                 if (Config?.UnifiedMetadataEnabled == true)
                 {
-                    var enrichmentResult = await _enrichment.EnrichAsync(
-                        metadata,
-                        Config.HardcoverApiKey,
-                        Config.GoogleBooksApiKey,
-                        Config.HardcoverEnabled,
-                        Config.GoogleBooksEnabled,
-                        Config.OpenLibraryEnabled,
-                        comicVineEnabled: Config.ComicVineEnabled,
-                        comicVineApiKey: Config.ComicVineApiKey ?? "",
-                        metronEnabled: Config.MetronEnabled,
-                        metronUsername: Config.MetronUsername ?? "",
-                        metronPassword: Config.MetronPassword ?? "",
-                        versedbEnabled: Config.VerseDbEnabled,
-                        versedbApiKey: Config.VerseDbApiKey ?? "",
-                        grandComicsDbEnabled: Config.GrandComicsDbEnabled,
-                        grandComicsDbUsername: Config.GrandComicsDbUsername ?? "",
-                        grandComicsDbPassword: Config.GrandComicsDbPassword ?? "",
-                        titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
-                        title: metadata.Title,
-                        author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
-                        ct: ct).ConfigureAwait(false);
-
-                    metadata = enrichmentResult.Metadata;
-
-                    if (!string.IsNullOrWhiteSpace(metadata.Isbn) && !enrichmentResult.ApiMatchFound)
+                    var cooldown = Config.EnrichmentCooldownDays;
+                    if (cooldown > 0 && _groupingService.IsEnrichmentOnCooldown(file, cooldown))
                     {
-                        result.EnrichmentFailures++;
-                        await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found", logCallback, _logger).ConfigureAwait(false);
+                        await LogInfoAsync($"Skipped enrichment (cooldown): {file}", logCallback, _logger).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        enrichmentAttempted = true;
+                        var enrichmentResult = await _enrichment.EnrichAsync(
+                            metadata,
+                            Config.HardcoverApiKey,
+                            Config.GoogleBooksApiKey,
+                            Config.HardcoverEnabled,
+                            Config.GoogleBooksEnabled,
+                            Config.OpenLibraryEnabled,
+                            comicVineEnabled: Config.ComicVineEnabled,
+                            comicVineApiKey: Config.ComicVineApiKey ?? "",
+                            metronEnabled: Config.MetronEnabled,
+                            metronUsername: Config.MetronUsername ?? "",
+                            metronPassword: Config.MetronPassword ?? "",
+                            versedbEnabled: Config.VerseDbEnabled,
+                            versedbApiKey: Config.VerseDbApiKey ?? "",
+                            grandComicsDbEnabled: Config.GrandComicsDbEnabled,
+                            grandComicsDbUsername: Config.GrandComicsDbUsername ?? "",
+                            grandComicsDbPassword: Config.GrandComicsDbPassword ?? "",
+                            titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
+                            title: metadata.Title,
+                            author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
+                            ct: ct).ConfigureAwait(false);
+
+                        metadata = enrichmentResult.Metadata;
+
+                        if (!string.IsNullOrWhiteSpace(metadata.Isbn) && !enrichmentResult.ApiMatchFound)
+                        {
+                            result.EnrichmentFailures++;
+                            await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found", logCallback, _logger).ConfigureAwait(false);
+                        }
                     }
                 }
 
@@ -195,6 +205,8 @@ public class BookIngestionService
                 if (moveResult.Success)
                 {
                     _groupingService.RegisterFile(targetPath, metadata, isPrimary: true);
+                    if (enrichmentAttempted)
+                        _groupingService.SetLastEnrichmentTime(targetPath);
                     result.FilesAdded++;
 
                     if (dir.EnableMetadataWriting)
@@ -209,6 +221,8 @@ public class BookIngestionService
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
 
                     var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false);
+                    if (enrichmentAttempted)
+                        _groupingService.SetLastEnrichmentTime(targetPath);
                     result.FilesSkipped++;
 
                     await MoveCompanionImagesAsync(sourceDir, targetDir, logCallback).ConfigureAwait(false);

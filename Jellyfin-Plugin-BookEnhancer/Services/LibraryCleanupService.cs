@@ -125,7 +125,7 @@ public class LibraryCleanupService
                         metadata = CreateMinimalMetadata(file);
 
                     var dir = libGroup
-                        .Where(d => file.StartsWith(d.LibraryPath, StringComparison.OrdinalIgnoreCase))
+                        .Where(d => IsUnderDirectory(file, d.LibraryPath))
                         .OrderByDescending(d => d.LibraryPath.Length)
                         .First();
 
@@ -135,13 +135,26 @@ public class LibraryCleanupService
 
                     if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
                     {
-                        enrichmentQueue.Add((file, metadata, dir, template));
+                        var cooldown = config.EnrichmentCooldownDays;
+                        if (cooldown > 0)
+                        {
+                            var lastEnriched = _groupingService.GetLastEnrichmentTime(file);
+                            if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
+                            {
+                                fileData.Add((file, metadata, dir, template));
+                            }
+                            else
+                            {
+                                enrichmentQueue.Add((file, metadata, dir, template));
+                            }
+                        }
+                        else
+                        {
+                            enrichmentQueue.Add((file, metadata, dir, template));
+                        }
                     }
                     else
                     {
-                        if (config.UnifiedMetadataEnabled)
-                            await logCallback($"[{libLabel}] Rich Local Metadata - Skipping enrichment: {file}").ConfigureAwait(false);
-
                         fileData.Add((file, metadata, dir, template));
                     }
                 }
@@ -191,7 +204,9 @@ public class LibraryCleanupService
                     {
                         libResult.FilesMoved++;
                         await logCallback($"[{libLabel}] Moved: {file} -> {expectedPath}").ConfigureAwait(false);
-                        _groupingService.UpdateFormatPath(file, expectedPath);
+                        var updated = _groupingService.UpdateFormatPath(file, expectedPath);
+                        if (updated == 0)
+                            _groupingService.RegisterFile(expectedPath, metadata, isPrimary: true);
 
                         var targetDir = Path.GetDirectoryName(expectedPath);
                         await MoveCompanionImagesAsync(dirToClean, targetDir, logCallback).ConfigureAwait(false);
@@ -251,21 +266,21 @@ public class LibraryCleanupService
                             author: rawMetadata.Authors.Count > 0 ? rawMetadata.Authors[0] : null,
                             ct: ct).ConfigureAwait(false);
 
-                        var enriched = enrichmentResult.Metadata;
+                        _groupingService.SetLastEnrichmentTime(file);
 
-                        if (NeedsEnrichment(enriched, template))
-                        {
-                            enrichmentIssues.Add(file);
-                            libResult.FilesSkipped++;
-                            await logCallback($"[{libLabel}] Enrichment could not resolve fields, skipped: {file}").ConfigureAwait(false);
-                            continue;
-                        }
+                        var enriched = enrichmentResult.Metadata;
 
                         var expectedPath = _organization.BuildTargetPath(libraryRoot, enriched, template);
 
                         if (string.Equals(file, expectedPath, StringComparison.OrdinalIgnoreCase))
                         {
-                            libResult.FilesSkipped++;
+                            if (NeedsEnrichment(enriched, template))
+                            {
+                                enrichmentIssues.Add(file);
+                                libResult.FilesSkipped++;
+                                await logCallback($"[{libLabel}] Enrichment could not resolve all fields, but file is at expected path: {file}").ConfigureAwait(false);
+                            }
+
                             continue;
                         }
 
@@ -288,8 +303,14 @@ public class LibraryCleanupService
                         if (moveResult.Success)
                         {
                             libResult.FilesMoved++;
-                            await logCallback($"[{libLabel}] Moved (enriched): {file} -> {expectedPath}").ConfigureAwait(false);
-                            _groupingService.UpdateFormatPath(file, expectedPath);
+                            var enrichedNote = NeedsEnrichment(enriched, template) ? " (partial)" : string.Empty;
+                            await logCallback($"[{libLabel}] Moved{enrichedNote}: {file} -> {expectedPath}").ConfigureAwait(false);
+                            var updated = _groupingService.UpdateFormatPath(file, expectedPath);
+                            if (updated == 0)
+                            {
+                                _groupingService.RegisterFile(expectedPath, enriched, isPrimary: true);
+                                _groupingService.SetLastEnrichmentTime(expectedPath);
+                            }
 
                             var targetDir = Path.GetDirectoryName(expectedPath);
                             await MoveCompanionImagesAsync(dirToClean, targetDir, logCallback).ConfigureAwait(false);
@@ -372,6 +393,9 @@ public class LibraryCleanupService
         foreach (var (path, metadata, _, _) in fileData)
         {
             var ext = Path.GetExtension(path);
+            if (!File.Exists(path))
+                continue;
+
             var size = new FileInfo(path).Length;
             var title = NormalizeString(metadata.Title);
             var author = metadata.Authors.Count > 0 ? NormalizeString(metadata.Authors[0]) : string.Empty;
@@ -394,7 +418,7 @@ public class LibraryCleanupService
         Dictionary<string, List<(long Size, string Path, string Title, string Author)>> index)
     {
         var ext = Path.GetExtension(sourcePath);
-        if (!index.TryGetValue(ext, out var candidates))
+        if (!index.TryGetValue(ext, out var candidates) || !File.Exists(sourcePath))
             return null;
 
         var sourceSize = new FileInfo(sourcePath).Length;
@@ -652,6 +676,10 @@ public class LibraryCleanupService
             string.IsNullOrWhiteSpace(metadata.Publisher))
             return true;
 
+        if (tokens.Contains("Series") &&
+            string.IsNullOrWhiteSpace(metadata.SeriesName))
+            return true;
+
         return false;
     }
 
@@ -728,6 +756,23 @@ public class LibraryCleanupService
         }
 
         return new HashSet<string>(config.IngestionFileExtensions, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool IsUnderDirectory(string filePath, string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || string.IsNullOrWhiteSpace(directoryPath))
+            return false;
+
+        if (!filePath.StartsWith(directoryPath, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        if (filePath.Length == directoryPath.Length)
+            return true;
+
+        var lastDirChar = directoryPath[^1];
+        return lastDirChar == Path.DirectorySeparatorChar || lastDirChar == Path.AltDirectorySeparatorChar ||
+               filePath[directoryPath.Length] == Path.DirectorySeparatorChar ||
+               filePath[directoryPath.Length] == Path.AltDirectorySeparatorChar;
     }
 
     private static FileMetadata CreateMinimalMetadata(string filePath)

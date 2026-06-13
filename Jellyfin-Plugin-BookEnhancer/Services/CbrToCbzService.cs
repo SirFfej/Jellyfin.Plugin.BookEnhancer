@@ -13,6 +13,7 @@ public class CbrToCbzService
     private readonly FileMetadataExtractor _fileExtractor;
     private readonly MetadataEnrichmentService _enrichment;
     private readonly LibraryOrganizationService _organization;
+    private readonly BookGroupingService _grouping;
     private readonly IFileMetadataWriter _writer;
     private readonly ILogger<CbrToCbzService> _logger;
 
@@ -25,12 +26,14 @@ public class CbrToCbzService
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
         LibraryOrganizationService organization,
+        BookGroupingService grouping,
         IFileMetadataWriter writer,
         ILogger<CbrToCbzService> logger)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
         _organization = organization;
+        _grouping = grouping;
         _writer = writer;
         _logger = logger;
     }
@@ -167,29 +170,37 @@ public class CbrToCbzService
                 var template = LibraryOrganizationService.GetDefaultTemplate(metadata);
                 if (NeedsEnrichment(metadata, template))
                 {
-                    var enrichmentResult = await _enrichment.EnrichAsync(
-                        metadata,
-                        config.HardcoverApiKey,
-                        config.GoogleBooksApiKey,
-                        config.HardcoverEnabled,
-                        config.GoogleBooksEnabled,
-                        config.OpenLibraryEnabled,
-                        comicVineEnabled: config.ComicVineEnabled,
-                        comicVineApiKey: config.ComicVineApiKey ?? "",
-                        metronEnabled: config.MetronEnabled,
-                        metronUsername: config.MetronUsername ?? "",
-                        metronPassword: config.MetronPassword ?? "",
-                        versedbEnabled: config.VerseDbEnabled,
-                        versedbApiKey: config.VerseDbApiKey ?? "",
-                        grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                        grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                        grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
-                        titleAuthorSearchEnabled: true,
-                        title: metadata.Title,
-                        author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
-                        ct: ct).ConfigureAwait(false);
+                    if (config.EnrichmentCooldownDays > 0 && _grouping.IsEnrichmentOnCooldown(cbzPath, config.EnrichmentCooldownDays))
+                    {
+                        await LogAsync(logCallback, $"  Skipped enrichment (cooldown).").ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        var enrichmentResult = await _enrichment.EnrichAsync(
+                            metadata,
+                            config.HardcoverApiKey,
+                            config.GoogleBooksApiKey,
+                            config.HardcoverEnabled,
+                            config.GoogleBooksEnabled,
+                            config.OpenLibraryEnabled,
+                            comicVineEnabled: config.ComicVineEnabled,
+                            comicVineApiKey: config.ComicVineApiKey ?? "",
+                            metronEnabled: config.MetronEnabled,
+                            metronUsername: config.MetronUsername ?? "",
+                            metronPassword: config.MetronPassword ?? "",
+                            versedbEnabled: config.VerseDbEnabled,
+                            versedbApiKey: config.VerseDbApiKey ?? "",
+                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
+                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
+                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                            titleAuthorSearchEnabled: true,
+                            title: metadata.Title,
+                            author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
+                            ct: ct).ConfigureAwait(false);
 
-                    metadata = enrichmentResult.Metadata;
+                        metadata = enrichmentResult.Metadata;
+                        _grouping.SetLastEnrichmentTime(cbzPath);
+                    }
                 }
             }
 
@@ -307,6 +318,10 @@ public class CbrToCbzService
 
         if (tokens.Contains("Publisher") &&
             string.IsNullOrWhiteSpace(metadata.Publisher))
+            return true;
+
+        if (tokens.Contains("Series") &&
+            string.IsNullOrWhiteSpace(metadata.SeriesName))
             return true;
 
         return false;

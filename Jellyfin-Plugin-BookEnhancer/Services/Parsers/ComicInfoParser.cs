@@ -9,8 +9,24 @@ namespace Jellyfin.Plugin.BookEnhancer.Services.Parsers;
 
 public class ComicInfoParser : IFileParser
 {
-    private static readonly Regex ComicFileNamePattern = new(
+    /// <summary>Matches "Series Name 123 (2024)" — existing pattern for scene-release comics with year.</summary>
+    private static readonly Regex ComicSeriesYearPattern = new(
         @"^(.+?)\s+(\d+)\s*\((\d{4})\)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Matches "Series Name #123" — hash separator.</summary>
+    private static readonly Regex ComicHashPattern = new(
+        @"^(.+?)\s+#(\d+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Matches "Series_Name_123" — underscore separator with trailing digits.</summary>
+    private static readonly Regex ComicUnderscorePattern = new(
+        @"^(.+?)_(\d{1,4})$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>Matches "Series Name 123" or "Series Name 1234" — space separator with trailing digits.</summary>
+    private static readonly Regex ComicTrailingNumberPattern = new(
+        @"^(.{3,}?)\s+(\d{1,4})$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public bool CanParse(string filePath)
@@ -73,29 +89,52 @@ public class ComicInfoParser : IFileParser
         if (string.IsNullOrWhiteSpace(nameWithoutExt))
             return null;
 
+        var cleanedName = SceneTagCleaner.Clean(nameWithoutExt);
+
         var meta = new FileMetadata
         {
             FilePath = filePath,
             FileFormat = "Comic",
-            Title = SceneTagCleaner.Clean(nameWithoutExt)
+            Title = cleanedName
         };
 
-        var match = ComicFileNamePattern.Match(nameWithoutExt);
-        if (match.Success)
+        var match = TryMatchComicPattern(cleanedName);
+        if (match is not null)
         {
-            var cleanedSeries = SceneTagCleaner.Clean(match.Groups[1].Value);
+            var cleanedSeries = SceneTagCleaner.Clean(match.Value.Series);
             if (!string.IsNullOrWhiteSpace(cleanedSeries))
                 meta.SeriesName = cleanedSeries.Trim();
 
-            meta.SeriesNumber = match.Groups[2].Value;
+            meta.SeriesNumber = match.Value.Number;
             if (float.TryParse(meta.SeriesNumber, out var num))
                 meta.SeriesIndex = num;
-
-            if (int.TryParse(match.Groups[3].Value, out var year))
-                meta.PublishYear = year;
         }
 
         return meta;
+    }
+
+    private static (string Series, string Number)? TryMatchComicPattern(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        var match = ComicSeriesYearPattern.Match(name);
+        if (match.Success)
+            return (match.Groups[1].Value, match.Groups[2].Value);
+
+        match = ComicHashPattern.Match(name);
+        if (match.Success)
+            return (match.Groups[1].Value, match.Groups[2].Value);
+
+        match = ComicUnderscorePattern.Match(name);
+        if (match.Success)
+            return (match.Groups[1].Value, match.Groups[2].Value);
+
+        match = ComicTrailingNumberPattern.Match(name);
+        if (match.Success)
+            return (match.Groups[1].Value, match.Groups[2].Value);
+
+        return null;
     }
 
     private static FileMetadata ParseComicInfo(XDocument doc, string filePath)

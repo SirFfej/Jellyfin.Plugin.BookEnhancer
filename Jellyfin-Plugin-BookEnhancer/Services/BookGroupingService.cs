@@ -50,9 +50,36 @@ public class BookGroupingService
 
             CREATE INDEX IF NOT EXISTS idx_formats_group ON book_formats(GroupId);
             CREATE INDEX IF NOT EXISTS idx_groups_isbn ON book_groups(Isbn);
+            CREATE INDEX IF NOT EXISTS idx_formats_path ON book_formats(FilePath);
             """;
 
         cmd.ExecuteNonQuery();
+
+        MigrateAddEnrichedAt(conn);
+    }
+
+    private static void MigrateAddEnrichedAt(SqliteConnection conn)
+    {
+        var hasColumn = false;
+        using var check = conn.CreateCommand();
+        check.CommandText = "PRAGMA table_info(book_formats)";
+        using var reader = check.ExecuteReader();
+        while (reader.Read())
+        {
+            var name = reader.GetString(1);
+            if (string.Equals(name, "EnrichedAt", StringComparison.OrdinalIgnoreCase))
+            {
+                hasColumn = true;
+                break;
+            }
+        }
+
+        if (!hasColumn)
+        {
+            using var migrate = conn.CreateCommand();
+            migrate.CommandText = "ALTER TABLE book_formats ADD COLUMN EnrichedAt TEXT";
+            migrate.ExecuteNonQuery();
+        }
     }
 
     private static Dictionary<string, int> GetFormatPriorityMap()
@@ -189,7 +216,7 @@ public class BookGroupingService
         cmd.ExecuteNonQuery();
     }
 
-    public void UpdateFormatPath(string oldPath, string newPath)
+    public int UpdateFormatPath(string oldPath, string newPath)
     {
         using var conn = CreateConnection();
         conn.Open();
@@ -202,6 +229,48 @@ public class BookGroupingService
 
         if (count > 0)
             _logger.LogDebug("Updated format path in DB: {Old} -> {New}", oldPath, newPath);
+
+        return count;
+    }
+
+    public DateTime? GetLastEnrichmentTime(string filePath)
+    {
+        using var conn = CreateConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT EnrichedAt FROM book_formats WHERE FilePath = @FilePath LIMIT 1";
+        cmd.Parameters.AddWithValue("@FilePath", filePath);
+
+        var result = cmd.ExecuteScalar();
+        if (result is null || result == DBNull.Value)
+            return null;
+
+        if (DateTime.TryParse(result.ToString(), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var dt))
+            return dt;
+
+        return null;
+    }
+
+    public bool IsEnrichmentOnCooldown(string filePath, int cooldownDays)
+    {
+        if (cooldownDays <= 0)
+            return false;
+
+        var lastEnriched = GetLastEnrichmentTime(filePath);
+        return lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldownDays;
+    }
+
+    public void SetLastEnrichmentTime(string filePath)
+    {
+        using var conn = CreateConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "UPDATE book_formats SET EnrichedAt = @Now WHERE FilePath = @FilePath";
+        cmd.Parameters.AddWithValue("@FilePath", filePath);
+        cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        cmd.ExecuteNonQuery();
     }
 
     public void SetPrimaryFormat(string groupId, string formatId)
@@ -240,7 +309,7 @@ public class BookGroupingService
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt
+            SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt, EnrichedAt
             FROM book_formats
             WHERE GroupId = @GroupId
             ORDER BY IsPrimary DESC, AddedAt ASC
@@ -266,7 +335,7 @@ public class BookGroupingService
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
-            SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt
+            SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt, EnrichedAt
             FROM book_formats
             ORDER BY AddedAt ASC
             """;
@@ -352,7 +421,8 @@ public class BookGroupingService
             FormatType = reader.GetString(3),
             JellyfinItemId = reader.IsDBNull(4) ? null : reader.GetString(4),
             IsPrimary = reader.GetInt32(5) == 1,
-            AddedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal)
+            AddedAt = DateTime.Parse(reader.GetString(6), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal),
+            EnrichedAt = reader.IsDBNull(7) ? null : DateTime.Parse(reader.GetString(7), CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
         };
     }
 }

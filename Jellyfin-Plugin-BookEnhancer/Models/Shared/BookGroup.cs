@@ -32,4 +32,6 @@ public class BookFormat
     public bool IsPrimary { get; set; }
 
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? EnrichedAt { get; set; }
 }

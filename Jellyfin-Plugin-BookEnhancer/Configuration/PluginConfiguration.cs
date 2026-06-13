@@ -36,6 +36,8 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public List<string> IncludedLibraryIds { get; set; } = new();
 
+    public int EnrichmentCooldownDays { get; set; } = 7;
+
     public string TrashDirectory { get; set; } = string.Empty;
     public int TrashCleanupIntervalDays { get; set; } = 7;
 

@@ -57,6 +57,12 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             var dir = FindMatchingDirectory(config, info.Path);
             var titleAuthorEnabled = dir?.EnableTitleAuthorSearch ?? true;
 
+            if (config.EnrichmentCooldownDays > 0 && _grouping.IsEnrichmentOnCooldown(info.Path, config.EnrichmentCooldownDays))
+            {
+                _logger.LogDebug("Skipped enrichment (cooldown) for {Path}", info.Path);
+                return result;
+            }
+
             var enrichmentResult = await _enrichment.EnrichAsync(
                 fileMeta,
                 config.HardcoverApiKey,
@@ -78,6 +84,8 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 title: fileMeta.Title,
                 author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
                 ct: cancellationToken).ConfigureAwait(false);
+
+            _grouping.SetLastEnrichmentTime(info.Path);
 
             var enriched = enrichmentResult.Metadata;
 
@@ -142,60 +150,80 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 {
                     if (localMeta.Isbn is not null)
                     {
-                        var enrichmentResult = await _enrichment.EnrichAsync(
-                            localMeta,
-                            config.HardcoverApiKey,
-                            config.GoogleBooksApiKey,
-                            config.HardcoverEnabled,
-                            config.GoogleBooksEnabled,
-                            config.OpenLibraryEnabled,
-                            comicVineEnabled: config.ComicVineEnabled,
-                            comicVineApiKey: config.ComicVineApiKey ?? "",
-                            metronEnabled: config.MetronEnabled,
-                            metronUsername: config.MetronUsername ?? "",
-                            metronPassword: config.MetronPassword ?? "",
-                            versedbEnabled: config.VerseDbEnabled,
-                            versedbApiKey: config.VerseDbApiKey ?? "",
-                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
-                            title: searchInfo.Name,
-                            ct: cancellationToken).ConfigureAwait(false);
-
-                        if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
+                        if (config.EnrichmentCooldownDays > 0 && !string.IsNullOrWhiteSpace(searchInfo.Path) && _grouping.IsEnrichmentOnCooldown(searchInfo.Path, config.EnrichmentCooldownDays))
                         {
-                            results.Add(MapSearchResult(enrichmentResult.Metadata));
-                            return results;
+                            _logger.LogDebug("Skipped search enrichment (cooldown) for {Path}", searchInfo.Path);
+                        }
+                        else
+                        {
+                            var enrichmentResult = await _enrichment.EnrichAsync(
+                                localMeta,
+                                config.HardcoverApiKey,
+                                config.GoogleBooksApiKey,
+                                config.HardcoverEnabled,
+                                config.GoogleBooksEnabled,
+                                config.OpenLibraryEnabled,
+                                comicVineEnabled: config.ComicVineEnabled,
+                                comicVineApiKey: config.ComicVineApiKey ?? "",
+                                metronEnabled: config.MetronEnabled,
+                                metronUsername: config.MetronUsername ?? "",
+                                metronPassword: config.MetronPassword ?? "",
+                                versedbEnabled: config.VerseDbEnabled,
+                                versedbApiKey: config.VerseDbApiKey ?? "",
+                                grandComicsDbEnabled: config.GrandComicsDbEnabled,
+                                grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
+                                grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                                title: searchInfo.Name,
+                                ct: cancellationToken).ConfigureAwait(false);
+
+                            if (!string.IsNullOrWhiteSpace(searchInfo.Path))
+                                _grouping.SetLastEnrichmentTime(searchInfo.Path);
+
+                            if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
+                            {
+                                results.Add(MapSearchResult(enrichmentResult.Metadata));
+                                return results;
+                            }
                         }
                     }
 
                     if (HasComicMetadata(localMeta))
                     {
-                        var enriched = await _enrichment.EnrichAsync(
-                            localMeta,
-                            config.HardcoverApiKey,
-                            config.GoogleBooksApiKey,
-                            config.HardcoverEnabled,
-                            config.GoogleBooksEnabled,
-                            config.OpenLibraryEnabled,
-                            comicVineEnabled: config.ComicVineEnabled,
-                            comicVineApiKey: config.ComicVineApiKey ?? "",
-                            metronEnabled: config.MetronEnabled,
-                            metronUsername: config.MetronUsername ?? "",
-                            metronPassword: config.MetronPassword ?? "",
-                            versedbEnabled: config.VerseDbEnabled,
-                            versedbApiKey: config.VerseDbApiKey ?? "",
-                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
-                            titleAuthorSearchEnabled: false,
-                            title: searchInfo.Name,
-                            ct: cancellationToken).ConfigureAwait(false);
-
-                        if (!string.IsNullOrWhiteSpace(enriched.Metadata.Title))
+                        if (config.EnrichmentCooldownDays > 0 && !string.IsNullOrWhiteSpace(searchInfo.Path) && _grouping.IsEnrichmentOnCooldown(searchInfo.Path, config.EnrichmentCooldownDays))
                         {
-                            results.Add(MapSearchResult(enriched.Metadata));
-                            return results;
+                            _logger.LogDebug("Skipped comic search enrichment (cooldown) for {Path}", searchInfo.Path);
+                        }
+                        else
+                        {
+                            var enriched = await _enrichment.EnrichAsync(
+                                localMeta,
+                                config.HardcoverApiKey,
+                                config.GoogleBooksApiKey,
+                                config.HardcoverEnabled,
+                                config.GoogleBooksEnabled,
+                                config.OpenLibraryEnabled,
+                                comicVineEnabled: config.ComicVineEnabled,
+                                comicVineApiKey: config.ComicVineApiKey ?? "",
+                                metronEnabled: config.MetronEnabled,
+                                metronUsername: config.MetronUsername ?? "",
+                                metronPassword: config.MetronPassword ?? "",
+                                versedbEnabled: config.VerseDbEnabled,
+                                versedbApiKey: config.VerseDbApiKey ?? "",
+                                grandComicsDbEnabled: config.GrandComicsDbEnabled,
+                                grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
+                                grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                                titleAuthorSearchEnabled: false,
+                                title: searchInfo.Name,
+                                ct: cancellationToken).ConfigureAwait(false);
+
+                            if (!string.IsNullOrWhiteSpace(searchInfo.Path))
+                                _grouping.SetLastEnrichmentTime(searchInfo.Path);
+
+                            if (!string.IsNullOrWhiteSpace(enriched.Metadata.Title))
+                            {
+                                results.Add(MapSearchResult(enriched.Metadata));
+                                return results;
+                            }
                         }
                     }
                 }

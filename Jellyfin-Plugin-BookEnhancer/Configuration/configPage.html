@@ -126,6 +126,18 @@
 
                     <hr style="margin:15px 0;" />
 
+                    <h3 style="font-size:1.1em;margin:12px 0 6px;">Enrichment Cooldown</h3>
+                    <div class="inputContainer">
+                        <input is="emby-input" id="txtEnrichmentCooldown" type="number"
+                               min="0" max="365" step="1" label="Skip re-enrichment if already enriched within (days)" />
+                        <div class="fieldDescription">
+                            Prevents re-enriching the same file on every scheduled task run to conserve API usage.
+                            Set to 0 to always enrich. Default: 7 (weekly).
+                        </div>
+                    </div>
+
+                    <hr style="margin:15px 0;" />
+
                     <h3 style="font-size:1.1em;margin:12px 0 6px;">Trash &amp; Safety</h3>
                     <p class="fieldDescription">
                         A trash directory is <strong>required</strong> before any plugin tasks will run.
@@ -643,6 +655,7 @@
             <table>
                 <tr>
                     <th>Edit Metadata field</th>
+                    <th>Jellyfin field to modify</th>
                     <th>Plugin field</th>
                     <th>Helps matching</th>
                     <th>Helps organization</th>
@@ -650,6 +663,7 @@
                 </tr>
                 <tr>
                     <td><strong>Name</strong></td>
+                    <td>Main tab &rarr; Title</td>
                     <td><code>Title</code></td>
                     <td>&#x2705; Title+Author cascade</td>
                     <td>&#x2705; <code>{Title}</code> filename</td>
@@ -657,13 +671,15 @@
                 </tr>
                 <tr>
                     <td><strong>Series</strong></td>
+                    <td>Not shown for Book items &#8212; set via file tags (ComicInfo.xml <code>&lt;Series&gt;</code>, EPUB <code>calibre:series</code>, ID3 <code>TIT1</code>) before scanning</td>
                     <td><code>SeriesName</code></td>
                     <td>&#x2705; Comic API cascade</td>
                     <td>&#x2705; <code>{Series}</code> directory</td>
-                    <td>Single text box on main Edit tab</td>
+                    <td>Plugin reads from file tags + Jellyfin DB. API enrichment can also populate this.</td>
                 </tr>
                 <tr>
                     <td><strong>Studio(s)</strong></td>
+                    <td>Main tab &rarr; Studios</td>
                     <td><code>Publisher</code></td>
                     <td>&#x274C;</td>
                     <td>&#x2705; <code>{Publisher}</code> directory</td>
@@ -671,6 +687,7 @@
                 </tr>
                 <tr>
                     <td><strong>People &rarr; Author</strong></td>
+                    <td>Main tab &rarr; People &rarr; Add Person &rarr; Role = Author</td>
                     <td><code>Authors[]</code></td>
                     <td>&#x2705; Title+Author cascade</td>
                     <td>&#x2705; <code>{Author}</code> directory</td>
@@ -678,6 +695,7 @@
                 </tr>
                 <tr>
                     <td><strong>Provider IDs &rarr; ISBN</strong></td>
+                    <td>External IDs &rarr; ISBN Id</td>
                     <td><code>Isbn</code></td>
                     <td>&#x2705; Primary ISBN cascade</td>
                     <td>&#x274C;</td>
@@ -685,13 +703,15 @@
                 </tr>
                 <tr>
                     <td><strong>Index Number</strong></td>
+                    <td>Not shown for Book items &#8212; set via file tags (ComicInfo.xml <code>&lt;Number&gt;</code>, EPUB <code>calibre:series_index</code>) before scanning</td>
                     <td><code>SeriesIndex</code></td>
                     <td>&#x2705; Comic issue #</td>
                     <td>&#x274C;</td>
-                    <td>Set alongside Series for comics</td>
+                    <td>Use alongside Series for issue-scoped comic queries. API enrichment may populate this.</td>
                 </tr>
                 <tr>
                     <td><strong>Overview</strong></td>
+                    <td>Main tab &rarr; Overview</td>
                     <td><code>Description</code></td>
                     <td>&#x274C;</td>
                     <td>&#x274C;</td>
@@ -699,6 +719,7 @@
                 </tr>
                 <tr>
                     <td><strong>Genres</strong></td>
+                    <td>Main tab &rarr; Genres</td>
                     <td><code>Genres[]</code></td>
                     <td>&#x274C;</td>
                     <td>&#x274C;</td>
@@ -706,6 +727,7 @@
                 </tr>
                 <tr>
                     <td><strong>Production Year</strong></td>
+                    <td>Main tab &rarr; Year</td>
                     <td><code>PublishYear</code></td>
                     <td>&#x274C;</td>
                     <td>&#x274C;</td>
@@ -713,12 +735,23 @@
                 </tr>
                 <tr>
                     <td><strong>Premiere Date</strong></td>
+                    <td>Main tab &rarr; Release date</td>
                     <td><code>PublishDate</code></td>
                     <td>&#x274C;</td>
                     <td>&#x274C;</td>
                     <td>Displayed in Jellyfin item info</td>
                 </tr>
             </table>
+
+            <h4>Example: Fixing a file in &quot;Unknown Publisher/Standalone&quot;</h4>
+            <p>Your file lands at <code>Unknown Publisher / Standalone / Title / Title.cbz</code> when Publisher and Series are missing. Here's how to fix it:</p>
+            <ol>
+                <li><strong>Set Publisher (Studio):</strong> Edit Metadata &rarr; Main tab &rarr; Studios &rarr; type <code>Image Comics</code> &mdash; maps to <code>{Publisher}</code> token</li>
+                <li><strong>Set Series:</strong> Series is <em>not</em> shown in the Book Edit Metadata UI, so set it in the file's <code>ComicInfo.xml</code> (<code>&lt;Series&gt;Scarlet&lt;/Series&gt;</code>) using ComicTagger or ComicRack before scanning</li>
+                <li><strong>Set Issue Number:</strong> Also not shown in the UI &#8212; set <code>&lt;Number&gt;4&lt;/Number&gt;</code> in ComicInfo.xml before scanning</li>
+            </ol>
+            <p>After enrichment, the plugin writes enriched metadata back into the ComicInfo.xml. On next library scan, the template produces <code>Image Comics / Scarlet / Scarlet 04.cbz</code>.</p>
+            <p>Alternatively, let the <strong>comic API cascade</strong> (ComicVine &rarr; Metron &rarr; VerseDB &rarr; GCD) populate Series + Issue Number automatically &#8212; just ensure <strong>Studios</strong> is set in Edit Metadata for the <code>{Publisher}</code> directory.</p>
 
             <h3>Which enrichment cascade fires</h3>
             <table>
@@ -1585,6 +1618,7 @@
                     config.TrashCleanupIntervalDays = 7;
                     config.BackupDirectory = "";
                     config.BackupCleanupIntervalDays = 30;
+                    config.EnrichmentCooldownDays = 7;
 
                     ApiClient.updatePluginConfiguration(pluginId, config).then(function () {
                         window.location.reload();
@@ -1611,6 +1645,8 @@
                     document.getElementById("txtGrandComicsDbUsername").value = config.GrandComicsDbUsername || "";
                     document.getElementById("txtGrandComicsDbPassword").value = config.GrandComicsDbPassword || "";
                     document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
+
+                    document.getElementById("txtEnrichmentCooldown").value = config.EnrichmentCooldownDays ?? 7;
 
                     document.getElementById("txtTrashDirectory").value = config.TrashDirectory || "";
                     document.getElementById("txtTrashCleanupInterval").value = config.TrashCleanupIntervalDays || 7;
@@ -1763,6 +1799,9 @@
                         config.GrandComicsDbUsername = document.getElementById("txtGrandComicsDbUsername").value;
                         config.GrandComicsDbPassword = document.getElementById("txtGrandComicsDbPassword").value;
                         config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
+
+                        var cooldownValue = parseInt(document.getElementById("txtEnrichmentCooldown").value);
+                        config.EnrichmentCooldownDays = isNaN(cooldownValue) ? 7 : cooldownValue;
 
                         config.TrashDirectory = document.getElementById("txtTrashDirectory").value.trim();
                         config.TrashCleanupIntervalDays = parseInt(document.getElementById("txtTrashCleanupInterval").value) || 0;

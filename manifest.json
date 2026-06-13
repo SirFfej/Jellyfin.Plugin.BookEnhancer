@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.0.1 - New: configurable enrichment cooldown (default 7 days) with per-file EnrichedAt tracking in bookgroups.db, preventing repeated API calls on every scheduled task run. Cooldown applied to ingestion, cleanup, metadata provider, search, scheduled enrichment, and CBR/CB7→CBZ conversion paths. New: LibraryCleanupService now registers moved files in bookgroups.db when they were not previously tracked, preserving enrichment timestamps across reorganizations. Fixed: comic filename regex now detects Series #NNN, Series_NNN, and Series NNN patterns so standalone comics move into series folders. Fixed: LibraryCleanupService no longer blocks file moves when enrichment cannot resolve all template fields. Hardened: PRAGMA table_info migration for EnrichedAt column, book_formats(FilePath) index, FileInfo.Length existence checks, and library path boundary matching. Build: 0W/0E.",
+        "checksum": "199FFE8AF5C5D05552FCFE9956515407",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.0.1/Jellyfin.Plugin.BookEnhancer_0.8.0.1.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.8.0.1"
+      },
+      {
         "changelog": "v0.8.0.0 - New: Jellyfin DB fallback — FileMetadataExtractor now reads missing/null metadata fields (Title, Overview, Publisher, SeriesName, IndexNumber, ProductionYear, PremiereDate, ProviderIds, Genres) from Jellyfin's library.db when file tags are incomplete, enabling user edits in the dashboard to flow back into file tags. New: Metadata Guide modal in config page explains write-back pipeline, cascade triggers, and template tokens. Fixed: Empty catch blocks in EpubParser, PdfParser, AudioParser now log warnings instead of swallowing exceptions. Fixed: _logCallback race condition in BookIngestionService and GroupingPostProcessingService — instance field replaced with static method param pattern for thread safety. Build: 0W/0E.",
         "checksum": "C0117CE90979E1AE448A2BCC75B3BCF0",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.0.0/Jellyfin.Plugin.BookEnhancer_0.8.0.0.zip",

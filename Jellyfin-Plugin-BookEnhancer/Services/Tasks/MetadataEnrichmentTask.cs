@@ -10,15 +10,18 @@ public class MetadataEnrichmentTask : IScheduledTask
 {
     private readonly FileMetadataExtractor _fileExtractor;
     private readonly MetadataEnrichmentService _enrichment;
+    private readonly BookGroupingService _groupingService;
     private readonly IApplicationPaths _appPaths;
 
     public MetadataEnrichmentTask(
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
+        BookGroupingService groupingService,
         IApplicationPaths appPaths)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
+        _groupingService = groupingService;
         _appPaths = appPaths;
     }
 
@@ -96,6 +99,7 @@ public class MetadataEnrichmentTask : IScheduledTask
             var noIsbn = 0;
             var noMatch = 0;
             var errors = 0;
+            var skippedCooldown = 0;
             var unenriched = new List<string>();
 
             logger.LogInformation($"Found {total} files across {dirs.Count} directories");
@@ -145,6 +149,18 @@ public class MetadataEnrichmentTask : IScheduledTask
                         }
                     }
 
+                    var cooldown = config.EnrichmentCooldownDays;
+                    if (cooldown > 0)
+                    {
+                        var lastEnriched = _groupingService.GetLastEnrichmentTime(filePath);
+                        if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
+                        {
+                            skippedCooldown++;
+                            logger.LogInformation($"Skipped (cooldown): {filePath}");
+                            continue;
+                        }
+                    }
+
                     var result = await _enrichment.EnrichAsync(
                         metadata,
                         config.HardcoverApiKey,
@@ -163,6 +179,8 @@ public class MetadataEnrichmentTask : IScheduledTask
                         grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
                         grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
                         ct: cancellationToken).ConfigureAwait(false);
+
+                    _groupingService.SetLastEnrichmentTime(filePath);
 
                     var enrichedMeta = result.Metadata;
 
@@ -191,10 +209,11 @@ public class MetadataEnrichmentTask : IScheduledTask
                     ((IProgress<double>)logger).Report((double)i / total);
             }
 
-            summaryBuffer.AppendLine($"Enriched:      {enriched}");
-            summaryBuffer.AppendLine($"No ISBN:       {noIsbn}");
-            summaryBuffer.AppendLine($"No match:      {noMatch}");
-            summaryBuffer.AppendLine($"Errors:        {errors}");
+            summaryBuffer.AppendLine($"Enriched:       {enriched}");
+            summaryBuffer.AppendLine($"No ISBN:        {noIsbn}");
+            summaryBuffer.AppendLine($"No match:       {noMatch}");
+            summaryBuffer.AppendLine($"Errors:         {errors}");
+            summaryBuffer.AppendLine($"Skipped (cooldown): {skippedCooldown}");
             summaryBuffer.AppendLine();
 
             if (unenriched.Count > 0)
@@ -216,7 +235,7 @@ public class MetadataEnrichmentTask : IScheduledTask
             var summaryPath = Path.Combine(logDir, $"MetadataEnrichment-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
             await File.WriteAllTextAsync(summaryPath, summaryBuffer.ToString(), cancellationToken).ConfigureAwait(false);
 
-            logger.LogInformation($"Enrichment complete — Enriched: {enriched}, No ISBN: {noIsbn}, No match: {noMatch}, Errors: {errors}");
+            logger.LogInformation($"Enrichment complete — Enriched: {enriched}, No ISBN: {noIsbn}, No match: {noMatch}, Errors: {errors}, Skipped (cooldown): {skippedCooldown}");
             logger.LogInformation($"Summary written to: {summaryPath}");
             ((IProgress<double>)logger).Report(1.0);
         }
