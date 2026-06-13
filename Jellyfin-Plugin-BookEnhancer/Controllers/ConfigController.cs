@@ -155,6 +155,60 @@ public class ConfigController : ControllerBase
         }
         results.Add(olResult);
 
+        // Comic Vine
+        var cvResult = new ServiceConnectivity { Name = "Comic Vine", Url = "https://comicvine.gamespot.com/api" };
+        try
+        {
+            using var cvClient = _httpClientFactory.CreateClient();
+            cvClient.Timeout = TimeSpan.FromSeconds(10);
+            cvClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var cvResp = await cvClient.GetAsync("https://comicvine.gamespot.com/api", ct).ConfigureAwait(false);
+            cvResult.Reachable = true;
+            cvResult.StatusCode = (int)cvResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            cvResult.Reachable = false;
+            cvResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(cvResult);
+
+        // Metron
+        var mtResult = new ServiceConnectivity { Name = "Metron", Url = "https://metron.cloud/api" };
+        try
+        {
+            using var mtClient = _httpClientFactory.CreateClient();
+            mtClient.Timeout = TimeSpan.FromSeconds(10);
+            mtClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var mtResp = await mtClient.GetAsync("https://metron.cloud/api", ct).ConfigureAwait(false);
+            mtResult.Reachable = true;
+            mtResult.StatusCode = (int)mtResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            mtResult.Reachable = false;
+            mtResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(mtResult);
+
+        // VerseDB
+        var vdResult = new ServiceConnectivity { Name = "VerseDB", Url = "https://versedb.com/api" };
+        try
+        {
+            using var vdClient = _httpClientFactory.CreateClient();
+            vdClient.Timeout = TimeSpan.FromSeconds(10);
+            vdClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var vdResp = await vdClient.GetAsync("https://versedb.com/api", ct).ConfigureAwait(false);
+            vdResult.Reachable = true;
+            vdResult.StatusCode = (int)vdResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            vdResult.Reachable = false;
+            vdResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(vdResult);
+
         return Ok(new ConnectivityResult { Results = results });
     }
 

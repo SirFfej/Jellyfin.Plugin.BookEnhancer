@@ -51,7 +51,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                 return;
             }
 
-            if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled))
+            if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled && !config.MetronEnabled && !config.VerseDbEnabled))
             {
                 logger.LogWarning("Online enrichment is disabled in plugin configuration");
                 return;
@@ -97,7 +97,9 @@ public class MetadataEnrichmentTask : IScheduledTask
                 $"Enrichment cascade — Hardcover: {(config.HardcoverEnabled && !string.IsNullOrWhiteSpace(config.HardcoverApiKey) ? "enabled" : "disabled")}, " +
                 $"Google Books: {(config.GoogleBooksEnabled ? "enabled" : "disabled")}, " +
                 $"OpenLibrary: {(config.OpenLibraryEnabled ? "enabled" : "disabled")}, " +
-                $"Comic Vine: {(config.ComicVineEnabled && !string.IsNullOrWhiteSpace(config.ComicVineApiKey) ? "enabled" : "disabled")}");
+                $"Comic Vine: {(config.ComicVineEnabled && !string.IsNullOrWhiteSpace(config.ComicVineApiKey) ? "enabled" : "disabled")}, " +
+                $"Metron: {(config.MetronEnabled && !string.IsNullOrWhiteSpace(config.MetronApiKey) ? "enabled" : "disabled")}, " +
+                $"VerseDB: {(config.VerseDbEnabled && !string.IsNullOrWhiteSpace(config.VerseDbApiKey) ? "enabled" : "disabled")}");
 
             summaryBuffer.AppendLine("=== Metadata Enrichment Report ===");
             summaryBuffer.AppendLine($"Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -141,6 +143,10 @@ public class MetadataEnrichmentTask : IScheduledTask
                         config.OpenLibraryEnabled,
                         comicVineEnabled: config.ComicVineEnabled,
                         comicVineApiKey: config.ComicVineApiKey ?? "",
+                        metronEnabled: config.MetronEnabled,
+                        metronApiKey: config.MetronApiKey ?? "",
+                        versedbEnabled: config.VerseDbEnabled,
+                        versedbApiKey: config.VerseDbApiKey ?? "",
                         ct: cancellationToken).ConfigureAwait(false);
 
                     var enrichedMeta = result.Metadata;

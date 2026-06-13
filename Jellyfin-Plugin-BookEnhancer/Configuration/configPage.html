@@ -246,12 +246,73 @@
 
                     <hr style="margin:15px 0;" />
 
+                    <h4 style="font-size:1em;margin:10px 0 3px;">Metron</h4>
+                    <p class="fieldDescription">
+                        Community-run comic database alternative to Comic Vine. Provides creative team credits,
+                        characters, cover art, and publisher info. Free API token required.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkMetronEnabled" type="checkbox" />
+                            <span>Enable Metron metadata lookup</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtMetronApiKey" type="password"
+                                   label="Metron API Token" style="flex:1;" />
+                        </div>
+                        <div id="testMetronResult" class="be-test-result" style="display:none;"></div>
+                        <div class="fieldDescription">
+                            Paste your Metron API token here.
+                            <a href="https://metron.cloud/accounts/signup/" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
+                                Sign up at Metron
+                            </a>
+                            — create an account, then go to your profile settings to get an API token.
+                        </div>
+                    </div>
+
+                    <hr style="margin:15px 0;" />
+
+                    <h4 style="font-size:1em;margin:10px 0 3px;">VerseDB</h4>
+                    <p class="fieldDescription">
+                        Modern comic database with excellent search and barcode lookup.
+                        Provides creative team credits, characters, cover art, and publisher info.
+                        Free account required for API token.
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkVVerseDbEnabled" type="checkbox" />
+                            <span>Enable VerseDB metadata lookup</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtVerseDbApiKey" type="password"
+                                   label="VerseDB API Token" style="flex:1;" />
+                        </div>
+                        <div id="testVerseDbResult" class="be-test-result" style="display:none;"></div>
+                        <div class="fieldDescription">
+                            Paste your VerseDB API token here.
+                            <a href="https://versedb.com/register" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
+                                Sign up at VerseDB
+                            </a>
+                            — create an account, then go to your API settings to generate a token.
+                        </div>
+                    </div>
+
+                    <hr style="margin:15px 0;" />
+
                     <div style="margin-top:8px;">
                         <button is="emby-button" id="btnTestConnectivity" type="button" class="raised"
                                 style="white-space:nowrap;">Test Enrichment Connectivity</button>
                         <div class="fieldDescription" style="margin-top:4px;">
-                            Checks whether this server can reach Hardcover, Google Books, and OpenLibrary.
-                            Useful for diagnosing network issues.
+                            Checks whether this server can reach Hardcover, Google Books, OpenLibrary,
+                            Comic Vine, Metron, and VerseDB. Useful for diagnosing network issues.
                         </div>
                         <div id="testConnectivityResult" class="be-test-result" style="display:none;"></div>
                     </div>
@@ -1084,6 +1145,12 @@
                     config.GoogleBooksEnabled = true;
                     config.GoogleBooksApiKey = "";
                     config.OpenLibraryEnabled = true;
+                    config.ComicVineEnabled = false;
+                    config.ComicVineApiKey = "";
+                    config.MetronEnabled = false;
+                    config.MetronApiKey = "";
+                    config.VerseDbEnabled = false;
+                    config.VerseDbApiKey = "";
                     config.MatchThreshold = 0.85;
                     config.EnableFormatGrouping = true;
                     config.GroupingStrategy = "IsbnOnly";
@@ -1110,6 +1177,10 @@
                     document.getElementById("chkOpenLibraryEnabled").checked = config.OpenLibraryEnabled || false;
                     document.getElementById("chkComicVineEnabled").checked = config.ComicVineEnabled || false;
                     document.getElementById("txtComicVineApiKey").value = config.ComicVineApiKey || "";
+                    document.getElementById("chkMetronEnabled").checked = config.MetronEnabled || false;
+                    document.getElementById("txtMetronApiKey").value = config.MetronApiKey || "";
+                    document.getElementById("chkVVerseDbEnabled").checked = config.VerseDbEnabled || false;
+                    document.getElementById("txtVerseDbApiKey").value = config.VerseDbApiKey || "";
                     document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
 
                     document.getElementById("chkEnableFormatGrouping").checked = config.EnableFormatGrouping !== false;
@@ -1240,6 +1311,10 @@
                         config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
                         config.ComicVineEnabled = document.getElementById("chkComicVineEnabled").checked;
                         config.ComicVineApiKey = document.getElementById("txtComicVineApiKey").value;
+                        config.MetronEnabled = document.getElementById("chkMetronEnabled").checked;
+                        config.MetronApiKey = document.getElementById("txtMetronApiKey").value;
+                        config.VerseDbEnabled = document.getElementById("chkVVerseDbEnabled").checked;
+                        config.VerseDbApiKey = document.getElementById("txtVerseDbApiKey").value;
                         config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
 
                         config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;

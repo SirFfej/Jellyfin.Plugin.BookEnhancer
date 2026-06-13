@@ -51,16 +51,21 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 2. **Google Books** (tier 2) — good coverage. Optional API key for higher rate limits.
 3. **OpenLibrary** (tier 3) — free, no key. Covers public domain and older titles.
 4. **Comic Vine** (tier 4) — comic-specific enrichment via search by series + issue number. Free API key required.
+5. **Metron** (tier 5) — community-run comic database, searched by series name + issue number. Free API token required.
+6. **VerseDB** (tier 6) — modern comic database with general search. Free account required for API token.
 
 Unified enrichment can be toggled on/off per source directory. When off, only raw file metadata is used.
 
 ### Network Diagnostics
-- **Test Enrichment Connectivity** button on the Metadata config tab — pings all 4 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine) and reports reachability, status codes, and error details per service
+- **Test Enrichment Connectivity** button on the Metadata config tab — pings all 6 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
 
-### Enrichment Cascade (v0.7.0)
-- **Comic Vine API** — final cascade tier enriches single-issue comics by series name + issue number; returns writer, penciller, inker, colorist, letterer, cover artist, editor, translator credits; character tags; publisher; cover date; description
-- **Comic Vine in Identify window** — files with `SeriesName`/`SeriesNumber` in ComicInfo.xml trigger Comic Vine enrichment even without ISBN
+### Enrichment Cascade (v0.7.0.1)
+- **Metron API** — community-run Comic Vine alternative, searched by series name + issue number; returns writer, penciller, inker, colorist, letterer, cover artist, editor, translator credits; character tags; publisher; cover date; description. Rate limited: 20 req/min, 5,000/day.
+- **VerseDB API** — modern comic database with general search fallback; returns creative team, characters, publisher, cover art. API token required.
+- **Comic Vine API** — original comic enrichment tier; searched first in the comic cascade by series + issue number
+- **Comic cascade ordering** — Comic Vine → Metron → VerseDB; each runs only if the previous returned no results
+- **Identify window comic support** — files with `SeriesName`/`SeriesNumber` in ComicInfo.xml trigger the full comic cascade even without ISBN
 - **Rate limiting** — 250ms delay between API calls to prevent hitting rate limits on all services
 - **Google Books API key guard** — unauthenticated requests no longer sent when no key is configured
 - **Accurate match reporting** — cascade returns whether any API actually responded with data, independent of whether local metadata was already complete (fixes "No enrichment found" for files with rich embedded metadata)
@@ -105,7 +110,7 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
 - **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons
 - **Grouping** — Preview, Process, and Repair Format Paths buttons with results display
-- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine toggle and API key input
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging
@@ -126,7 +131,9 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
  4. Go to the **Ingestion** tab to configure format priority and enrichment settings:
     - **Hardcover API Key** (required for enrichment) — get one free at https://hardcover.app/account/api
     - **Google Books API Key** (optional) — get one at https://console.cloud.google.com/apis/credentials
-    - **Comic Vine API Key** (optional) — enable on the **Metadata** tab; get a key at https://comicvine.gamespot.com/api
+    - **Comic Vine API Key** (optional) — enable on the **Metadata** tab; get a key at https://comicvine.gamespot.com/api (signup may require Google/Twitter login)
+    - **Metron API Token** (optional) — enable on the **Metadata** tab; sign up at https://metron.cloud and get a token from your profile settings
+    - **VerseDB API Token** (optional) — enable on the **Metadata** tab; sign up at https://versedb.com and generate a token in API settings
 5. Run the scheduled task **Ingestion Scan** from Dashboard → Scheduled Tasks
 
 ## Scheduled Tasks

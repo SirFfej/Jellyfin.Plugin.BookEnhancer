@@ -10,6 +10,8 @@ public class MetadataEnrichmentService
     private readonly GoogleBooksApiClient _googleBooks;
     private readonly OpenLibraryApiClient _openLibrary;
     private readonly ComicVineApiClient _comicVine;
+    private readonly MetronApiClient _metron;
+    private readonly VerseDbApiClient _verseDb;
     private readonly ILogger<MetadataEnrichmentService> _logger;
 
     public MetadataEnrichmentService(
@@ -17,12 +19,16 @@ public class MetadataEnrichmentService
         GoogleBooksApiClient googleBooks,
         OpenLibraryApiClient openLibrary,
         ComicVineApiClient comicVine,
+        MetronApiClient metron,
+        VerseDbApiClient verseDb,
         ILogger<MetadataEnrichmentService> logger)
     {
         _hardcover = hardcover;
         _googleBooks = googleBooks;
         _openLibrary = openLibrary;
         _comicVine = comicVine;
+        _metron = metron;
+        _verseDb = verseDb;
         _logger = logger;
     }
 
@@ -35,6 +41,10 @@ public class MetadataEnrichmentService
         bool openLibraryEnabled,
         bool comicVineEnabled = false,
         string comicVineApiKey = "",
+        bool metronEnabled = false,
+        string metronApiKey = "",
+        bool versedbEnabled = false,
+        string versedbApiKey = "",
         bool titleAuthorSearchEnabled = true,
         string? title = null,
         string? author = null,
@@ -59,9 +69,9 @@ public class MetadataEnrichmentService
             }
         }
 
-        if (!apiMatchFound && comicVineEnabled && !string.IsNullOrWhiteSpace(comicVineApiKey))
+        if (!apiMatchFound)
         {
-            apiMatchFound = await SearchByComicVineCascade(source, comicVineApiKey, ct).ConfigureAwait(false);
+            apiMatchFound = await SearchByComicCascade(source, comicVineEnabled, comicVineApiKey, metronEnabled, metronApiKey, versedbEnabled, versedbApiKey, ct).ConfigureAwait(false);
         }
 
         return new EnrichmentResult
@@ -179,57 +189,79 @@ public class MetadataEnrichmentService
         return anyApiReturnedData;
     }
 
-    private async Task<bool> SearchByComicVineCascade(
+    private async Task<bool> SearchByComicCascade(
         FileMetadata source,
+        bool comicVineEnabled,
         string comicVineApiKey,
+        bool metronEnabled,
+        string metronApiKey,
+        bool versedbEnabled,
+        string versedbApiKey,
         CancellationToken ct)
-    {
-        var query = BuildComicQuery(source);
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            _logger.LogDebug("No series/issue info available for Comic Vine search, skipping");
-            return false;
-        }
-
-        var results = await _comicVine.SearchIssuesAsync(query, comicVineApiKey, ct).ConfigureAwait(false);
-        if (results.Count == 0)
-        {
-            _logger.LogDebug("Comic Vine returned no results for query {Query}", query);
-            return false;
-        }
-
-        var best = results[0];
-        var detail = await _comicVine.GetIssueDetailAsync(best.Id, comicVineApiKey, ct).ConfigureAwait(false);
-        if (detail is null)
-        {
-            _logger.LogDebug("Comic Vine issue detail returned null for ID {Id}", best.Id);
-            return false;
-        }
-
-        MergeNulls(source, detail);
-        if (!string.IsNullOrWhiteSpace(best.PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
-            source.Publisher = best.PublisherName;
-
-        _logger.LogDebug("Comic Vine enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-        return true;
-    }
-
-    private static string? BuildComicQuery(FileMetadata source)
     {
         var series = source.SeriesName;
         var issue = source.SeriesNumber;
-        var title = source.Title;
 
-        if (!string.IsNullOrWhiteSpace(series) && !string.IsNullOrWhiteSpace(issue))
-            return $"{series} {issue}";
+        if (string.IsNullOrWhiteSpace(series))
+        {
+            _logger.LogDebug("No series info available for comic API search, skipping");
+            return false;
+        }
 
-        if (!string.IsNullOrWhiteSpace(series))
-            return series;
+        if (comicVineEnabled && !string.IsNullOrWhiteSpace(comicVineApiKey))
+        {
+            var query = issue is not null ? $"{series} {issue}" : series;
+            var cvResults = await _comicVine.SearchIssuesAsync(query, comicVineApiKey, ct).ConfigureAwait(false);
+            if (cvResults.Count > 0)
+            {
+                var detail = await _comicVine.GetIssueDetailAsync(cvResults[0].Id, comicVineApiKey, ct).ConfigureAwait(false);
+                if (detail is not null)
+                {
+                    MergeNulls(source, detail);
+                    if (!string.IsNullOrWhiteSpace(cvResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
+                        source.Publisher = cvResults[0].PublisherName;
+                    _logger.LogDebug("Comic Vine enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                    return true;
+                }
+            }
+        }
 
-        if (!string.IsNullOrWhiteSpace(title))
-            return title;
+        if (metronEnabled && !string.IsNullOrWhiteSpace(metronApiKey) && !string.IsNullOrWhiteSpace(issue))
+        {
+            var mtResults = await _metron.SearchIssuesAsync(series, issue, metronApiKey, ct).ConfigureAwait(false);
+            if (mtResults.Count > 0)
+            {
+                var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, metronApiKey, ct).ConfigureAwait(false);
+                if (detail is not null)
+                {
+                    MergeNulls(source, detail);
+                    if (!string.IsNullOrWhiteSpace(mtResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
+                        source.Publisher = mtResults[0].PublisherName;
+                    _logger.LogDebug("Metron enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                    return true;
+                }
+            }
+        }
 
-        return null;
+        if (versedbEnabled && !string.IsNullOrWhiteSpace(versedbApiKey))
+        {
+            var query = issue is not null ? $"{series} {issue}" : series;
+            var vdResults = await _verseDb.SearchIssuesAsync(query, versedbApiKey, ct).ConfigureAwait(false);
+            if (vdResults.Count > 0)
+            {
+                var detail = await _verseDb.GetIssueDetailAsync(vdResults[0].Id, versedbApiKey, ct).ConfigureAwait(false);
+                if (detail is not null)
+                {
+                    MergeNulls(source, detail);
+                    if (!string.IsNullOrWhiteSpace(vdResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
+                        source.Publisher = vdResults[0].PublisherName;
+                    _logger.LogDebug("VerseDB enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private static void MergeSource(FileMetadata target, FileMetadata source)
