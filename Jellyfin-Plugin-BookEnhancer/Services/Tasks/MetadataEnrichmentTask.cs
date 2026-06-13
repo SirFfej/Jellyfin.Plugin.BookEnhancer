@@ -129,9 +129,13 @@ public class MetadataEnrichmentTask : IScheduledTask
 
                     if (string.IsNullOrWhiteSpace(metadata.Isbn))
                     {
-                        noIsbn++;
-                        unenriched.Add($"NO ISBN: {filePath}");
-                        continue;
+                        var isComic = string.Equals(metadata.FileFormat, "Comic", StringComparison.OrdinalIgnoreCase);
+                        if (!isComic)
+                        {
+                            noIsbn++;
+                            unenriched.Add($"NO ISBN: {filePath}");
+                            continue;
+                        }
                     }
 
                     var result = await _enrichment.EnrichAsync(

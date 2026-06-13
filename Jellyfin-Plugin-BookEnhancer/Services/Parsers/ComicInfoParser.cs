@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using SharpCompress.Archives;
@@ -8,6 +9,10 @@ namespace Jellyfin.Plugin.BookEnhancer.Services.Parsers;
 
 public class ComicInfoParser : IFileParser
 {
+    private static readonly Regex ComicFileNamePattern = new(
+        @"^(.+?)\s+(\d+)\s*\((\d{4})\)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public bool CanParse(string filePath)
     {
         var ext = Path.GetExtension(filePath);
@@ -30,12 +35,13 @@ public class ComicInfoParser : IFileParser
                 _ => null
             };
 
-            if (doc is null) return Task.FromResult<FileMetadata?>(null);
+            if (doc is null)
+                return Task.FromResult<FileMetadata?>(ParseFromFileName(filePath));
             return Task.FromResult<FileMetadata?>(ParseComicInfo(doc, filePath));
         }
         catch
         {
-            return Task.FromResult<FileMetadata?>(null);
+            return Task.FromResult<FileMetadata?>(ParseFromFileName(filePath));
         }
     }
 
@@ -59,6 +65,37 @@ public class ComicInfoParser : IFileParser
         entry.WriteTo(ms);
         ms.Position = 0;
         return XDocument.Load(ms);
+    }
+
+    private static FileMetadata? ParseFromFileName(string filePath)
+    {
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(filePath);
+        if (string.IsNullOrWhiteSpace(nameWithoutExt))
+            return null;
+
+        var meta = new FileMetadata
+        {
+            FilePath = filePath,
+            FileFormat = "Comic",
+            Title = SceneTagCleaner.Clean(nameWithoutExt)
+        };
+
+        var match = ComicFileNamePattern.Match(nameWithoutExt);
+        if (match.Success)
+        {
+            var cleanedSeries = SceneTagCleaner.Clean(match.Groups[1].Value);
+            if (!string.IsNullOrWhiteSpace(cleanedSeries))
+                meta.SeriesName = cleanedSeries.Trim();
+
+            meta.SeriesNumber = match.Groups[2].Value;
+            if (float.TryParse(meta.SeriesNumber, out var num))
+                meta.SeriesIndex = num;
+
+            if (int.TryParse(match.Groups[3].Value, out var year))
+                meta.PublishYear = year;
+        }
+
+        return meta;
     }
 
     private static FileMetadata ParseComicInfo(XDocument doc, string filePath)

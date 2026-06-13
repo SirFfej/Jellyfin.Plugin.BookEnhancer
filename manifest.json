@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.7.0.2 - Comic filename fallback: when ComicInfo.xml is missing or unreadable (e.g. RAR5 CBRs), SeriesName, SeriesNumber, and PublishYear are parsed from common filename patterns (e.g. 'All New X-Men 014 (2013)'). Comic files no longer require an ISBN to reach the enrichment cascade — filename-parsed series+issue now triggers Comic Vine / Metron / VerseDB search. MetadataEnrichmentTask skips ISBN gate for comic formats. Build: 0W/0E.",
+        "checksum": "86d0361f7baed866ebb36c64a6e19d3f",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.2/Jellyfin.Plugin.BookEnhancer_0.7.0.2.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.7.0.2"
+      },
+      {
         "changelog": "v0.7.0.1 - Metron and VerseDB comic API integration: new MetronApiClient (community-run comic DB, searched by series+issue number, 20 req/min), new VerseDbApiClient (modern comic DB with general search). Comic enrichment cascade expanded to Comic Vine -> Metron -> VerseDB (sequential, each only if previous returns nothing). Test Enrichment Connectivity now pings all 6 services (Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB). Config page adds Metron and VerseDB toggle+token inputs. All 4 enrichment callers updated with new params. Build: 0W/0E.",
         "checksum": "66df5369d3f59aff3e435d0547f7392a",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.1/Jellyfin.Plugin.BookEnhancer_0.7.0.1.zip",

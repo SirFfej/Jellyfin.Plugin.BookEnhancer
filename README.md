@@ -42,7 +42,7 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 
 ### File Parsing
 - **EPUB** — title, authors, ISBN (3 extraction strategies), publisher, date, language, tags, series, cover image
-- **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count
+- **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count. **Filename fallback** — when ComicInfo.xml is missing or unreadable (e.g. RAR5 CBRs), series name, issue number, and year are parsed from common filename patterns like `Series Name 014 (2013)` to enable enrichment via the comic cascade.
 - **PDF** — title, author, subject, keywords, page count
 - **Audio** (MP3, M4B, FLAC, OGG, OPUS, M4A, WMA, AIFF) — title, artist, album/series, genres, narrators, duration, cover art
 
@@ -60,7 +60,10 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Test Enrichment Connectivity** button on the Metadata config tab — pings all 6 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
 
-### Enrichment Cascade (v0.7.0.1)
+### Enrichment Cascade (v0.7.0.2)
+- **Comic filename fallback** — when ComicInfo.xml is missing or unreadable, `SeriesName`, `SeriesNumber`, and `PublishYear` are parsed from common filename patterns (e.g. `All New X-Men 014 (2013)`). Files without ISBN but with filename-derived series/issue can now reach the comic enrichment cascade instead of being skipped.
+- **Comic ISBN requirement removed** — comic files (.cbz/.cbr/.cb7) no longer require an ISBN to proceed to the enrichment cascade; the comic tier (Comic Vine → Metron → VerseDB) can run on filename-parsed series + issue number alone.
+- **RAR5 fallback** — CBR files using the RAR5 format (not supported by SharpCompress for extraction) now produce fallback metadata from the filename instead of returning null, enabling enrichment where previously "Could not extract metadata" was logged.
 - **Metron API** — community-run Comic Vine alternative, searched by series name + issue number; returns writer, penciller, inker, colorist, letterer, cover artist, editor, translator credits; character tags; publisher; cover date; description. Rate limited: 20 req/min, 5,000/day.
 - **VerseDB API** — modern comic database with general search fallback; returns creative team, characters, publisher, cover art. API token required.
 - **Comic Vine API** — original comic enrichment tier; searched first in the comic cascade by series + issue number
