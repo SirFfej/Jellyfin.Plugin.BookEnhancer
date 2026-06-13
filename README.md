@@ -56,6 +56,14 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 
 Unified enrichment can be toggled on/off per source directory. When off, only raw file metadata is used.
 
+Enriched metadata and dashboard edits are written back to file tags (ComicInfo.xml, OPF, ID3) during library scans when `EnableMetadata Writing` is enabled, creating self-documenting files that preserve edits across library re-scans.
+
+### Jellyfin DB Metadata Fallback (v0.8.0.0)
+- **Dashboard edits preserved** — when file tags are incomplete or null, metadata is filled from Jellyfin's `library.db`, allowing user edits in the Edit Metadata dialog to survive library scans
+- **Write-back pipeline** — DB edits are picked up during the next library scan and written to file tags (ComicInfo.xml, OPF, ID3) when `EnableMetadata Writing` is on
+- **Null-only fill** — DB values never overwrite existing file tags; only missing/null fields are populated from the DB, preventing circular amplification of the plugin's own writes
+- **Covers all standard fields** — Title, Overview, Publisher, SeriesName, IndexNumber, ProductionYear, PremiereDate, ProviderIds (ISBN/ASIN), and Genres
+
 ### Network Diagnostics
 - **Test Enrichment Connectivity** button on the Metadata config tab — pings all 6 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
@@ -113,7 +121,7 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
 - **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons
 - **Grouping** — Preview, Process, and Repair Format Paths buttons with results display
-- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, and field mappings
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging
