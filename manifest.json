@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.7.0.6 - BREAKING: TrashDirectory now required before any plugin tasks run (safety gate after 5,841 files deleted by parent-directory cleanup bug). Fixed: CleanupNonBookDirectories recursive SearchOption.AllDirectories prevents parent dirs from being classified as non-book. New: TrashDirectory with configurable auto-purge (default 7d) and creation-time validation. New: Publisher-aware default template ({Publisher}/{Series}/{Title} when publisher exists). New: CBR/CB7 to CBZ conversion + ComicInfo.xml tagging from config page (SharpCompress extraction, enrichment pipeline, trash originals). Fixed: FileMetadataWriter atomic temp-file swaps prevent data loss on crash. Fixed: Zip-slip traversal guard. Fixed: LibraryOrganizationService.MoveFile no longer permanently deletes on size-only match. Fixed: CBR→CBZ validates archive before trashing original. Build: 0W/0E.",
+        "checksum": "28E87A303F9D223A6BAFA88E8E74B60C",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.6/Jellyfin.Plugin.BookEnhancer_0.7.0.6.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.7.0.6"
+      },
+      {
         "changelog": "v0.7.0.5 - Client-side per-API rate limiting via SimpleRateLimiter (sliding-window): GCD 80 req/hr, Comic Vine 180 req/hr, Metron 20 req/min, VerseDB 30 req/min, Hardcover 60 req/min, Google Books 60 req/min, OpenLibrary 100 req/min. Rate limiter static across transient instances, called before every HTTP request. Fixed: Hardcover GraphQlEndpoint → BaseUrl. Build: 0W/0E.",
         "checksum": "8eac88698646024f9a5c02a3c2937a95",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.5/Jellyfin.Plugin.BookEnhancer_0.7.0.5.zip",

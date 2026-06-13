@@ -35,6 +35,9 @@ public class PluginConfiguration : BasePluginConfiguration
     public int AutoScanIntervalMinutes { get; set; } = 0;
 
     public List<string> IncludedLibraryIds { get; set; } = new();
+
+    public string TrashDirectory { get; set; } = string.Empty;
+    public int TrashCleanupIntervalDays { get; set; } = 7;
 }
 
 public class FormatPriorityEntry

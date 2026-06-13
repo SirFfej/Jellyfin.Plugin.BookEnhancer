@@ -34,6 +34,13 @@ public class GroupingProcessTask : IScheduledTask
         var logDir = _appPaths.LogDirectoryPath;
         using var logger = new TaskLogger(logDir, "GroupingProcess");
 
+        var config = Plugin.Instance?.Configuration;
+        if (config is null || string.IsNullOrWhiteSpace(config.TrashDirectory))
+        {
+            logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
+            return;
+        }
+
         Func<string, Task> logCallback = msg =>
         {
             logger.LogInformation(msg);

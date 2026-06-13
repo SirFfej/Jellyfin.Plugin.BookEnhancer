@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <Version>0.7.0.5</Version>
-    <AssemblyVersion>0.7.0.5</AssemblyVersion>
-    <FileVersion>0.7.0.5</FileVersion>
+    <Version>0.7.0.6</Version>
+    <AssemblyVersion>0.7.0.6</AssemblyVersion>
+    <FileVersion>0.7.0.6</FileVersion>
     <RootNamespace>Jellyfin.Plugin.BookEnhancer</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -13,7 +13,7 @@
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <AnalysisMode>AllEnabledByDefault</AnalysisMode>
     <CodeAnalysisRuleSet>../jellyfin.ruleset</CodeAnalysisRuleSet>
-    <NoWarn>CA1002;CA1063;CA1305;CA1307;CA1816;CA1819;CA1852;CA2007;CA2227;CS1591;NU1902;SA1122;SA1127;SA1210;SA1402;SA1501;SA1502;SA1503;SA1513;SA1516;SA1520;SA1600</NoWarn>
+    <NoWarn>CA1002;CA1063;CA1305;CA1307;CA1816;CA1819;CA1852;CA2007;CA2227;CA3003;CS1591;NU1902;SA1122;SA1127;SA1210;SA1402;SA1501;SA1502;SA1503;SA1513;SA1516;SA1520;SA1600</NoWarn>
   </PropertyGroup>
 
   <!-- Plugin GUID — read by BasePlugin<T> via reflection to set the plugin Id -->

@@ -56,6 +56,12 @@ public class BookIngestionService
         if (config is null)
             return new IngestionResult { Errors = 1 };
 
+        if (string.IsNullOrWhiteSpace(config.TrashDirectory))
+        {
+            await LogWarningAsync("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.").ConfigureAwait(false);
+            return new IngestionResult { Errors = 1 };
+        }
+
         var result = new IngestionResult();
         var enabledDirs = config.ManagedDirectories
             .Where(d => d.Enabled && !string.IsNullOrWhiteSpace(d.SourcePath) && !string.IsNullOrWhiteSpace(d.LibraryPath))
@@ -172,7 +178,7 @@ public class BookIngestionService
                 }
 
                 var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
-                    ? "{Author}/{Series}/{Title}"
+                    ? LibraryOrganizationService.GetDefaultTemplate(metadata)
                     : dir.OrganizeTemplate;
                 var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
                 var moveResult = await _organization.MoveFile(file, targetPath, Config?.CopyMode == true, _logCallback).ConfigureAwait(false);

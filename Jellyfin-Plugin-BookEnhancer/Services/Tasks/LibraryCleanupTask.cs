@@ -35,6 +35,13 @@ public class LibraryCleanupTask : IScheduledTask
         var logDir = _appPaths.LogDirectoryPath;
         using var logger = new TaskLogger(logDir, "log_LibraryCleanup");
 
+        var config = Plugin.Instance?.Configuration;
+        if (config is null || string.IsNullOrWhiteSpace(config.TrashDirectory))
+        {
+            logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
+            return;
+        }
+
         var logBuffer = new StringBuilder();
 
         try

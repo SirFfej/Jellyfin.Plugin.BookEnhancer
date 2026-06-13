@@ -40,17 +40,23 @@ public class MetadataEnrichmentTask : IScheduledTask
         var logDir = _appPaths.LogDirectoryPath;
         using var logger = new TaskLogger(logDir, "MetadataEnrichment");
 
+        var config = Plugin.Instance?.Configuration;
+        if (config is null)
+        {
+            logger.LogError("Plugin configuration not available");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(config.TrashDirectory))
+        {
+            logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
+            return;
+        }
+
         var summaryBuffer = new StringBuilder();
 
         try
         {
-            var config = Plugin.Instance?.Configuration;
-            if (config is null)
-            {
-                logger.LogError("Plugin configuration not available");
-                return;
-            }
-
             if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled && !config.MetronEnabled && !config.VerseDbEnabled && !config.GrandComicsDbEnabled))
             {
                 logger.LogWarning("Online enrichment is disabled in plugin configuration");

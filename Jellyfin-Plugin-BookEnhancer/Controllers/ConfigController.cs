@@ -6,6 +6,8 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -275,6 +277,20 @@ public class ConfigController : ControllerBase
         });
     }
 
+    [HttpPost("ConvertCbrToCbz")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Authorized endpoint used for user-configured library directories only.")]
+    public async Task<ActionResult<CbrToCbzResult>> ConvertCbrToCbz(
+        [FromBody] CbrToCbzRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.ScanPath))
+            return Ok(new CbrToCbzResult { Errors = 1, ErrorDetails = ["No scan path provided."] });
+
+        var service = HttpContext.RequestServices.GetRequiredService<CbrToCbzService>();
+        var result = await service.ConvertAsync(request.ScanPath, ct: ct).ConfigureAwait(false);
+        return Ok(result);
+    }
+
     [HttpPost("ValidateDirectory")]
     [Authorize]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Authorized endpoint used for user-configured source directories only.")]
@@ -359,6 +375,12 @@ public class ValidateDirectoryResult
 
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
+}
+
+public class CbrToCbzRequest
+{
+    [JsonPropertyName("scanPath")]
+    public string ScanPath { get; set; } = string.Empty;
 }
 
 public class ConnectivityResult

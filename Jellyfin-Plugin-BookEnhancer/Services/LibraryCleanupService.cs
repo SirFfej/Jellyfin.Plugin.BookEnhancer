@@ -11,6 +11,7 @@ public class LibraryCleanupService
     private readonly LibraryOrganizationService _organization;
     private readonly BookGroupingService _groupingService;
     private readonly IApplicationPaths _appPaths;
+    private string _trashRunDir = string.Empty;
 
     private static readonly HashSet<string> _imageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -51,6 +52,12 @@ public class LibraryCleanupService
         if (config is null)
             return new CleanupResult { Errors = 1 };
 
+        if (string.IsNullOrWhiteSpace(config.TrashDirectory))
+        {
+            await logCallback("ERROR: Trash directory not configured. Set a trash directory in plugin settings before running any tasks. All operations are blocked until configured.").ConfigureAwait(false);
+            return new CleanupResult { Errors = 1 };
+        }
+
         var result = new CleanupResult();
         var dirs = config.ManagedDirectories
             .Where(d => d.Enabled && !string.IsNullOrWhiteSpace(d.LibraryPath))
@@ -63,6 +70,9 @@ public class LibraryCleanupService
         }
 
         var supportedExts = GetSupportedExtensions(config);
+
+        _trashRunDir = Path.Combine(config.TrashDirectory, DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+        Directory.CreateDirectory(_trashRunDir);
 
         var libraryGroups = dirs
             .GroupBy(d => d.LibraryPath, StringComparer.OrdinalIgnoreCase)
@@ -120,7 +130,7 @@ public class LibraryCleanupService
                         .First();
 
                     var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
-                        ? "{Author}/{Series}/{Title}"
+                        ? LibraryOrganizationService.GetDefaultTemplate(metadata)
                         : dir.OrganizeTemplate;
 
                     if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
@@ -164,7 +174,7 @@ public class LibraryCleanupService
                     var dup = FindDuplicate(file, metadata, duplicateIndex);
                     if (dup is not null)
                     {
-                        File.Delete(file);
+                        await MoveToTrash(file, isDirectory: false, logCallback).ConfigureAwait(false);
                         libResult.DuplicatesFound++;
                         await logCallback($"[{libLabel}] Duplicate of {dup}, removed: {file}").ConfigureAwait(false);
 
@@ -262,7 +272,7 @@ public class LibraryCleanupService
                         var dup = FindDuplicate(file, enriched, duplicateIndex);
                         if (dup is not null)
                         {
-                            File.Delete(file);
+                            await MoveToTrash(file, isDirectory: false, logCallback).ConfigureAwait(false);
                             libResult.DuplicatesFound++;
                             await logCallback($"[{libLabel}] Duplicate (enriched) of {dup}, removed: {file}").ConfigureAwait(false);
 
@@ -339,6 +349,8 @@ public class LibraryCleanupService
             result.EmptyDirectoriesRemoved += libResult.EmptyDirectoriesRemoved;
             result.NonBookDirectoriesRemoved += libResult.NonBookDirectoriesRemoved;
         }
+
+        await PurgeOldTrashAsync(config, logCallback).ConfigureAwait(false);
 
         await logCallback(
             $"Cleanup complete — Libraries: {libraryGroups.Count}, " +
@@ -458,17 +470,17 @@ public class LibraryCleanupService
                 {
                     ct.ThrowIfCancellationRequested();
 
-                    var hasBookFile = Directory.EnumerateFiles(subDir)
+                    var hasBookFile = Directory.EnumerateFiles(subDir, "*", SearchOption.AllDirectories)
                         .Any(f => supportedExts.Contains(Path.GetExtension(f)));
 
                     if (!hasBookFile)
                     {
                         foreach (var file in Directory.EnumerateFiles(subDir, "*", SearchOption.AllDirectories))
                         {
-                            await logCallback($"  Deleting file: {file}").ConfigureAwait(false);
+                            await logCallback($"  Removing file: {file}").ConfigureAwait(false);
                         }
 
-                        Directory.Delete(subDir, recursive: true);
+                        await MoveToTrash(subDir, isDirectory: true, logCallback).ConfigureAwait(false);
                         result.NonBookDirectoriesRemoved++;
                         await logCallback($"Removed non-book directory: {subDir}").ConfigureAwait(false);
                     }
@@ -482,6 +494,79 @@ public class LibraryCleanupService
             {
                 await logCallback($"Failed to cleanup non-book directories under {dir.LibraryPath}: {ex.Message}").ConfigureAwait(false);
             }
+        }
+    }
+
+    private async Task MoveToTrash(string path, bool isDirectory, Func<string, Task> logCallback)
+    {
+        var dest = isDirectory
+            ? Path.Combine(_trashRunDir, new DirectoryInfo(path).Name)
+            : Path.Combine(_trashRunDir, Path.GetFileName(path));
+
+        if (File.Exists(dest) || Directory.Exists(dest))
+        {
+            var baseName = isDirectory
+                ? new DirectoryInfo(path).Name
+                : Path.GetFileNameWithoutExtension(path);
+            var ext = isDirectory ? string.Empty : Path.GetExtension(path);
+            var counter = 1;
+            while (File.Exists(dest) || Directory.Exists(dest))
+            {
+                dest = Path.Combine(_trashRunDir, $"{baseName}_{counter}{ext}");
+                counter++;
+            }
+        }
+
+        if (isDirectory)
+            Directory.Move(path, dest);
+        else
+            File.Move(path, dest);
+
+        await logCallback($"  Moved to trash: {path} -> {dest}").ConfigureAwait(false);
+    }
+
+    private async Task PurgeOldTrashAsync(PluginConfiguration config, Func<string, Task> logCallback)
+    {
+        if (config.TrashCleanupIntervalDays <= 0 || !Directory.Exists(config.TrashDirectory))
+            return;
+
+        try
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-config.TrashCleanupIntervalDays);
+            var minValidDate = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            foreach (var dir in Directory.GetDirectories(config.TrashDirectory))
+            {
+                // Skip the current run's trash directory
+                if (string.Equals(dir, _trashRunDir, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try
+                {
+                    var created = Directory.GetCreationTimeUtc(dir);
+
+                    // Validate the creation time is plausible before purging
+                    if (created < minValidDate || created > DateTime.UtcNow)
+                    {
+                        await logCallback($"Skipping trash directory with invalid creation time ({created:yyyy-MM-dd}): {dir}").ConfigureAwait(false);
+                        continue;
+                    }
+
+                    if (created >= cutoff)
+                        continue;
+
+                    Directory.Delete(dir, recursive: true);
+                    await logCallback($"Purged old trash: {dir} (from {created:yyyy-MM-dd})").ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await logCallback($"Failed to purge trash directory {dir}: {ex.Message}").ConfigureAwait(false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await logCallback($"Trash cleanup failed: {ex.Message}").ConfigureAwait(false);
         }
     }
 
@@ -513,7 +598,7 @@ public class LibraryCleanupService
                     var targetInfo = new FileInfo(targetPath);
                     if (sourceInfo.Exists && targetInfo.Exists && sourceInfo.Length == targetInfo.Length)
                     {
-                        File.Delete(imagePath);
+                        await MoveToTrash(imagePath, isDirectory: false, logCallback).ConfigureAwait(false);
                         await logCallback($"  Removed stale companion image (already at target): {imagePath}").ConfigureAwait(false);
                     }
                     continue;
@@ -561,6 +646,10 @@ public class LibraryCleanupService
 
         if (tokens.Contains("Author") &&
             (metadata.Authors.Count == 0 || string.IsNullOrWhiteSpace(metadata.Authors[0])))
+            return true;
+
+        if (tokens.Contains("Publisher") &&
+            string.IsNullOrWhiteSpace(metadata.Publisher))
             return true;
 
         return false;

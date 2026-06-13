@@ -40,6 +40,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<LibraryOrganizationService>();
         serviceCollection.AddTransient<BookIngestionService>();
         serviceCollection.AddTransient<LibraryCleanupService>();
+        serviceCollection.AddTransient<CbrToCbzService>();
         serviceCollection.AddTransient<IFileMetadataWriter, FileMetadataWriter>();
         // Controllers are auto-discovered by Jellyfin via GetApiPluginAssemblies()
 

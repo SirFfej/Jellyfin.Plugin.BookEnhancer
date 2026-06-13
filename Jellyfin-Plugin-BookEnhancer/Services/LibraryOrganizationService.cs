@@ -60,20 +60,6 @@ public class LibraryOrganizationService
 
             if (File.Exists(targetPath))
             {
-                var sourceInfo = new FileInfo(sourcePath);
-                var targetInfo = new FileInfo(targetPath);
-
-                if (sourceInfo.Exists && targetInfo.Exists && sourceInfo.Length == targetInfo.Length)
-                {
-                    File.Delete(sourcePath);
-                    if (logCallback is not null)
-                        await logCallback($"Removed stale original (already at target): {sourcePath}").ConfigureAwait(false);
-                    else
-                        _logger.LogInformation("Removed stale original (already at target): {Src}", sourcePath);
-
-                    return MoveResult.CreateSuccess(targetPath);
-                }
-
                 if (logCallback is not null)
                     await logCallback($"Target already exists, skipping: {targetPath}").ConfigureAwait(false);
                 else
@@ -112,6 +98,14 @@ public class LibraryOrganizationService
 
             return MoveResult.CreateError(ex.Message);
         }
+    }
+
+    public static string GetDefaultTemplate(FileMetadata metadata)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.Publisher))
+            return "{Publisher}/{Series}/{Title}";
+
+        return "{Author}/{Series}/{Title}";
     }
 
     private static string GetAuthorDirectoryName(FileMetadata metadata)

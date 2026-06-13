@@ -80,6 +80,7 @@ public class FileMetadataWriter : IFileMetadataWriter
     private async Task<bool> WriteComicInfoXmlAsync(string filePath, FileMetadata metadata, CancellationToken ct)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        var tempCbz = filePath + ".tmp";
         try
         {
             Directory.CreateDirectory(tempDir);
@@ -92,7 +93,9 @@ public class FileMetadataWriter : IFileMetadataWriter
 
                     var entryName = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
                     var destPath = Path.GetFullPath(Path.Combine(tempDir, entryName));
-                    if (!destPath.StartsWith(tempDir, StringComparison.Ordinal))
+                    var normalizedTempDir = tempDir.EndsWith(Path.DirectorySeparatorChar)
+                        ? tempDir : tempDir + Path.DirectorySeparatorChar;
+                    if (!destPath.StartsWith(normalizedTempDir, StringComparison.Ordinal))
                         continue;
 
                     var destDir = Path.GetDirectoryName(destPath);
@@ -117,10 +120,11 @@ public class FileMetadataWriter : IFileMetadataWriter
             UpdateComicInfoXml(doc, metadata);
             doc.Save(comicInfoPath);
 
-            if (File.Exists(filePath))
-                File.Delete(filePath);
+            ZipFile.CreateFromDirectory(tempDir, tempCbz);
 
-            ZipFile.CreateFromDirectory(tempDir, filePath);
+            File.Delete(filePath);
+            File.Move(tempCbz, filePath);
+            tempCbz = null;
 
             _logger.LogDebug("Wrote ComicInfo.xml to {Path}", filePath);
             return true;
@@ -134,6 +138,8 @@ public class FileMetadataWriter : IFileMetadataWriter
         {
             if (Directory.Exists(tempDir))
                 Directory.Delete(tempDir, true);
+            if (tempCbz is not null && File.Exists(tempCbz))
+                File.Delete(tempCbz);
         }
     }
 
@@ -181,16 +187,15 @@ public class FileMetadataWriter : IFileMetadataWriter
 
     private async Task<bool> WriteEpubMetadataAsync(string filePath, FileMetadata metadata, CancellationToken ct)
     {
+        var tempPath = filePath + ".tmp";
         try
         {
-            var tempPath = filePath + ".tmp";
             File.Copy(filePath, tempPath, true);
 
             using var archive = ZipFile.Open(tempPath, ZipArchiveMode.Update);
             var opfEntry = ResolveOpfEntry(archive);
             if (opfEntry is null)
             {
-                File.Delete(tempPath);
                 return false;
             }
 
@@ -214,6 +219,11 @@ public class FileMetadataWriter : IFileMetadataWriter
         {
             _logger.LogWarning(ex, "Failed to write EPUB metadata to {Path}", filePath);
             return false;
+        }
+        finally
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
         }
     }
 
