@@ -44,13 +44,6 @@ public class CbrToCbzService
         if (config is null)
             return new CbrToCbzResult { Errors = 1, ErrorDetails = ["Plugin configuration not available."] };
 
-        if (string.IsNullOrWhiteSpace(config.TrashDirectory))
-        {
-            var msg = "Trash directory not configured. Set a trash directory in plugin settings before running conversion.";
-            await LogAsync(logCallback, msg).ConfigureAwait(false);
-            return new CbrToCbzResult { Errors = 1, ErrorDetails = [msg] };
-        }
-
         if (string.IsNullOrWhiteSpace(scanPath) || !Directory.Exists(scanPath))
         {
             var msg = $"Directory does not exist: {scanPath}";
@@ -58,8 +51,19 @@ public class CbrToCbzService
             return new CbrToCbzResult { Errors = 1, ErrorDetails = [msg] };
         }
 
-        var trashRunDir = Path.Combine(config.TrashDirectory, $"convert-{DateTime.Now:yyyyMMdd-HHmmss}");
-        Directory.CreateDirectory(trashRunDir);
+        var backupDir = !string.IsNullOrWhiteSpace(config.BackupDirectory)
+            ? config.BackupDirectory
+            : config.TrashDirectory;
+
+        if (string.IsNullOrWhiteSpace(backupDir))
+        {
+            var msg = "No backup or trash directory configured. Set a backup directory in plugin settings before running conversion.";
+            await LogAsync(logCallback, msg).ConfigureAwait(false);
+            return new CbrToCbzResult { Errors = 1, ErrorDetails = [msg] };
+        }
+
+        var originalsRunDir = Path.Combine(backupDir, $"convert-{DateTime.Now:yyyyMMdd-HHmmss}");
+        Directory.CreateDirectory(originalsRunDir);
 
         var files = Directory.EnumerateFiles(scanPath, "*", SearchOption.AllDirectories)
             .Where(f => _comicExtensions.Contains(Path.GetExtension(f)))
@@ -85,7 +89,7 @@ public class CbrToCbzService
 
             try
             {
-                await ConvertSingleFileAsync(file, trashRunDir, config, logCallback, ct).ConfigureAwait(false);
+                await ConvertSingleFileAsync(file, originalsRunDir, config, logCallback, ct).ConfigureAwait(false);
                 result.Converted++;
             }
             catch (Exception ex)
@@ -96,13 +100,15 @@ public class CbrToCbzService
             }
         }
 
+        await PurgeOldBackupsAsync(backupDir, config.BackupCleanupIntervalDays, logCallback).ConfigureAwait(false);
+
         await LogAsync(logCallback, $"Conversion complete — Converted: {result.Converted}, Errors: {result.Errors}").ConfigureAwait(false);
         return result;
     }
 
     private async Task ConvertSingleFileAsync(
         string cbrPath,
-        string trashRunDir,
+        string originalsRunDir,
         PluginConfiguration config,
         Func<string, Task>? logCallback,
         CancellationToken ct)
@@ -121,7 +127,7 @@ public class CbrToCbzService
             await LogAsync(logCallback, $"  Repacking as CBZ: {cbzPath}").ConfigureAwait(false);
             ZipFile.CreateFromDirectory(tempDir, cbzPath);
 
-            // Step 3: Verify CBZ is valid before trashing original
+            // Step 3: Verify CBZ is valid before moving original
             await LogAsync(logCallback, $"  Verifying CBZ integrity...").ConfigureAwait(false);
             try
             {
@@ -134,13 +140,12 @@ public class CbrToCbzService
             }
             catch
             {
-                // Clean up the failed CBZ so we don't leave a broken file
                 try { File.Delete(cbzPath); } catch { }
                 throw;
             }
 
-            // Step 4: Move original CBR to trash (only after CBZ is verified valid)
-            await MoveToTrash(cbrPath, trashRunDir, logCallback).ConfigureAwait(false);
+            // Step 4: Move original to backup directory (only after CBZ is verified valid)
+            await MoveOriginalToBackup(cbrPath, originalsRunDir, logCallback).ConfigureAwait(false);
 
             // Step 5: Extract metadata from new CBZ
             await LogAsync(logCallback, $"  Extracting metadata...").ConfigureAwait(false);
@@ -227,9 +232,9 @@ public class CbrToCbzService
         }
     }
 
-    private static async Task MoveToTrash(string path, string trashRunDir, Func<string, Task>? logCallback)
+    private static async Task MoveOriginalToBackup(string path, string backupRunDir, Func<string, Task>? logCallback)
     {
-        var dest = Path.Combine(trashRunDir, Path.GetFileName(path));
+        var dest = Path.Combine(backupRunDir, Path.GetFileName(path));
 
         if (File.Exists(dest))
         {
@@ -238,13 +243,58 @@ public class CbrToCbzService
             var counter = 1;
             while (File.Exists(dest))
             {
-                dest = Path.Combine(trashRunDir, $"{baseName}_{counter}{ext}");
+                dest = Path.Combine(backupRunDir, $"{baseName}_{counter}{ext}");
                 counter++;
             }
         }
 
         File.Move(path, dest);
-        await LogAsync(logCallback, $"  Moved original to trash: {path} -> {dest}").ConfigureAwait(false);
+        await LogAsync(logCallback, $"  Moved original to backup: {path} -> {dest}").ConfigureAwait(false);
+    }
+
+    private static async Task PurgeOldBackupsAsync(string backupDir, int cleanupIntervalDays, Func<string, Task>? logCallback)
+    {
+        if (cleanupIntervalDays <= 0 || !Directory.Exists(backupDir))
+            return;
+
+        try
+        {
+            var cutoff = DateTime.UtcNow.AddDays(-cleanupIntervalDays);
+            var minValidDate = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+            foreach (var dir in Directory.GetDirectories(backupDir))
+            {
+                // Skip non-convert directories
+                var dirName = Path.GetFileName(dir);
+                if (!dirName.StartsWith("convert-", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                try
+                {
+                    var created = Directory.GetCreationTimeUtc(dir);
+
+                    if (created < minValidDate || created > DateTime.UtcNow)
+                    {
+                        await LogAsync(logCallback, $"Skipping backup directory with invalid creation time ({created:yyyy-MM-dd}): {dir}").ConfigureAwait(false);
+                        continue;
+                    }
+
+                    if (created >= cutoff)
+                        continue;
+
+                    Directory.Delete(dir, recursive: true);
+                    await LogAsync(logCallback, $"Purged old backup: {dir} (from {created:yyyy-MM-dd})").ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await LogAsync(logCallback, $"Failed to purge backup directory {dir}: {ex.Message}").ConfigureAwait(false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogAsync(logCallback, $"Backup cleanup failed: {ex.Message}").ConfigureAwait(false);
+        }
     }
 
     private static bool NeedsEnrichment(FileMetadata metadata, string template)

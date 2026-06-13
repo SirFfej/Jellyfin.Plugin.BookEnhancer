@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.BookEnhancer.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("Books/Config")]
 public class ConfigController : ControllerBase
 {

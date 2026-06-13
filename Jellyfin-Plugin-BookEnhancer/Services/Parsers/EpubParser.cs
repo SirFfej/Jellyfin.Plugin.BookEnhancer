@@ -16,28 +16,21 @@ public class EpubParser : IFileParser
 
     public async Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
     {
-        try
-        {
-            using var stream = File.OpenRead(filePath);
-            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        using var stream = File.OpenRead(filePath);
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
 
-            var opfPath = Resolve_opfPath(archive);
-            if (opfPath is null) return null;
+        var opfPath = Resolve_opfPath(archive);
+        if (opfPath is null) return null;
 
-            var opfEntry = archive.GetEntry(opfPath);
-            if (opfEntry is null) return null;
+        var opfEntry = archive.GetEntry(opfPath);
+        if (opfEntry is null) return null;
 
-            using var opfStream = opfEntry.Open();
-            var opfDoc = await XDocument.LoadAsync(opfStream, LoadOptions.None, ct).ConfigureAwait(false);
+        using var opfStream = opfEntry.Open();
+        var opfDoc = await XDocument.LoadAsync(opfStream, LoadOptions.None, ct).ConfigureAwait(false);
 
-            var meta = Parse_opf(opfDoc, filePath);
-            ExtractCover(meta, archive, opfDoc, opfPath);
-            return meta;
-        }
-        catch
-        {
-            return null;
-        }
+        var meta = Parse_opf(opfDoc, filePath);
+        ExtractCover(meta, archive, opfDoc, opfPath);
+        return meta;
     }
 
     private static string? Resolve_opfPath(ZipArchive archive)
@@ -188,40 +181,33 @@ public class EpubParser : IFileParser
 
     private static void ExtractCover(FileMetadata meta, ZipArchive archive, XDocument opf, string opfPath)
     {
-        try
-        {
-            var metadataEl = opf.Root?.Element(_opf + "metadata");
-            var manifestEl = opf.Root?.Element(_opf + "manifest");
-            if (metadataEl is null || manifestEl is null) return;
+        var metadataEl = opf.Root?.Element(_opf + "metadata");
+        var manifestEl = opf.Root?.Element(_opf + "manifest");
+        if (metadataEl is null || manifestEl is null) return;
 
-            var coverMeta = metadataEl.Elements(_opf + "meta")
-                .FirstOrDefault(e => e.Attribute("name")?.Value == "cover");
-            var coverId = coverMeta?.Attribute("content")?.Value;
-            if (coverId is null) return;
+        var coverMeta = metadataEl.Elements(_opf + "meta")
+            .FirstOrDefault(e => e.Attribute("name")?.Value == "cover");
+        var coverId = coverMeta?.Attribute("content")?.Value;
+        if (coverId is null) return;
 
-            var coverItem = manifestEl.Elements(_opf + "item")
-                .FirstOrDefault(e => e.Attribute("id")?.Value == coverId);
-            var href = coverItem?.Attribute("href")?.Value;
-            var mediaType = coverItem?.Attribute("media-type")?.Value;
-            if (href is null) return;
+        var coverItem = manifestEl.Elements(_opf + "item")
+            .FirstOrDefault(e => e.Attribute("id")?.Value == coverId);
+        var href = coverItem?.Attribute("href")?.Value;
+        var mediaType = coverItem?.Attribute("media-type")?.Value;
+        if (href is null) return;
 
-            var opfDir = Path.GetDirectoryName(opfPath)?.Replace('\\', '/');
-            var coverPath = opfDir != null ? $"{opfDir}/{href}" : href;
-            coverPath = coverPath.Replace("//", "/").TrimStart('/');
+        var opfDir = Path.GetDirectoryName(opfPath)?.Replace('\\', '/');
+        var coverPath = opfDir != null ? $"{opfDir}/{href}" : href;
+        coverPath = coverPath.Replace("//", "/").TrimStart('/');
 
-            var coverEntry = archive.GetEntry(coverPath);
-            if (coverEntry is null) return;
+        var coverEntry = archive.GetEntry(coverPath);
+        if (coverEntry is null) return;
 
-            using var coverStream = coverEntry.Open();
-            using var ms = new MemoryStream();
-            coverStream.CopyTo(ms);
-            meta.CoverBytes = ms.ToArray();
-            meta.CoverMimeType = mediaType ?? "image/jpeg";
-            meta.HasCover = true;
-        }
-        catch
-        {
-            // best-effort
-        }
+        using var coverStream = coverEntry.Open();
+        using var ms = new MemoryStream();
+        coverStream.CopyTo(ms);
+        meta.CoverBytes = ms.ToArray();
+        meta.CoverMimeType = mediaType ?? "image/jpeg";
+        meta.HasCover = true;
     }
 }

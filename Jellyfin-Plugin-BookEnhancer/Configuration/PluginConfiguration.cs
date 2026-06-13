@@ -38,6 +38,9 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public string TrashDirectory { get; set; } = string.Empty;
     public int TrashCleanupIntervalDays { get; set; } = 7;
+
+    public string BackupDirectory { get; set; } = string.Empty;
+    public int BackupCleanupIntervalDays { get; set; } = 30;
 }
 
 public class FormatPriorityEntry

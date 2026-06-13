@@ -79,52 +79,21 @@ public class FileMetadataWriter : IFileMetadataWriter
 
     private async Task<bool> WriteComicInfoXmlAsync(string filePath, FileMetadata metadata, CancellationToken ct)
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        var tempCbz = filePath + ".tmp";
         try
         {
-            Directory.CreateDirectory(tempDir);
-
-            using (var archive = ZipFile.OpenRead(filePath))
+            using (var archive = ZipFile.Open(filePath, ZipArchiveMode.Update))
             {
-                foreach (var entry in archive.Entries)
+                var existing = archive.GetEntry("ComicInfo.xml");
+                existing?.Delete();
+
+                var entry = archive.CreateEntry("ComicInfo.xml");
+                using (var entryStream = entry.Open())
                 {
-                    if (ct.IsCancellationRequested) return false;
-
-                    var entryName = entry.FullName.Replace('/', Path.DirectorySeparatorChar);
-                    var destPath = Path.GetFullPath(Path.Combine(tempDir, entryName));
-                    var normalizedTempDir = tempDir.EndsWith(Path.DirectorySeparatorChar)
-                        ? tempDir : tempDir + Path.DirectorySeparatorChar;
-                    if (!destPath.StartsWith(normalizedTempDir, StringComparison.Ordinal))
-                        continue;
-
-                    var destDir = Path.GetDirectoryName(destPath);
-                    if (!string.IsNullOrWhiteSpace(destDir) && !Directory.Exists(destDir))
-                        Directory.CreateDirectory(destDir);
-
-                    entry.ExtractToFile(destPath, true);
+                    var doc = new XDocument(new XElement("ComicInfo"));
+                    UpdateComicInfoXml(doc, metadata);
+                    doc.Save(entryStream);
                 }
             }
-
-            var comicInfoPath = Path.Combine(tempDir, "ComicInfo.xml");
-            XDocument doc;
-            if (File.Exists(comicInfoPath))
-            {
-                doc = XDocument.Load(comicInfoPath);
-            }
-            else
-            {
-                doc = new XDocument(new XElement("ComicInfo"));
-            }
-
-            UpdateComicInfoXml(doc, metadata);
-            doc.Save(comicInfoPath);
-
-            ZipFile.CreateFromDirectory(tempDir, tempCbz);
-
-            File.Delete(filePath);
-            File.Move(tempCbz, filePath);
-            tempCbz = null;
 
             _logger.LogDebug("Wrote ComicInfo.xml to {Path}", filePath);
             return true;
@@ -133,13 +102,6 @@ public class FileMetadataWriter : IFileMetadataWriter
         {
             _logger.LogWarning(ex, "Failed to write ComicInfo.xml to {Path}", filePath);
             return false;
-        }
-        finally
-        {
-            if (Directory.Exists(tempDir))
-                Directory.Delete(tempDir, true);
-            if (tempCbz is not null && File.Exists(tempCbz))
-                File.Delete(tempCbz);
         }
     }
 
@@ -187,30 +149,23 @@ public class FileMetadataWriter : IFileMetadataWriter
 
     private async Task<bool> WriteEpubMetadataAsync(string filePath, FileMetadata metadata, CancellationToken ct)
     {
-        var tempPath = filePath + ".tmp";
         try
         {
-            File.Copy(filePath, tempPath, true);
-
-            using var archive = ZipFile.Open(tempPath, ZipArchiveMode.Update);
-            var opfEntry = ResolveOpfEntry(archive);
-            if (opfEntry is null)
+            using (var archive = ZipFile.Open(filePath, ZipArchiveMode.Update))
             {
-                return false;
+                var opfEntry = ResolveOpfEntry(archive);
+                if (opfEntry is null)
+                    return false;
+
+                using (var opfStream = opfEntry.Open())
+                {
+                    var opfDoc = await XDocument.LoadAsync(opfStream, LoadOptions.None, ct).ConfigureAwait(false);
+                    UpdateOpfXml(opfDoc, metadata);
+
+                    opfStream.SetLength(0);
+                    opfDoc.Save(opfStream);
+                }
             }
-
-            using (var opfStream = opfEntry.Open())
-            {
-                var opfDoc = await XDocument.LoadAsync(opfStream, LoadOptions.None, ct).ConfigureAwait(false);
-                UpdateOpfXml(opfDoc, metadata);
-
-                opfStream.SetLength(0);
-                opfDoc.Save(opfStream);
-            }
-
-            archive.Dispose();
-            File.Delete(filePath);
-            File.Move(tempPath, filePath);
 
             _logger.LogDebug("Wrote OPF metadata to {Path}", filePath);
             return true;
@@ -219,11 +174,6 @@ public class FileMetadataWriter : IFileMetadataWriter
         {
             _logger.LogWarning(ex, "Failed to write EPUB metadata to {Path}", filePath);
             return false;
-        }
-        finally
-        {
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
         }
     }
 

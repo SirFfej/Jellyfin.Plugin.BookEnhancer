@@ -1,10 +1,12 @@
 using Jellyfin.Plugin.BookEnhancer.Models.Api;
 using Jellyfin.Plugin.BookEnhancer.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Jellyfin.Plugin.BookEnhancer.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("Books/Ingestion")]
 public class IngestionController : ControllerBase
 {

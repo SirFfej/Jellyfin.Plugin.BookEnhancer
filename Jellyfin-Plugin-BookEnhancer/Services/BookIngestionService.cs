@@ -12,7 +12,16 @@ public class BookIngestionService
     private readonly LibraryOrganizationService _organization;
     private readonly IFileMetadataWriter _writer;
     private readonly ILogger<BookIngestionService> _logger;
-    private Func<string, Task>? _logCallback;
+
+    private static readonly HashSet<string> _imageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".avif", ".svg"
+    };
+
+    private static readonly HashSet<string> _imageBaseNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cover", "folder", "poster", "thumbnail", "thumb", "front", "back", "spine"
+    };
 
     public BookIngestionService(
         FileMetadataExtractor fileExtractor,
@@ -50,15 +59,13 @@ public class BookIngestionService
 
     public async Task<IngestionResult> ScanAllAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
-        _logCallback = logCallback;
-
         var config = Plugin.Instance?.Configuration;
         if (config is null)
             return new IngestionResult { Errors = 1 };
 
         if (string.IsNullOrWhiteSpace(config.TrashDirectory))
         {
-            await LogWarningAsync("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.").ConfigureAwait(false);
+            await LogWarningAsync("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.", logCallback, _logger).ConfigureAwait(false);
             return new IngestionResult { Errors = 1 };
         }
 
@@ -69,7 +76,7 @@ public class BookIngestionService
 
         if (enabledDirs.Count == 0)
         {
-            await LogInfoAsync("No enabled source directories configured").ConfigureAwait(false);
+            await LogInfoAsync("No enabled source directories configured", logCallback, _logger).ConfigureAwait(false);
             return result;
         }
 
@@ -78,7 +85,7 @@ public class BookIngestionService
             if (ct.IsCancellationRequested)
                 break;
 
-            var dirResult = await ScanDirectoryAsync(dir, ct).ConfigureAwait(false);
+            var dirResult = await ScanDirectoryAsync(dir, logCallback, ct).ConfigureAwait(false);
             result.FilesFound += dirResult.FilesFound;
             result.FilesAdded += dirResult.FilesAdded;
             result.FilesSkipped += dirResult.FilesSkipped;
@@ -88,37 +95,37 @@ public class BookIngestionService
         return result;
     }
 
-    private async Task LogInfoAsync(string message)
+    private static async Task LogInfoAsync(string message, Func<string, Task>? logCallback, ILogger logger)
     {
-        if (_logCallback is not null)
-            await _logCallback(message).ConfigureAwait(false);
+        if (logCallback is not null)
+            await logCallback(message).ConfigureAwait(false);
         else
-            _logger.LogInformation("{Message}", message);
+            logger.LogInformation("{Message}", message);
     }
 
-    private async Task LogWarningAsync(string message)
+    private static async Task LogWarningAsync(string message, Func<string, Task>? logCallback, ILogger logger)
     {
-        if (_logCallback is not null)
-            await _logCallback(message).ConfigureAwait(false);
+        if (logCallback is not null)
+            await logCallback(message).ConfigureAwait(false);
         else
-            _logger.LogWarning("{Message}", message);
+            logger.LogWarning("{Message}", message);
     }
 
-    private async Task LogErrorAsync(Exception ex, string message)
+    private static async Task LogErrorAsync(Exception ex, string message, Func<string, Task>? logCallback, ILogger logger)
     {
-        if (_logCallback is not null)
-            await _logCallback($"{message} — {ex.Message}").ConfigureAwait(false);
+        if (logCallback is not null)
+            await logCallback($"{message} — {ex.Message}").ConfigureAwait(false);
         else
-            _logger.LogWarning(ex, "{Message}", message);
+            logger.LogWarning(ex, "{Message}", message);
     }
 
-    private async Task<IngestionResult> ScanDirectoryAsync(ManagedSourceDirectory dir, CancellationToken ct)
+    private async Task<IngestionResult> ScanDirectoryAsync(ManagedSourceDirectory dir, Func<string, Task>? logCallback, CancellationToken ct)
     {
         var result = new IngestionResult();
 
         if (!Directory.Exists(dir.SourcePath))
         {
-            await LogWarningAsync($"Source directory does not exist: {dir.SourcePath}").ConfigureAwait(false);
+            await LogWarningAsync($"Source directory does not exist: {dir.SourcePath}", logCallback, _logger).ConfigureAwait(false);
             result.Errors++;
             return result;
         }
@@ -129,7 +136,7 @@ public class BookIngestionService
             .ToList();
 
         result.FilesFound = files.Count;
-        await LogInfoAsync($"Found {files.Count} files in {dir.SourcePath}").ConfigureAwait(false);
+        await LogInfoAsync($"Found {files.Count} files in {dir.SourcePath}", logCallback, _logger).ConfigureAwait(false);
 
         foreach (var file in files)
         {
@@ -173,7 +180,7 @@ public class BookIngestionService
                     if (!string.IsNullOrWhiteSpace(metadata.Isbn) && !enrichmentResult.ApiMatchFound)
                     {
                         result.EnrichmentFailures++;
-                        await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found").ConfigureAwait(false);
+                        await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found", logCallback, _logger).ConfigureAwait(false);
                     }
                 }
 
@@ -181,7 +188,9 @@ public class BookIngestionService
                     ? LibraryOrganizationService.GetDefaultTemplate(metadata)
                     : dir.OrganizeTemplate;
                 var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
-                var moveResult = await _organization.MoveFile(file, targetPath, Config?.CopyMode == true, _logCallback).ConfigureAwait(false);
+                var sourceDir = Path.GetDirectoryName(file);
+                var targetDir = Path.GetDirectoryName(targetPath);
+                var moveResult = await _organization.MoveFile(file, targetPath, Config?.CopyMode == true, logCallback).ConfigureAwait(false);
 
                 if (moveResult.Success)
                 {
@@ -190,6 +199,9 @@ public class BookIngestionService
 
                     if (dir.EnableMetadataWriting)
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
+
+                    await MoveCompanionImagesAsync(sourceDir, targetDir, logCallback).ConfigureAwait(false);
+                    await CleanupEmptyDirectories(sourceDir, logCallback).ConfigureAwait(false);
                 }
                 else if (moveResult.Skipped)
                 {
@@ -198,16 +210,19 @@ public class BookIngestionService
 
                     var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false);
                     result.FilesSkipped++;
+
+                    await MoveCompanionImagesAsync(sourceDir, targetDir, logCallback).ConfigureAwait(false);
+                    await CleanupEmptyDirectories(sourceDir, logCallback).ConfigureAwait(false);
                 }
                 else
                 {
-                    await LogWarningAsync($"Failed to move file: {file} — {moveResult.ErrorMessage}").ConfigureAwait(false);
+                    await LogWarningAsync($"Failed to move file: {file} — {moveResult.ErrorMessage}", logCallback, _logger).ConfigureAwait(false);
                     result.Errors++;
                 }
             }
             catch (Exception ex)
             {
-                await LogErrorAsync(ex, $"Error processing file: {file}").ConfigureAwait(false);
+                await LogErrorAsync(ex, $"Error processing file: {file}", logCallback, _logger).ConfigureAwait(false);
                 result.Errors++;
             }
         }
@@ -223,6 +238,75 @@ public class BookIngestionService
             FileFormat = Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant(),
             Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(filePath))
         };
+    }
+
+    private async Task MoveCompanionImagesAsync(string? sourceDir, string? targetDir, Func<string, Task>? logCallback)
+    {
+        if (string.IsNullOrWhiteSpace(sourceDir) || string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(sourceDir))
+            return;
+
+        if (string.Equals(sourceDir, targetDir, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        try
+        {
+            foreach (var imagePath in Directory.EnumerateFiles(sourceDir))
+            {
+                var ext = Path.GetExtension(imagePath);
+                if (!_imageExtensions.Contains(ext)) continue;
+
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(imagePath);
+
+                if (!_imageBaseNames.Contains(nameWithoutExt) && !nameWithoutExt.Contains("cover", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var targetPath = Path.Combine(targetDir, Path.GetFileName(imagePath));
+
+                if (File.Exists(targetPath))
+                {
+                    var sourceInfo = new FileInfo(imagePath);
+                    var targetInfo = new FileInfo(targetPath);
+                    if (sourceInfo.Exists && targetInfo.Exists && sourceInfo.Length == targetInfo.Length)
+                    {
+                        File.Delete(imagePath);
+                        await LogInfoAsync($"  Removed stale companion image (already at target): {imagePath}", logCallback, _logger).ConfigureAwait(false);
+                    }
+                    continue;
+                }
+
+                Directory.CreateDirectory(targetDir);
+                File.Move(imagePath, targetPath);
+                await LogInfoAsync($"  Moved companion image: {imagePath} -> {targetPath}", logCallback, _logger).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogErrorAsync(ex, $"Failed to move companion images from {sourceDir}", logCallback, _logger).ConfigureAwait(false);
+        }
+    }
+
+    private async Task CleanupEmptyDirectories(string? startPath, Func<string, Task>? logCallback)
+    {
+        if (string.IsNullOrWhiteSpace(startPath) || !Directory.Exists(startPath))
+            return;
+
+        try
+        {
+            var dir = new DirectoryInfo(startPath);
+            while (dir != null)
+            {
+                if (dir.EnumerateFileSystemInfos().Any())
+                    break;
+
+                dir.Delete();
+                await LogInfoAsync($"  Removed empty directory: {dir.FullName}", logCallback, _logger).ConfigureAwait(false);
+                dir = dir.Parent;
+            }
+        }
+        catch (Exception ex)
+        {
+            await LogErrorAsync(ex, $"Failed to remove empty directory {startPath}", logCallback, _logger).ConfigureAwait(false);
+        }
     }
 }
 

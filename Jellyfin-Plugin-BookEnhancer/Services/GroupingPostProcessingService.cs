@@ -15,7 +15,6 @@ public class GroupingPostProcessingService
     private readonly ILibraryManager _libraryManager;
     private readonly FileMetadataExtractor _fileExtractor;
     private readonly ILogger<GroupingPostProcessingService> _logger;
-    private Func<string, Task>? _logCallback;
 
     public GroupingPostProcessingService(
         BookGroupingService groupingService,
@@ -31,54 +30,50 @@ public class GroupingPostProcessingService
 
     private static PluginConfiguration? Config => Plugin.Instance?.Configuration;
 
-    private async Task LogInfoAsync(string message)
+    private static async Task LogInfoAsync(string message, Func<string, Task>? logCallback, ILogger logger)
     {
-        if (_logCallback is not null)
-            await _logCallback(message).ConfigureAwait(false);
+        if (logCallback is not null)
+            await logCallback(message).ConfigureAwait(false);
         else
-            _logger.LogInformation("{Message}", message);
+            logger.LogInformation("{Message}", message);
     }
 
-    private async Task LogWarningAsync(string message)
+    private static async Task LogWarningAsync(string message, Func<string, Task>? logCallback, ILogger logger)
     {
-        if (_logCallback is not null)
-            await _logCallback(message).ConfigureAwait(false);
+        if (logCallback is not null)
+            await logCallback(message).ConfigureAwait(false);
         else
-            _logger.LogWarning("{Message}", message);
+            logger.LogWarning("{Message}", message);
     }
 
-    private async Task LogWarningAsync(Exception ex, string message)
+    private static async Task LogWarningAsync(Exception ex, string message, Func<string, Task>? logCallback, ILogger logger)
     {
-        if (_logCallback is not null)
-            await _logCallback($"{message} — {ex.Message}").ConfigureAwait(false);
+        if (logCallback is not null)
+            await logCallback($"{message} — {ex.Message}").ConfigureAwait(false);
         else
-            _logger.LogWarning(ex, "{Message}", message);
+            logger.LogWarning(ex, "{Message}", message);
     }
 
     public async Task ProcessAllGroupsAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
-        _logCallback = logCallback;
-
         var groups = _groupingService.GetAllGroupsWithMultipleFormats();
-        await LogInfoAsync($"Processing {groups.Count} book groups with multiple formats").ConfigureAwait(false);
+        await LogInfoAsync($"Processing {groups.Count} book groups with multiple formats", logCallback, _logger).ConfigureAwait(false);
 
         foreach (var group in groups)
         {
             if (ct.IsCancellationRequested)
                 break;
 
-            await ProcessGroupAsync(group, ct).ConfigureAwait(false);
+            await ProcessGroupAsync(group, logCallback, ct).ConfigureAwait(false);
         }
     }
 
     public async Task ScanLibrariesAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
-        _logCallback = logCallback;
-
         var config = Config;
         if (config is null)
         {
-            await LogInfoAsync("Plugin configuration not available").ConfigureAwait(false);
+            await LogInfoAsync("Plugin configuration not available", logCallback, _logger).ConfigureAwait(false);
             return;
         }
 
@@ -88,7 +83,7 @@ public class GroupingPostProcessingService
 
         if (dirs.Count == 0)
         {
-            await LogInfoAsync("No enabled managed directories with library paths configured").ConfigureAwait(false);
+            await LogInfoAsync("No enabled managed directories with library paths configured", logCallback, _logger).ConfigureAwait(false);
             return;
         }
 
@@ -101,7 +96,7 @@ public class GroupingPostProcessingService
 
             if (!Directory.Exists(dir.LibraryPath))
             {
-                await LogWarningAsync($"Library path does not exist: {dir.LibraryPath}").ConfigureAwait(false);
+                await LogWarningAsync($"Library path does not exist: {dir.LibraryPath}", logCallback, _logger).ConfigureAwait(false);
                 continue;
             }
 
@@ -111,7 +106,7 @@ public class GroupingPostProcessingService
 
             if (files.Count == 0)
             {
-                await LogInfoAsync($"No supported files found in {dir.LibraryPath}").ConfigureAwait(false);
+                await LogInfoAsync($"No supported files found in {dir.LibraryPath}", logCallback, _logger).ConfigureAwait(false);
                 continue;
             }
 
@@ -143,15 +138,15 @@ public class GroupingPostProcessingService
                 }
                 catch (Exception ex)
                 {
-                    await LogWarningAsync($"Failed to scan {file}: {ex.Message}").ConfigureAwait(false);
+                    await LogWarningAsync($"Failed to scan {file}: {ex.Message}", logCallback, _logger).ConfigureAwait(false);
                 }
             }
 
-            await LogInfoAsync($"Registered {registered} files in {files.Count} from {dir.LibraryPath}").ConfigureAwait(false);
+            await LogInfoAsync($"Registered {registered} files in {files.Count} from {dir.LibraryPath}", logCallback, _logger).ConfigureAwait(false);
             totalRegistered += registered;
         }
 
-        await LogInfoAsync($"Library scan complete — {totalRegistered} files registered in grouping database").ConfigureAwait(false);
+        await LogInfoAsync($"Library scan complete — {totalRegistered} files registered in grouping database", logCallback, _logger).ConfigureAwait(false);
     }
 
     private static HashSet<string> GetSupportedExtensions(PluginConfiguration config)
@@ -169,7 +164,7 @@ public class GroupingPostProcessingService
         return new HashSet<string>(config.IngestionFileExtensions, StringComparer.OrdinalIgnoreCase);
     }
 
-    public async Task ProcessGroupAsync(BookGroup group, CancellationToken ct = default)
+    public async Task ProcessGroupAsync(BookGroup group, Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
         var best = group.Formats.OrderBy(f => BookGroupingService.GetFormatPriority(f.FormatType)).First();
         if (!best.IsPrimary)
@@ -187,7 +182,7 @@ public class GroupingPostProcessingService
         var primaryItem = FindItemByPath(primary.FilePath);
         if (primaryItem is null)
         {
-            await LogWarningAsync($"Primary item not found in library for group {group.Id} at {primary.FilePath}").ConfigureAwait(false);
+            await LogWarningAsync($"Primary item not found in library for group {group.Id} at {primary.FilePath}", logCallback, _logger).ConfigureAwait(false);
             return;
         }
 
@@ -207,7 +202,7 @@ public class GroupingPostProcessingService
                 var altItem = FindItemByPath(alternate.FilePath);
                 if (altItem is not null)
                 {
-                    await DeleteItemWithRetryAsync(altItem, ct).ConfigureAwait(false);
+                    await DeleteItemWithRetryAsync(altItem, logCallback, ct).ConfigureAwait(false);
                 }
 
                 if (formatsDir is not null && File.Exists(alternate.FilePath))
@@ -226,24 +221,22 @@ public class GroupingPostProcessingService
             }
             catch (Exception ex)
             {
-                await LogWarningAsync(ex, $"Failed to process alternate format {alternate.FilePath}").ConfigureAwait(false);
+                await LogWarningAsync(ex, $"Failed to process alternate format {alternate.FilePath}", logCallback, _logger).ConfigureAwait(false);
             }
         }
 
-        await LogInfoAsync($"Merged {alternates.Count} alternate formats into primary item '{primaryItem.Name}' (ID: {primaryItem.Id})").ConfigureAwait(false);
+        await LogInfoAsync($"Merged {alternates.Count} alternate formats into primary item '{primaryItem.Name}' (ID: {primaryItem.Id})", logCallback, _logger).ConfigureAwait(false);
     }
 
     public async Task<RepairResult> RepairFormatPathsAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
     {
-        _logCallback = logCallback;
-
         var formats = _groupingService.GetAllFormats();
         var result = new RepairResult
         {
             TotalFormats = formats.Count
         };
 
-        await LogInfoAsync($"Starting format path repair across {formats.Count} formats").ConfigureAwait(false);
+        await LogInfoAsync($"Starting format path repair across {formats.Count} formats", logCallback, _logger).ConfigureAwait(false);
 
         foreach (var format in formats)
         {
@@ -268,11 +261,11 @@ public class GroupingPostProcessingService
             {
                 result.NotFound++;
                 result.StalePaths.Add(format.FilePath);
-                await LogWarningAsync($"Format {format.Id} points to path not found in Jellyfin library: {format.FilePath}").ConfigureAwait(false);
+                await LogWarningAsync($"Format {format.Id} points to path not found in Jellyfin library: {format.FilePath}", logCallback, _logger).ConfigureAwait(false);
             }
         }
 
-        await LogInfoAsync($"Repair complete — Total: {result.TotalFormats}, Fixed: {result.Fixed}, Skipped (OK): {result.Skipped}, Not Found: {result.NotFound}").ConfigureAwait(false);
+        await LogInfoAsync($"Repair complete — Total: {result.TotalFormats}, Fixed: {result.Fixed}, Skipped (OK): {result.Skipped}, Not Found: {result.NotFound}", logCallback, _logger).ConfigureAwait(false);
 
         return result;
     }
@@ -290,7 +283,7 @@ public class GroupingPostProcessingService
         }
     }
 
-    private async Task DeleteItemWithRetryAsync(BaseItem item, CancellationToken ct)
+    private async Task DeleteItemWithRetryAsync(BaseItem item, Func<string, Task>? logCallback, CancellationToken ct)
     {
         var attempt = 0;
         while (true)
@@ -311,7 +304,7 @@ public class GroupingPostProcessingService
                 if (!isLocked)
                     throw;
 
-                await LogWarningAsync($"Database locked, retrying delete (attempt {attempt}/{MaxDeleteRetries})").ConfigureAwait(false);
+                await LogWarningAsync($"Database locked, retrying delete (attempt {attempt}/{MaxDeleteRetries})", logCallback, _logger).ConfigureAwait(false);
 
                 var delay = DeleteRetryBaseDelayMs * (int)Math.Pow(2, attempt - 1);
                 await Task.Delay(delay, ct).ConfigureAwait(false);

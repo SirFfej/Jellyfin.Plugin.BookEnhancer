@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.0.0 - New: Jellyfin DB fallback — FileMetadataExtractor now reads missing/null metadata fields (Title, Overview, Publisher, SeriesName, IndexNumber, ProductionYear, PremiereDate, ProviderIds, Genres) from Jellyfin's library.db when file tags are incomplete, enabling user edits in the dashboard to flow back into file tags. New: Metadata Guide modal in config page explains write-back pipeline, cascade triggers, and template tokens. Fixed: Empty catch blocks in EpubParser, PdfParser, AudioParser now log warnings instead of swallowing exceptions. Fixed: _logCallback race condition in BookIngestionService and GroupingPostProcessingService — instance field replaced with static method param pattern for thread safety. Build: 0W/0E.",
+        "checksum": "C0117CE90979E1AE448A2BCC75B3BCF0",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.0.0/Jellyfin.Plugin.BookEnhancer_0.8.0.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.8.0.0"
+      },
+      {
         "changelog": "v0.7.0.6 - BREAKING: TrashDirectory now required before any plugin tasks run (safety gate after 5,841 files deleted by parent-directory cleanup bug). Fixed: CleanupNonBookDirectories recursive SearchOption.AllDirectories prevents parent dirs from being classified as non-book. New: TrashDirectory with configurable auto-purge (default 7d) and creation-time validation. New: Publisher-aware default template ({Publisher}/{Series}/{Title} when publisher exists). New: CBR/CB7 to CBZ conversion + ComicInfo.xml tagging from config page (SharpCompress extraction, enrichment pipeline, trash originals). Fixed: FileMetadataWriter atomic temp-file swaps prevent data loss on crash. Fixed: Zip-slip traversal guard. Fixed: LibraryOrganizationService.MoveFile no longer permanently deletes on size-only match. Fixed: CBR→CBZ validates archive before trashing original. Build: 0W/0E.",
         "checksum": "28E87A303F9D223A6BAFA88E8E74B60C",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.6/Jellyfin.Plugin.BookEnhancer_0.7.0.6.zip",
