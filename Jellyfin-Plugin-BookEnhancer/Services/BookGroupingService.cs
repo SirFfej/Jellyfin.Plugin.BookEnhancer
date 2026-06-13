@@ -280,6 +280,28 @@ public class BookGroupingService
         return formats;
     }
 
+    public BookGroup? RegisterFile(string path, FileMetadata metadata, bool isPrimary)
+    {
+        var existingGroup = !string.IsNullOrWhiteSpace(metadata.Isbn)
+            ? GetGroupByIsbn(metadata.Isbn)
+            : null;
+
+        if (existingGroup is null && isPrimary)
+        {
+            var group = CreateGroup(metadata);
+            AddFormatToGroup(group.Id, path, metadata.FileFormat, isPrimary: true);
+            return group;
+        }
+
+        if (existingGroup is not null)
+        {
+            AddFormatToGroup(existingGroup.Id, path, metadata.FileFormat, isPrimary: false);
+            return existingGroup;
+        }
+
+        return null;
+    }
+
     public List<BookGroup> GetAllGroupsWithMultipleFormats()
     {
         var groups = new List<BookGroup>();

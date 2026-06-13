@@ -42,6 +42,9 @@ public class GroupingProcessTask : IScheduledTask
 
         try
         {
+            logger.LogInformation("Scanning libraries to build grouping database...");
+            await _groupingService.ScanLibrariesAsync(logCallback, cancellationToken).ConfigureAwait(false);
+
             logger.LogInformation("Starting grouping post-processing...");
             await _groupingService.ProcessAllGroupsAsync(logCallback, cancellationToken).ConfigureAwait(false);
             logger.LogInformation("Grouping process complete");

@@ -213,6 +213,18 @@
                             <span>Enable OpenLibrary metadata lookup</span>
                         </label>
                     </div>
+
+                    <hr style="margin:15px 0;" />
+
+                    <div style="margin-top:8px;">
+                        <button is="emby-button" id="btnTestConnectivity" type="button" class="raised"
+                                style="white-space:nowrap;">Test Enrichment Connectivity</button>
+                        <div class="fieldDescription" style="margin-top:4px;">
+                            Checks whether this server can reach Hardcover, Google Books, and OpenLibrary.
+                            Useful for diagnosing network issues.
+                        </div>
+                        <div id="testConnectivityResult" class="be-test-result" style="display:none;"></div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="tab-grouping" style="display:none;">
@@ -507,6 +519,53 @@
                     .finally(function () {
                         btn.disabled = false;
                         btn.textContent = "Test";
+                    });
+            });
+
+            document.getElementById("btnTestConnectivity").addEventListener("click", function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Testing...";
+                var resultEl = document.getElementById("testConnectivityResult");
+                resultEl.style.display = "block";
+                resultEl.innerHTML = '<div class="loading-spinner"></div> Checking connectivity...';
+
+                authFetch("Books/Config/TestConnectivity", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" }
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        var html = "";
+                        var allReachable = true;
+                        result.results.forEach(function (svc) {
+                            var ok = svc.reachable;
+                            if (!ok) allReachable = false;
+                            var color = ok ? "var(--green,#4caf50)" : "var(--red,#f44336)";
+                            var icon = ok ? "&#x2713;" : "&#x2717;";
+                            html += '<div style="padding:4px 0;">';
+                            html += '<span style="color:' + color + ';font-weight:600;">' + icon + ' ' + svc.name + '</span>';
+                            html += '<span style="color:var(--text-secondary);font-size:11px;margin-left:6px;">' + svc.url + '</span>';
+                            if (svc.statusCode) html += '<span style="color:var(--text-secondary);font-size:11px;margin-left:4px;">[' + svc.statusCode + ']</span>';
+                            if (svc.error) html += '<div style="color:var(--red,#f44336);font-size:11px;margin-left:16px;">' + escapeHtml(svc.error) + '</div>';
+                            html += '</div>';
+                        });
+                        html += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border-color);font-weight:600;color:' + (allReachable ? "var(--green,#4caf50)" : "var(--red,#f44336)") + ';">';
+                        html += allReachable ? "All services reachable." : "Some services are not reachable — check network/firewall.";
+                        html += '</div>';
+                        resultEl.innerHTML = html;
+                        resultEl.style.background = allReachable ? "var(--green-background,rgba(0,200,83,0.15))" : "var(--red-background,rgba(244,67,54,0.15))";
+                        resultEl.style.border = "1px solid " + (allReachable ? "var(--green,#4caf50)" : "var(--red,#f44336)");
+                    })
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Connectivity test failed:", err);
+                        resultEl.innerHTML = '<span style="color:var(--red,#f44336);">Request failed: ' + err.message + '</span>';
+                        resultEl.style.background = "var(--red-background,rgba(244,67,54,0.15))";
+                        resultEl.style.border = "1px solid var(--red,#f44336)";
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Test Enrichment Connectivity";
                     });
             });
 

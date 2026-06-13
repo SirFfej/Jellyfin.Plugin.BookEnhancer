@@ -7,6 +7,10 @@
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-blue?labelColor=black" />
 </p>
 
+## License
+
+**GPL-3.0** — free to use, modify, and distribute. See [LICENSE](LICENSE) for full terms.
+
 > **This plugin is in active development. Expect breaking changes between releases.**
 
 Unified metadata enrichment for ebooks, audiobooks, and comics in Jellyfin. Parses metadata directly from book files and enriches via online API cascade — no Calibre, Audiobookshelf, or Komga dependencies required.
@@ -49,6 +53,10 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 
 Unified enrichment can be toggled on/off per source directory. When off, only raw file metadata is used.
 
+### Network Diagnostics
+- **Test Enrichment Connectivity** button on the Metadata config tab — pings all 3 enrichment APIs (Hardcover, Google Books, OpenLibrary) and reports reachability, status codes, and error details per service
+- **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
+
 ### Ingestion
 - **Managed source directories** — configure source folders → organize into library paths
 - **Per-source organize templates** — customize folder structure with `{Author}`, `{Series}`, `{Title}`, `{Publisher}` tokens
@@ -60,16 +68,20 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 
 ### Grouping
 - **ISBN-based grouping** — same book in multiple formats grouped under a single Jellyfin item
+- **Library-direct scanning** — grouping scans actual library directories on each run, not a stale SQLite cache; works independently of whether ingestion has ever run
 - **Grouping Preview** — dry-run view of how files will be grouped before processing
 - **Repair Format Paths** — cross-references `book_formats` against Jellyfin library items, populates `JellyfinItemId`, reports stale paths
-- **Post-processing** — after ingestion, groups formats and links them to Jellyfin library items
 
 ### Library Cleanup
 - **Reorganize files** — moves files to match the current organize template if the source directory structure has changed
 - **Metadata enrichment pass** — files with missing template fields (author, publisher, series) are queued for online enrichment before reorganization
 - **Enrichment safety guard** — if enrichment cannot resolve required template fields, files are left in place and logged to an enrichment-issues file (prevents moving to `Unknown/` paths)
-- **Empty directory removal** — automatically cleans up empty directories left after moves
+- **Library-wide empty directory sweep** — after reorganization, removes all empty subdirectories across every managed library (deepest-first enumeration)
 - **Deduplication** — when target file already exists with identical content, the stale source is removed silently
+
+### Full Maintenance
+- **Combined pipeline** — runs library cleanup → scans library directories for groups → processes groups in sequence
+- **No longer includes ingestion scan** — ingestion is a separate concern; Full Maintenance handles library maintenance and grouping only
 
 ### Metadata Enrichment Report
 - **Scan all library files** — iterates all managed directories, extracts metadata, attempts online enrichment cascade
@@ -80,6 +92,7 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
 - **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons
 - **Grouping** — Preview, Process, and Repair Format Paths buttons with results display
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging
@@ -102,12 +115,15 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
    - **Google Books API Key** (optional) — get one at https://console.cloud.google.com/apis/credentials
 5. Run the scheduled task **Ingestion Scan** from Dashboard → Scheduled Tasks
 
-### Scheduled Tasks
-- **Ingestion Scan** — scans source directories, extracts metadata, organizes files into library paths
-- **Grouping Process** — groups book formats by ISBN, links to Jellyfin library items
-- **Full Maintenance** — runs both ingestion and grouping in sequence
-- **Library Cleanup** — reorganizes files to match current templates, enriches missing metadata, removes stale duplicates and empty directories
-- **Metadata Enrichment** — scans all library files, attempts online enrichment, reports items that could not be enriched (no ISBN, no match, errors)
+## Scheduled Tasks
+
+| Task | Description |
+|------|-------------|
+| **Ingestion Scan** | Scans source directories, extracts metadata, organizes files into library paths |
+| **Grouping Process** | Scans library directories and groups book formats by ISBN |
+| **Full Maintenance** | Runs library cleanup → library scan → grouping (no ingestion) |
+| **Library Cleanup** | Reorganizes files to match current templates, enriches missing metadata, removes stale duplicates and empty directories |
+| **Metadata Enrichment** | Scans all library files, attempts online enrichment, reports items that could not be enriched |
 
 ## Build from Source
 
@@ -127,7 +143,3 @@ Third-party NuGet packages are bundled in the release ZIP (included automaticall
 - `Newtonsoft.Json` — internal serialization
 
 Jellyfin server assemblies (`Microsoft.Extensions.*`, `Jellyfin.Model`, `Jellyfin.Controller`) are NOT bundled — they resolve from the server at runtime.
-
-## License
-
-GPL-3.0

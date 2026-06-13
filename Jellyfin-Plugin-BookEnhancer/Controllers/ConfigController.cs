@@ -91,6 +91,73 @@ public class ConfigController : ControllerBase
         }
     }
 
+    [HttpPost("TestConnectivity")]
+    public async Task<ActionResult<ConnectivityResult>> TestConnectivity(CancellationToken ct)
+    {
+        var results = new List<ServiceConnectivity>();
+
+        // Hardcover
+        var hcResult = new ServiceConnectivity { Name = "Hardcover", Url = "https://api.hardcover.app/v1/graphql" };
+        try
+        {
+            using var hcClient = _httpClientFactory.CreateClient();
+            hcClient.Timeout = TimeSpan.FromSeconds(10);
+            hcClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var payload = JsonSerializer.Serialize(new { query = "query { me { id } }" });
+            var hcReq = new HttpRequestMessage(HttpMethod.Post, _hardcoverGraphQlEndpoint)
+            {
+                Content = new StringContent(payload, Encoding.UTF8, "application/json")
+            };
+            var hcResp = await hcClient.SendAsync(hcReq, ct).ConfigureAwait(false);
+            hcResult.Reachable = true;
+            hcResult.StatusCode = (int)hcResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            hcResult.Reachable = false;
+            hcResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(hcResult);
+
+        // Google Books
+        var gbResult = new ServiceConnectivity { Name = "Google Books", Url = "https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1" };
+        try
+        {
+            using var gbClient = _httpClientFactory.CreateClient();
+            gbClient.Timeout = TimeSpan.FromSeconds(10);
+            gbClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var gbResp = await gbClient.GetAsync("https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1", ct).ConfigureAwait(false);
+            gbResult.Reachable = true;
+            gbResult.StatusCode = (int)gbResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            gbResult.Reachable = false;
+            gbResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(gbResult);
+
+        // OpenLibrary
+        var olResult = new ServiceConnectivity { Name = "OpenLibrary", Url = "https://openlibrary.org/api/books?bibkeys=ISBN:9780307272119&format=json" };
+        try
+        {
+            using var olClient = _httpClientFactory.CreateClient();
+            olClient.Timeout = TimeSpan.FromSeconds(10);
+            olClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var olResp = await olClient.GetAsync("https://openlibrary.org/api/books?bibkeys=ISBN:9780307272119&format=json", ct).ConfigureAwait(false);
+            olResult.Reachable = true;
+            olResult.StatusCode = (int)olResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            olResult.Reachable = false;
+            olResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(olResult);
+
+        return Ok(new ConnectivityResult { Results = results });
+    }
+
     [HttpGet("Info")]
     public ActionResult<PluginInfoResult> GetInfo()
     {
@@ -179,4 +246,28 @@ public class ValidateDirectoryResult
 
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
+}
+
+public class ConnectivityResult
+{
+    [JsonPropertyName("results")]
+    public List<ServiceConnectivity> Results { get; set; } = new();
+}
+
+public class ServiceConnectivity
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = string.Empty;
+
+    [JsonPropertyName("reachable")]
+    public bool Reachable { get; set; }
+
+    [JsonPropertyName("statusCode")]
+    public int? StatusCode { get; set; }
+
+    [JsonPropertyName("error")]
+    public string? Error { get; set; }
 }

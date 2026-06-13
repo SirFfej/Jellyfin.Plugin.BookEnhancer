@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
@@ -12,18 +13,23 @@ public class GroupingPostProcessingService
 
     private readonly BookGroupingService _groupingService;
     private readonly ILibraryManager _libraryManager;
+    private readonly FileMetadataExtractor _fileExtractor;
     private readonly ILogger<GroupingPostProcessingService> _logger;
     private Func<string, Task>? _logCallback;
 
     public GroupingPostProcessingService(
         BookGroupingService groupingService,
         ILibraryManager libraryManager,
+        FileMetadataExtractor fileExtractor,
         ILogger<GroupingPostProcessingService> logger)
     {
         _groupingService = groupingService;
         _libraryManager = libraryManager;
+        _fileExtractor = fileExtractor;
         _logger = logger;
     }
+
+    private static PluginConfiguration? Config => Plugin.Instance?.Configuration;
 
     private async Task LogInfoAsync(string message)
     {
@@ -63,6 +69,104 @@ public class GroupingPostProcessingService
 
             await ProcessGroupAsync(group, ct).ConfigureAwait(false);
         }
+    }
+
+    public async Task ScanLibrariesAsync(Func<string, Task>? logCallback = null, CancellationToken ct = default)
+    {
+        _logCallback = logCallback;
+
+        var config = Config;
+        if (config is null)
+        {
+            await LogInfoAsync("Plugin configuration not available").ConfigureAwait(false);
+            return;
+        }
+
+        var dirs = config.ManagedDirectories
+            .Where(d => d.Enabled && !string.IsNullOrWhiteSpace(d.LibraryPath))
+            .ToList();
+
+        if (dirs.Count == 0)
+        {
+            await LogInfoAsync("No enabled managed directories with library paths configured").ConfigureAwait(false);
+            return;
+        }
+
+        var supportedExts = GetSupportedExtensions(config);
+
+        var totalRegistered = 0;
+        foreach (var dir in dirs)
+        {
+            if (ct.IsCancellationRequested) break;
+
+            if (!Directory.Exists(dir.LibraryPath))
+            {
+                await LogWarningAsync($"Library path does not exist: {dir.LibraryPath}").ConfigureAwait(false);
+                continue;
+            }
+
+            var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
+                .Where(f => supportedExts.Contains(Path.GetExtension(f)))
+                .ToList();
+
+            if (files.Count == 0)
+            {
+                await LogInfoAsync($"No supported files found in {dir.LibraryPath}").ConfigureAwait(false);
+                continue;
+            }
+
+            var registered = 0;
+            foreach (var file in files)
+            {
+                if (ct.IsCancellationRequested) break;
+
+                try
+                {
+                    var metadata = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
+                    if (metadata is null)
+                        continue;
+
+                    if (!string.IsNullOrWhiteSpace(metadata.Isbn))
+                    {
+                        _groupingService.RegisterFile(file, metadata, isPrimary: true);
+                        registered++;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(metadata.Title) && metadata.Authors.Count > 0)
+                    {
+                        var existing = _groupingService.GetGroupByIsbn(metadata.Isbn);
+                        if (existing is not null)
+                        {
+                            _groupingService.RegisterFile(file, metadata, isPrimary: false);
+                            registered++;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await LogWarningAsync($"Failed to scan {file}: {ex.Message}").ConfigureAwait(false);
+                }
+            }
+
+            await LogInfoAsync($"Registered {registered} files in {files.Count} from {dir.LibraryPath}").ConfigureAwait(false);
+            totalRegistered += registered;
+        }
+
+        await LogInfoAsync($"Library scan complete — {totalRegistered} files registered in grouping database").ConfigureAwait(false);
+    }
+
+    private static HashSet<string> GetSupportedExtensions(PluginConfiguration config)
+    {
+        if (config.IngestionFileExtensions is null || config.IngestionFileExtensions.Count == 0)
+        {
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".epub", ".pdf",
+                ".cbz", ".cbr", ".cb7",
+                ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
+            };
+        }
+
+        return new HashSet<string>(config.IngestionFileExtensions, StringComparer.OrdinalIgnoreCase);
     }
 
     public async Task ProcessGroupAsync(BookGroup group, CancellationToken ct = default)

@@ -305,6 +305,11 @@ public class LibraryCleanupService
 
             await CleanupNonBookDirectories(libGroup, libResult, logCallback, ct).ConfigureAwait(false);
 
+            var removedEmpty = await SweepEmptyDirectoriesAsync(libraryRoot, logCallback, ct).ConfigureAwait(false);
+            libResult.EmptyDirectoriesRemoved += removedEmpty;
+            if (removedEmpty > 0)
+                await logCallback($"[{libLabel}] Removed {removedEmpty} empty directories from library").ConfigureAwait(false);
+
             await logCallback(
                 $"[{libLabel}] Library complete — " +
                 $"Moved: {libResult.FilesMoved}, Skipped: {libResult.FilesSkipped}, " +
@@ -543,14 +548,6 @@ public class LibraryCleanupService
             (metadata.Authors.Count == 0 || string.IsNullOrWhiteSpace(metadata.Authors[0])))
             return true;
 
-        if (tokens.Contains("Series") &&
-            string.IsNullOrWhiteSpace(metadata.SeriesName))
-            return true;
-
-        if (tokens.Contains("Publisher") &&
-            string.IsNullOrWhiteSpace(metadata.Publisher))
-            return true;
-
         return false;
     }
 
@@ -571,6 +568,44 @@ public class LibraryCleanupService
         }
 
         return tokens;
+    }
+
+    private static async Task<int> SweepEmptyDirectoriesAsync(string rootPath, Func<string, Task> logCallback, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(rootPath) || !Directory.Exists(rootPath))
+            return 0;
+
+        var count = 0;
+        try
+        {
+            var allDirs = Directory.GetDirectories(rootPath, "*", SearchOption.AllDirectories);
+            Array.Sort(allDirs, (a, b) => b.Length.CompareTo(a.Length));
+
+            foreach (var dir in allDirs)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                try
+                {
+                    if (new DirectoryInfo(dir).EnumerateFileSystemInfos().Any())
+                        continue;
+
+                    Directory.Delete(dir);
+                    count++;
+                    await logCallback($"Removed empty directory: {dir}").ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await logCallback($"Failed to remove empty directory {dir}: {ex.Message}").ConfigureAwait(false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await logCallback($"Failed to sweep empty directories under {rootPath}: {ex.Message}").ConfigureAwait(false);
+        }
+
+        return count;
     }
 
     private static HashSet<string> GetSupportedExtensions(PluginConfiguration? config)

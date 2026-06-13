@@ -191,7 +191,7 @@ public class BookIngestionService
 
                 if (moveResult.Success)
                 {
-                    RegisterFile(targetPath, metadata, isPrimary: true);
+                    _groupingService.RegisterFile(targetPath, metadata, isPrimary: true);
                     result.FilesAdded++;
 
                     if (dir.EnableMetadataWriting)
@@ -202,20 +202,8 @@ public class BookIngestionService
                     if (dir.EnableMetadataWriting)
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
 
-                    var existingGroup = !string.IsNullOrWhiteSpace(metadata.Isbn)
-                        ? _groupingService.GetGroupByIsbn(metadata.Isbn)
-                        : null;
-
-                    if (existingGroup is not null)
-                    {
-                        _groupingService.AddFormatToGroup(
-                            existingGroup.Id, targetPath, metadata.FileFormat, isPrimary: false);
-                        result.FilesSkipped++;
-                    }
-                    else
-                    {
-                        result.FilesSkipped++;
-                    }
+                    var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false);
+                    result.FilesSkipped++;
                 }
                 else
                 {
@@ -231,23 +219,6 @@ public class BookIngestionService
         }
 
         return result;
-    }
-
-    private void RegisterFile(string path, FileMetadata metadata, bool isPrimary)
-    {
-        var existingGroup = !string.IsNullOrWhiteSpace(metadata.Isbn)
-            ? _groupingService.GetGroupByIsbn(metadata.Isbn)
-            : null;
-
-        if (existingGroup is null && isPrimary)
-        {
-            var group = _groupingService.CreateGroup(metadata);
-            _groupingService.AddFormatToGroup(group.Id, path, metadata.FileFormat, isPrimary: true);
-        }
-        else if (existingGroup is not null && !isPrimary)
-        {
-            _groupingService.AddFormatToGroup(existingGroup.Id, path, metadata.FileFormat, isPrimary: false);
-        }
     }
 
     private static FileMetadata CreateMinimalMetadata(string filePath)

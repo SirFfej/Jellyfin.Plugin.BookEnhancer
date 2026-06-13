@@ -5,16 +5,16 @@ namespace Jellyfin.Plugin.BookEnhancer.Services.Tasks;
 
 public class FullMaintenanceTask : IScheduledTask
 {
-    private readonly BookIngestionService _ingestionService;
+    private readonly LibraryCleanupService _cleanupService;
     private readonly GroupingPostProcessingService _groupingService;
     private readonly IApplicationPaths _appPaths;
 
     public FullMaintenanceTask(
-        BookIngestionService ingestionService,
+        LibraryCleanupService cleanupService,
         GroupingPostProcessingService groupingService,
         IApplicationPaths appPaths)
     {
-        _ingestionService = ingestionService;
+        _cleanupService = cleanupService;
         _groupingService = groupingService;
         _appPaths = appPaths;
     }
@@ -23,7 +23,7 @@ public class FullMaintenanceTask : IScheduledTask
 
     public string Key => "BookEnhancerMaintenance";
 
-    public string Description => "Runs ingestion scan followed by grouping post-processing.";
+    public string Description => "Reorganizes library files and runs grouping post-processing.";
 
     public string Category => "BookEnhancers";
 
@@ -56,19 +56,22 @@ public class FullMaintenanceTask : IScheduledTask
 
         try
         {
-            logger.LogInformation("Starting full maintenance — ingestion scan...");
+            logger.LogInformation("Starting full maintenance — library cleanup...");
             ((IProgress<double>)logger).Report(0.0);
 
-            var ingestionResult = await _ingestionService.ScanAllAsync(logCallback, cancellationToken).ConfigureAwait(false);
+            var cleanupResult = await _cleanupService.RunCleanupAsync(progress, logCallback, cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
-                $"Ingestion complete — Found: {ingestionResult.FilesFound}, " +
-                $"Added: {ingestionResult.FilesAdded}, " +
-                $"Skipped: {ingestionResult.FilesSkipped}, Enrichment failures: {ingestionResult.EnrichmentFailures}, Errors: {ingestionResult.Errors}");
+                $"Library cleanup complete — " +
+                $"Moved: {cleanupResult.FilesMoved}, Skipped: {cleanupResult.FilesSkipped}, " +
+                $"Errors: {cleanupResult.Errors}, Duplicates: {cleanupResult.DuplicatesFound}");
             ((IProgress<double>)logger).Report(0.5);
+
+            logger.LogInformation("Scanning libraries for grouping...");
+            await _groupingService.ScanLibrariesAsync(logCallback, cancellationToken).ConfigureAwait(false);
 
             logger.LogInformation("Starting grouping post-processing...");
             await _groupingService.ProcessAllGroupsAsync(logCallback, cancellationToken).ConfigureAwait(false);
-            logger.LogInformation("Grouping process complete");
+            logger.LogInformation("Full maintenance complete");
             ((IProgress<double>)logger).Report(1.0);
         }
         catch (OperationCanceledException)
