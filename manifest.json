@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.6.0.0 - Enrichment cascade overhaul: 250ms rate limiting between API calls, Google Books API key guard added, cascade now returns ApiMatchFound flag independent of HasCompleteMetadata (fixes 'No enrichment found' for files with rich local metadata). CleanupNonBookDirectories fixed to operate on LibraryPath instead of SourcePath (prevents ingestion folder deletion). 'Rich Local Metadata - Skipping enrichment' logged for files with complete metadata.",
+        "checksum": "eac4f3dd74db9dbcc450e68da384bb86",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.6.0.0/Jellyfin.Plugin.BookEnhancer_0.6.0.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.6.0.0"
+      },
+      {
         "changelog": "v0.5.0.0 - FullMaintenance pipeline: library cleanup -> library scan -> grouping (no longer includes ingestion). GroupingProcess now scans library directories directly instead of relying on SQLite DB (works independently of ingestion). LibraryCleanup sweeps empty directories library-wide. Config page adds Test Enrichment Connectivity button + endpoint for isolating network-level issues from API key problems. README restructured with License/alpha warning first.",
         "checksum": "077f42881ab4a0f58616d5626a08ee15",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.5.0.0/Jellyfin.Plugin.BookEnhancer_0.5.0.0.zip",

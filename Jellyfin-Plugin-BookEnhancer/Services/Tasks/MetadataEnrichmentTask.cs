@@ -131,15 +131,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                         continue;
                     }
 
-                    // Snapshot fields before enrichment to detect changes
-                    var beforeTitle = metadata.Title;
-                    var beforeAuthorFirst = metadata.Authors.Count > 0 ? metadata.Authors[0] : null;
-                    var beforePublisher = metadata.Publisher;
-                    var beforeSeries = metadata.SeriesName;
-                    var beforeGenreCount = metadata.Genres.Count;
-                    var beforeHasDescription = !string.IsNullOrWhiteSpace(metadata.Description);
-
-                    var enrichedMeta = await _enrichment.EnrichAsync(
+                    var result = await _enrichment.EnrichAsync(
                         metadata,
                         config.HardcoverApiKey,
                         config.GoogleBooksApiKey,
@@ -148,15 +140,9 @@ public class MetadataEnrichmentTask : IScheduledTask
                         config.OpenLibraryEnabled,
                         ct: cancellationToken).ConfigureAwait(false);
 
-                    var titleChanged = enrichedMeta.Title != beforeTitle;
-                    var authorChanged = enrichedMeta.Authors.Count > 0 &&
-                        (beforeAuthorFirst is null || !string.Equals(enrichedMeta.Authors[0], beforeAuthorFirst, StringComparison.OrdinalIgnoreCase));
-                    var publisherChanged = enrichedMeta.Publisher != beforePublisher;
-                    var seriesChanged = enrichedMeta.SeriesName != beforeSeries;
-                    var genresAdded = enrichedMeta.Genres.Count > beforeGenreCount;
-                    var descriptionAdded = !string.IsNullOrWhiteSpace(enrichedMeta.Description) && !beforeHasDescription;
+                    var enrichedMeta = result.Metadata;
 
-                    if (titleChanged || authorChanged || publisherChanged || seriesChanged || genresAdded || descriptionAdded)
+                    if (result.ApiMatchFound)
                     {
                         enriched++;
                         logger.LogInformation($"Enriched: {filePath} (ISBN: {metadata.Isbn})");
@@ -167,6 +153,8 @@ public class MetadataEnrichmentTask : IScheduledTask
                         unenriched.Add($"NO MATCH: {filePath} (ISBN: {metadata.Isbn})");
                         logger.LogInformation($"No enrichment found: {filePath} (ISBN: {metadata.Isbn})");
                     }
+
+                    await Task.Delay(250, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

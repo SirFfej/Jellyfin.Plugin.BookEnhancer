@@ -129,6 +129,9 @@ public class LibraryCleanupService
                     }
                     else
                     {
+                        if (config.UnifiedMetadataEnabled)
+                            await logCallback($"[{libLabel}] Rich Local Metadata - Skipping enrichment: {file}").ConfigureAwait(false);
+
                         fileData.Add((file, metadata, dir, template));
                     }
                 }
@@ -216,7 +219,7 @@ public class LibraryCleanupService
 
                     try
                     {
-                        var enriched = await _enrichment.EnrichAsync(
+                        var enrichmentResult = await _enrichment.EnrichAsync(
                             rawMetadata,
                             config.HardcoverApiKey,
                             config.GoogleBooksApiKey,
@@ -227,6 +230,8 @@ public class LibraryCleanupService
                             title: rawMetadata.Title,
                             author: rawMetadata.Authors.Count > 0 ? rawMetadata.Authors[0] : null,
                             ct: ct).ConfigureAwait(false);
+
+                        var enriched = enrichmentResult.Metadata;
 
                         if (NeedsEnrichment(enriched, template))
                         {
@@ -431,12 +436,12 @@ public class LibraryCleanupService
 
         foreach (var dir in libraryDirs)
         {
-            if (string.IsNullOrWhiteSpace(dir.SourcePath) || !Directory.Exists(dir.SourcePath))
+            if (string.IsNullOrWhiteSpace(dir.LibraryPath) || !Directory.Exists(dir.LibraryPath))
                 continue;
 
             try
             {
-                var allDirs = Directory.GetDirectories(dir.SourcePath, "*", SearchOption.AllDirectories);
+                var allDirs = Directory.GetDirectories(dir.LibraryPath, "*", SearchOption.AllDirectories);
                 Array.Sort(allDirs, (a, b) => b.Length.CompareTo(a.Length));
 
                 foreach (var subDir in allDirs)
@@ -465,7 +470,7 @@ public class LibraryCleanupService
             }
             catch (Exception ex)
             {
-                await logCallback($"Failed to cleanup non-book directories under {dir.SourcePath}: {ex.Message}").ConfigureAwait(false);
+                await logCallback($"Failed to cleanup non-book directories under {dir.LibraryPath}: {ex.Message}").ConfigureAwait(false);
             }
         }
     }

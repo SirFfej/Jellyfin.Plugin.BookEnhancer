@@ -57,7 +57,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             var dir = FindMatchingDirectory(config, info.Path);
             var titleAuthorEnabled = dir?.EnableTitleAuthorSearch ?? true;
 
-            var enriched = await _enrichment.EnrichAsync(
+            var enrichmentResult = await _enrichment.EnrichAsync(
                 fileMeta,
                 config.HardcoverApiKey,
                 config.GoogleBooksApiKey,
@@ -68,6 +68,8 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 title: fileMeta.Title,
                 author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
                 ct: cancellationToken).ConfigureAwait(false);
+
+            var enriched = enrichmentResult.Metadata;
 
             if (string.IsNullOrWhiteSpace(enriched.Title)) return result;
 
@@ -128,7 +130,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 var localMeta = await ExtractFileMetadata(searchInfo.Path, cancellationToken).ConfigureAwait(false);
                 if (localMeta?.Isbn != null)
                 {
-                    var enriched = await _enrichment.EnrichAsync(
+                    var enrichmentResult = await _enrichment.EnrichAsync(
                         localMeta,
                         config.HardcoverApiKey,
                         config.GoogleBooksApiKey,
@@ -138,9 +140,9 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                         title: searchInfo.Name,
                         ct: cancellationToken).ConfigureAwait(false);
 
-                    if (!string.IsNullOrWhiteSpace(enriched.Title))
+                    if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
                     {
-                        results.Add(MapSearchResult(enriched));
+                        results.Add(MapSearchResult(enrichmentResult.Metadata));
                         return results;
                     }
                 }

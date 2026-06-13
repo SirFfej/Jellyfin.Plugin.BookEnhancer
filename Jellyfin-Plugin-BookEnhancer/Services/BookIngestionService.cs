@@ -140,14 +140,7 @@ public class BookIngestionService
 
                 if (Config?.UnifiedMetadataEnabled == true)
                 {
-                    var beforeTitle = metadata.Title;
-                    var beforeAuthorCount = metadata.Authors.Count;
-                    var beforePublisher = metadata.Publisher;
-                    var beforeSeries = metadata.SeriesName;
-                    var beforeDescription = metadata.Description;
-                    var beforeGenreCount = metadata.Genres.Count;
-
-                    var enriched = await _enrichment.EnrichAsync(
+                    var enrichmentResult = await _enrichment.EnrichAsync(
                         metadata,
                         Config.HardcoverApiKey,
                         Config.GoogleBooksApiKey,
@@ -159,27 +152,12 @@ public class BookIngestionService
                         author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
                         ct: ct).ConfigureAwait(false);
 
-                    metadata = enriched;
+                    metadata = enrichmentResult.Metadata;
 
-                    if (!string.IsNullOrWhiteSpace(metadata.Isbn))
-                    {
-                        var titleChanged = metadata.Title != beforeTitle;
-                        var authorsChanged = metadata.Authors.Count > beforeAuthorCount;
-                        var publisherChanged = metadata.Publisher != beforePublisher;
-                        var seriesChanged = metadata.SeriesName != beforeSeries;
-                        var descriptionAdded = !string.IsNullOrWhiteSpace(metadata.Description) && string.IsNullOrWhiteSpace(beforeDescription);
-                        var genresAdded = metadata.Genres.Count > beforeGenreCount;
-
-                        if (!titleChanged && !authorsChanged && !publisherChanged && !seriesChanged && !descriptionAdded && !genresAdded)
-                        {
-                            result.EnrichmentFailures++;
-                            await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found").ConfigureAwait(false);
-                        }
-                    }
-                    else
+                    if (!string.IsNullOrWhiteSpace(metadata.Isbn) && !enrichmentResult.ApiMatchFound)
                     {
                         result.EnrichmentFailures++;
-                        await LogWarningAsync($"ENRICHMENT FAILURE: {file} — no ISBN available for lookup").ConfigureAwait(false);
+                        await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found").ConfigureAwait(false);
                     }
                 }
 
