@@ -63,7 +63,7 @@ public class FullMaintenanceTask : IScheduledTask
             logger.LogInformation(
                 $"Ingestion complete — Found: {ingestionResult.FilesFound}, " +
                 $"Added: {ingestionResult.FilesAdded}, " +
-                $"Skipped: {ingestionResult.FilesSkipped}, Errors: {ingestionResult.Errors}");
+                $"Skipped: {ingestionResult.FilesSkipped}, Enrichment failures: {ingestionResult.EnrichmentFailures}, Errors: {ingestionResult.Errors}");
             ((IProgress<double>)logger).Report(0.5);
 
             logger.LogInformation("Starting grouping post-processing...");

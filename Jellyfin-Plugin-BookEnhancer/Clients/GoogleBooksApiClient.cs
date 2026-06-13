@@ -17,6 +17,31 @@ public class GoogleBooksApiClient
         _logger = logger;
     }
 
+    public async Task<FileMetadata?> SearchByTitleAuthorAsync(string title, string author, string? apiKey, CancellationToken ct = default)
+    {
+        try
+        {
+            var url = $"{BaseUrl}volumes?q=intitle:{Uri.EscapeDataString(title)}+inauthor:{Uri.EscapeDataString(author)}&maxResults=1";
+            if (!string.IsNullOrWhiteSpace(apiKey))
+                url += $"&key={apiKey}";
+
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+
+            var response = await client.GetFromJsonAsync<VolumeResponse>(url, ct).ConfigureAwait(false);
+            var volume = response?.Items?.FirstOrDefault();
+            if (volume?.VolumeInfo is null) return null;
+
+            return MapVolume(volume.VolumeInfo, string.Empty);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Google Books title/author search failed for {Title} by {Author}", title, author);
+            return null;
+        }
+    }
+
     public async Task<FileMetadata?> SearchByIsbnAsync(string isbn, string? apiKey, CancellationToken ct = default)
     {
         var cleanIsbn = CleanIsbn(isbn);

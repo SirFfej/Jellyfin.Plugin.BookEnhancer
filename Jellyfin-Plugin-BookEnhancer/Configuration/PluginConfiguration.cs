@@ -40,4 +40,6 @@ public class ManagedSourceDirectory
     public bool Enabled { get; set; } = true;
     public string LibraryId { get; set; } = string.Empty;
     public string OrganizeTemplate { get; set; } = string.Empty;
+    public bool EnableTitleAuthorSearch { get; set; } = true;
+    public bool EnableMetadataWriting { get; set; } = false;
 }

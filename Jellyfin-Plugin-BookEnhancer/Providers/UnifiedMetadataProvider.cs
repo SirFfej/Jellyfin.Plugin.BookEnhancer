@@ -1,4 +1,5 @@
 using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using Jellyfin.Plugin.BookEnhancer.Services;
 using MediaBrowser.Controller.Entities;
@@ -16,6 +17,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
     private readonly MetadataEnrichmentService _enrichment;
     private readonly BookGroupingService _grouping;
     private readonly ILibraryManager _libraryManager;
+    private readonly IFileMetadataWriter _writer;
     private readonly ILogger<UnifiedMetadataProvider> _logger;
 
     public UnifiedMetadataProvider(
@@ -23,12 +25,14 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
         MetadataEnrichmentService enrichment,
         BookGroupingService grouping,
         ILibraryManager libraryManager,
+        IFileMetadataWriter writer,
         ILogger<UnifiedMetadataProvider> logger)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
         _grouping = grouping;
         _libraryManager = libraryManager;
+        _writer = writer;
         _logger = logger;
     }
 
@@ -50,6 +54,9 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             var fileMeta = await ExtractFileMetadata(info.Path, cancellationToken).ConfigureAwait(false);
             if (fileMeta is null) return result;
 
+            var dir = FindMatchingDirectory(config, info.Path);
+            var titleAuthorEnabled = dir?.EnableTitleAuthorSearch ?? true;
+
             var enriched = await _enrichment.EnrichAsync(
                 fileMeta,
                 config.HardcoverApiKey,
@@ -57,9 +64,15 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 config.HardcoverEnabled,
                 config.GoogleBooksEnabled,
                 config.OpenLibraryEnabled,
-                cancellationToken).ConfigureAwait(false);
+                titleAuthorSearchEnabled: titleAuthorEnabled,
+                title: fileMeta.Title,
+                author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
+                ct: cancellationToken).ConfigureAwait(false);
 
             if (string.IsNullOrWhiteSpace(enriched.Title)) return result;
+
+            if (dir?.EnableMetadataWriting == true && !string.IsNullOrWhiteSpace(info.Path) && File.Exists(info.Path))
+                await _writer.WriteMetadataAsync(info.Path, enriched, cancellationToken).ConfigureAwait(false);
 
             if (config.EnableFormatGrouping && !string.IsNullOrWhiteSpace(enriched.Isbn))
             {
@@ -122,7 +135,8 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                         config.HardcoverEnabled,
                         config.GoogleBooksEnabled,
                         config.OpenLibraryEnabled,
-                        cancellationToken).ConfigureAwait(false);
+                        title: searchInfo.Name,
+                        ct: cancellationToken).ConfigureAwait(false);
 
                     if (!string.IsNullOrWhiteSpace(enriched.Title))
                     {
@@ -283,5 +297,14 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
         }
 
         return false;
+    }
+
+    private static ManagedSourceDirectory? FindMatchingDirectory(PluginConfiguration config, string? itemPath)
+    {
+        if (string.IsNullOrWhiteSpace(itemPath)) return null;
+
+        return config.ManagedDirectories
+            .Where(d => d.Enabled && !string.IsNullOrWhiteSpace(d.LibraryPath))
+            .FirstOrDefault(d => itemPath.StartsWith(d.LibraryPath, StringComparison.OrdinalIgnoreCase));
     }
 }

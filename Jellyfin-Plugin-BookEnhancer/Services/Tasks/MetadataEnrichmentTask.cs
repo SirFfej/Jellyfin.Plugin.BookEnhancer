@@ -146,7 +146,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                         config.HardcoverEnabled,
                         config.GoogleBooksEnabled,
                         config.OpenLibraryEnabled,
-                        cancellationToken).ConfigureAwait(false);
+                        ct: cancellationToken).ConfigureAwait(false);
 
                     var titleChanged = enrichedMeta.Title != beforeTitle;
                     var authorChanged = enrichedMeta.Authors.Count > 0 &&

@@ -30,16 +30,46 @@ public class MetadataEnrichmentService
         bool hardcoverEnabled,
         bool googleBooksEnabled,
         bool openLibraryEnabled,
+        bool titleAuthorSearchEnabled = true,
+        string? title = null,
+        string? author = null,
         CancellationToken ct = default)
     {
         var isbn = source.Isbn;
-        if (string.IsNullOrWhiteSpace(isbn))
+        var hasIsbn = !string.IsNullOrWhiteSpace(isbn);
+        var foundAny = false;
+
+        if (hasIsbn)
         {
-            _logger.LogDebug("No ISBN available for enrichment, skipping online lookups");
-            return source;
+            foundAny = await SearchByIsbnCascade(source, isbn!, hardcoverApiKey, googleBooksApiKey, hardcoverEnabled, googleBooksEnabled, openLibraryEnabled, ct).ConfigureAwait(false);
         }
 
-        // Tier 1: Hardcover (highest quality, most fields)
+        if (!foundAny && titleAuthorSearchEnabled)
+        {
+            var searchTitle = title ?? source.Title;
+            var searchAuthor = author ?? (source.Authors.Count > 0 ? source.Authors[0] : null);
+
+            if (!string.IsNullOrWhiteSpace(searchTitle))
+            {
+                _logger.LogDebug("ISBN lookup failed or unavailable, falling back to title/author search");
+                await SearchByTitleAuthorCascade(source, searchTitle, searchAuthor, hardcoverApiKey, googleBooksApiKey, hardcoverEnabled, googleBooksEnabled, openLibraryEnabled, ct).ConfigureAwait(false);
+            }
+        }
+
+        return source;
+    }
+
+    private async Task<bool> SearchByIsbnCascade(
+        FileMetadata source,
+        string isbn,
+        string hardcoverApiKey,
+        string? googleBooksApiKey,
+        bool hardcoverEnabled,
+        bool googleBooksEnabled,
+        bool openLibraryEnabled,
+        CancellationToken ct)
+    {
+        // Tier 1: Hardcover
         if (hardcoverEnabled && !string.IsNullOrWhiteSpace(hardcoverApiKey))
         {
             var hcMeta = await _hardcover.SearchByIsbnAsync(isbn, hardcoverApiKey, ct).ConfigureAwait(false);
@@ -47,13 +77,11 @@ public class MetadataEnrichmentService
             {
                 MergeSource(source, hcMeta);
                 _logger.LogDebug("Hardcover enriched ISBN {Isbn}", isbn);
-
-                if (HasCompleteMetadata(source))
-                    return source;
+                if (HasCompleteMetadata(source)) return true;
             }
         }
 
-        // Tier 2: Google Books (good fallback)
+        // Tier 2: Google Books
         if (googleBooksEnabled)
         {
             var gbMeta = await _googleBooks.SearchByIsbnAsync(isbn, googleBooksApiKey, ct).ConfigureAwait(false);
@@ -61,13 +89,11 @@ public class MetadataEnrichmentService
             {
                 MergeNulls(source, gbMeta);
                 _logger.LogDebug("Google Books enriched ISBN {Isbn}", isbn);
-
-                if (HasCompleteMetadata(source))
-                    return source;
+                if (HasCompleteMetadata(source)) return true;
             }
         }
 
-        // Tier 3: OpenLibrary (always available, no key needed)
+        // Tier 3: OpenLibrary
         if (openLibraryEnabled)
         {
             var olMeta = await _openLibrary.SearchByIsbnAsync(isbn, ct).ConfigureAwait(false);
@@ -75,10 +101,64 @@ public class MetadataEnrichmentService
             {
                 MergeNulls(source, olMeta);
                 _logger.LogDebug("OpenLibrary enriched ISBN {Isbn}", isbn);
+                if (HasCompleteMetadata(source)) return true;
             }
         }
 
-        return source;
+        return false;
+    }
+
+    private async Task SearchByTitleAuthorCascade(
+        FileMetadata source,
+        string title,
+        string? author,
+        string hardcoverApiKey,
+        string? googleBooksApiKey,
+        bool hardcoverEnabled,
+        bool googleBooksEnabled,
+        bool openLibraryEnabled,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(author))
+        {
+            _logger.LogDebug("No author available for title/author search, skipping");
+            return;
+        }
+
+        // Tier 1: Hardcover
+        if (hardcoverEnabled && !string.IsNullOrWhiteSpace(hardcoverApiKey))
+        {
+            var hcMeta = await _hardcover.SearchByTitleAuthorAsync(title, author, hardcoverApiKey, ct).ConfigureAwait(false);
+            if (hcMeta != null)
+            {
+                MergeSource(source, hcMeta);
+                _logger.LogDebug("Hardcover title/author search matched {Title}", title);
+                if (HasCompleteMetadata(source)) return;
+            }
+        }
+
+        // Tier 2: Google Books
+        if (googleBooksEnabled)
+        {
+            var gbMeta = await _googleBooks.SearchByTitleAuthorAsync(title, author, googleBooksApiKey, ct).ConfigureAwait(false);
+            if (gbMeta != null)
+            {
+                MergeNulls(source, gbMeta);
+                _logger.LogDebug("Google Books title/author search matched {Title}", title);
+                if (HasCompleteMetadata(source)) return;
+            }
+        }
+
+        // Tier 3: OpenLibrary
+        if (openLibraryEnabled)
+        {
+            var olMeta = await _openLibrary.SearchByTitleAuthorAsync(title, author, ct).ConfigureAwait(false);
+            if (olMeta != null)
+            {
+                MergeNulls(source, olMeta);
+                _logger.LogDebug("OpenLibrary title/author search matched {Title}", title);
+            }
+        }
     }
 
     private static void MergeSource(FileMetadata target, FileMetadata source)

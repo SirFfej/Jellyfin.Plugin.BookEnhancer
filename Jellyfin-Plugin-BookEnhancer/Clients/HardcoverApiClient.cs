@@ -19,6 +19,104 @@ public class HardcoverApiClient
         _logger = logger;
     }
 
+    public async Task<FileMetadata?> SearchByTitleAuthorAsync(string title, string author, string apiKey, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
+        try
+        {
+            var bookData = await QueryBookByTitleAuthor(title, author, apiKey, ct).ConfigureAwait(false);
+            if (bookData is null) return null;
+
+            var meta = MapBookToMetadata(bookData);
+            return meta;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Hardcover title/author search failed for {Title} by {Author}", title, author);
+            return null;
+        }
+    }
+
+    private async Task<BookResult?> QueryBookByTitleAuthor(string title, string author, string apiKey, CancellationToken ct)
+    {
+        var query = @"
+query($title: String!) {
+  books(where: {title: {_iregex: $title}}, limit: 10) {
+    id
+    title
+    subtitle
+    description
+    release_year
+    release_date
+    cached_tags
+    headline
+    contributions {
+      contribution
+      author { name }
+    }
+    book_series {
+      position
+      details
+      series { name }
+    }
+  }
+}";
+        var body = new { query, variables = new { title } };
+        var response = await SendGraphQlAsync<BookResponse>(body, apiKey, ct).ConfigureAwait(false);
+        if (response?.Data?.Books is null) return null;
+
+        var loweredAuthor = author.ToLowerInvariant();
+        return response.Data.Books.FirstOrDefault(b =>
+            b.Contributions?.Any(c =>
+                c.Author?.Name != null &&
+                c.Author.Name.Contains(loweredAuthor, StringComparison.OrdinalIgnoreCase)) == true);
+    }
+
+    private static FileMetadata? MapBookToMetadata(BookResult book)
+    {
+        if (string.IsNullOrWhiteSpace(book.Title)) return null;
+
+        var meta = new FileMetadata
+        {
+            FileFormat = "Hardcover",
+            Title = book.Title,
+            Subtitle = book.Subtitle,
+            Description = book.Description
+        };
+
+        if (book.ReleaseYear.HasValue) meta.PublishYear = book.ReleaseYear;
+        if (book.ReleaseDate != null && DateTime.TryParse(book.ReleaseDate, out var dt))
+            meta.PublishDate = dt;
+
+        if (book.Contributions != null)
+        {
+            foreach (var c in book.Contributions)
+            {
+                if (c.Author?.Name is null) continue;
+                var mappedRole = NormalizeRole(c.Contribution);
+                if (mappedRole == "Author")
+                    meta.Authors.Add(c.Author.Name);
+                else if (mappedRole == "Narrator")
+                    meta.Narrators.Add(c.Author.Name);
+                else
+                    meta.ComicPeople.Add(new ComicPersonInfo { Name = c.Author.Name, Role = mappedRole });
+            }
+        }
+
+        if (book.BookSeries != null)
+        {
+            var primary = book.BookSeries.FirstOrDefault();
+            if (primary != null)
+            {
+                meta.SeriesName = primary.Series?.Name;
+                if (primary.Position.HasValue) meta.SeriesIndex = (float)primary.Position.Value;
+            }
+        }
+
+        return meta;
+    }
+
     public async Task<FileMetadata?> SearchByIsbnAsync(string isbn, string apiKey, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(apiKey)) return null;

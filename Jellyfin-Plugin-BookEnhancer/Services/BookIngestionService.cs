@@ -10,6 +10,7 @@ public class BookIngestionService
     private readonly MetadataEnrichmentService _enrichment;
     private readonly BookGroupingService _groupingService;
     private readonly LibraryOrganizationService _organization;
+    private readonly IFileMetadataWriter _writer;
     private readonly ILogger<BookIngestionService> _logger;
     private Func<string, Task>? _logCallback;
 
@@ -18,12 +19,14 @@ public class BookIngestionService
         MetadataEnrichmentService enrichment,
         BookGroupingService groupingService,
         LibraryOrganizationService organization,
+        IFileMetadataWriter writer,
         ILogger<BookIngestionService> logger)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
         _groupingService = groupingService;
         _organization = organization;
+        _writer = writer;
         _logger = logger;
     }
 
@@ -137,6 +140,13 @@ public class BookIngestionService
 
                 if (Config?.UnifiedMetadataEnabled == true)
                 {
+                    var beforeTitle = metadata.Title;
+                    var beforeAuthorCount = metadata.Authors.Count;
+                    var beforePublisher = metadata.Publisher;
+                    var beforeSeries = metadata.SeriesName;
+                    var beforeDescription = metadata.Description;
+                    var beforeGenreCount = metadata.Genres.Count;
+
                     var enriched = await _enrichment.EnrichAsync(
                         metadata,
                         Config.HardcoverApiKey,
@@ -144,9 +154,33 @@ public class BookIngestionService
                         Config.HardcoverEnabled,
                         Config.GoogleBooksEnabled,
                         Config.OpenLibraryEnabled,
-                        ct).ConfigureAwait(false);
+                        titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
+                        title: metadata.Title,
+                        author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
+                        ct: ct).ConfigureAwait(false);
 
                     metadata = enriched;
+
+                    if (!string.IsNullOrWhiteSpace(metadata.Isbn))
+                    {
+                        var titleChanged = metadata.Title != beforeTitle;
+                        var authorsChanged = metadata.Authors.Count > beforeAuthorCount;
+                        var publisherChanged = metadata.Publisher != beforePublisher;
+                        var seriesChanged = metadata.SeriesName != beforeSeries;
+                        var descriptionAdded = !string.IsNullOrWhiteSpace(metadata.Description) && string.IsNullOrWhiteSpace(beforeDescription);
+                        var genresAdded = metadata.Genres.Count > beforeGenreCount;
+
+                        if (!titleChanged && !authorsChanged && !publisherChanged && !seriesChanged && !descriptionAdded && !genresAdded)
+                        {
+                            result.EnrichmentFailures++;
+                            await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found").ConfigureAwait(false);
+                        }
+                    }
+                    else
+                    {
+                        result.EnrichmentFailures++;
+                        await LogWarningAsync($"ENRICHMENT FAILURE: {file} — no ISBN available for lookup").ConfigureAwait(false);
+                    }
                 }
 
                 var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
@@ -159,9 +193,15 @@ public class BookIngestionService
                 {
                     RegisterFile(targetPath, metadata, isPrimary: true);
                     result.FilesAdded++;
+
+                    if (dir.EnableMetadataWriting)
+                        await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
                 }
                 else if (moveResult.Skipped)
                 {
+                    if (dir.EnableMetadataWriting)
+                        await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
+
                     var existingGroup = !string.IsNullOrWhiteSpace(metadata.Isbn)
                         ? _groupingService.GetGroupByIsbn(metadata.Isbn)
                         : null;
@@ -227,4 +267,5 @@ public class IngestionResult
     public int FilesAdded { get; set; }
     public int FilesSkipped { get; set; }
     public int Errors { get; set; }
+    public int EnrichmentFailures { get; set; }
 }

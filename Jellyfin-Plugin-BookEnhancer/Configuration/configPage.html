@@ -735,6 +735,16 @@
                         '<div class="inputContainer">' +
                             '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
+                        '</div>' +
+                        '<div style="display:flex;gap:16px;margin-top:8px;">' +
+                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">' +
+                                '<input is="emby-checkbox" class="dir-title-author-search" type="checkbox" data-idx="' + idx + '"' + (dir.EnableTitleAuthorSearch !== false ? ' checked' : '') + ' />' +
+                                '<span>Title/Author Search</span>' +
+                            '</label>' +
+                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">' +
+                                '<input is="emby-checkbox" class="dir-metadata-write" type="checkbox" data-idx="' + idx + '"' + (dir.EnableMetadataWriting ? ' checked' : '') + ' />' +
+                                '<span>Write Metadata to Files</span>' +
+                            '</label>' +
                         '</div>';
 
                     container.appendChild(row);
@@ -825,13 +835,17 @@
                     var libInput = container.querySelector('.dir-library[data-idx="' + idx + '"]');
                     var enabledInput = container.querySelector('.dir-enabled[data-idx="' + idx + '"]');
                     var tmplInput = container.querySelector('.dir-template[data-idx="' + idx + '"]');
+                    var titleAuthorInput = container.querySelector('.dir-title-author-search[data-idx="' + idx + '"]');
+                    var metadataWriteInput = container.querySelector('.dir-metadata-write[data-idx="' + idx + '"]');
 
                     dirs.push({
                         SourcePath: sourceInput ? sourceInput.value : "",
                         LibraryPath: libInput ? libInput.value : "",
                         Enabled: enabledInput ? enabledInput.checked : true,
                         LibraryId: libSelect ? libSelect.value : "",
-                        OrganizeTemplate: tmplInput ? tmplInput.value : ""
+                        OrganizeTemplate: tmplInput ? tmplInput.value : "",
+                        EnableTitleAuthorSearch: titleAuthorInput ? titleAuthorInput.checked : true,
+                        EnableMetadataWriting: metadataWriteInput ? metadataWriteInput.checked : false
                     });
                 });
 
@@ -840,7 +854,7 @@
 
             document.getElementById("btnAddDirectory").addEventListener("click", function () {
                 var dirs = getCurrentDirectories();
-                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "" });
+                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false });
                 renderDirectories(dirs);
             });
 

@@ -17,6 +17,63 @@ public class OpenLibraryApiClient
         _logger = logger;
     }
 
+    public async Task<FileMetadata?> SearchByTitleAuthorAsync(string title, string author, CancellationToken ct = default)
+    {
+        try
+        {
+            var query = $"{BaseUrl}/search.json?q={Uri.EscapeDataString(title)}+{Uri.EscapeDataString(author)}&limit=5";
+
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+
+            var response = await client.GetFromJsonAsync<OlSearchResponse>(query, ct).ConfigureAwait(false);
+            var doc = response?.Docs?.FirstOrDefault();
+            if (doc is null) return null;
+
+            return MapSearchResult(doc);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "OpenLibrary title/author search failed for {Title} by {Author}", title, author);
+            return null;
+        }
+    }
+
+    private static FileMetadata? MapSearchResult(OlSearchDoc doc)
+    {
+        if (string.IsNullOrWhiteSpace(doc.Title)) return null;
+
+        var meta = new FileMetadata
+        {
+            FileFormat = "OpenLibrary",
+            Title = doc.Title,
+            Isbn = doc.Isbn?.FirstOrDefault(),
+            Publisher = doc.Publisher?.FirstOrDefault(),
+            PublishYear = doc.FirstPublishYear
+        };
+
+        if (doc.AuthorName != null)
+        {
+            foreach (var name in doc.AuthorName)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                    meta.Authors.Add(name);
+            }
+        }
+
+        if (doc.Subject != null)
+        {
+            foreach (var s in doc.Subject)
+            {
+                if (!string.IsNullOrWhiteSpace(s))
+                    meta.Genres.Add(s);
+            }
+        }
+
+        return meta;
+    }
+
     public async Task<FileMetadata?> SearchByIsbnAsync(string isbn, CancellationToken ct = default)
     {
         var cleanIsbn = CleanIsbn(isbn);
@@ -100,6 +157,33 @@ public class OpenLibraryApiClient
     {
         var cleaned = new string(isbn.Where(c => char.IsDigit(c) || c is 'X' or 'x').ToArray());
         return string.IsNullOrWhiteSpace(cleaned) ? null : cleaned;
+    }
+
+    private class OlSearchResponse
+    {
+        [JsonPropertyName("docs")]
+        public List<OlSearchDoc>? Docs { get; set; }
+    }
+
+    private class OlSearchDoc
+    {
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
+
+        [JsonPropertyName("author_name")]
+        public List<string>? AuthorName { get; set; }
+
+        [JsonPropertyName("isbn")]
+        public List<string>? Isbn { get; set; }
+
+        [JsonPropertyName("publisher")]
+        public List<string>? Publisher { get; set; }
+
+        [JsonPropertyName("first_publish_year")]
+        public int? FirstPublishYear { get; set; }
+
+        [JsonPropertyName("subject")]
+        public List<string>? Subject { get; set; }
     }
 
     private class OlBookEntry

@@ -12,6 +12,23 @@ public class LibraryCleanupService
     private readonly BookGroupingService _groupingService;
     private readonly IApplicationPaths _appPaths;
 
+    private static readonly HashSet<string> _imageExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".avif", ".svg"
+    };
+
+    private static readonly HashSet<string> _imageBaseNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "cover", "folder", "poster", "thumbnail", "thumb", "front", "back", "spine"
+    };
+
+    private static readonly HashSet<string> _sharedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".epub", ".pdf", ".mobi", ".azw3", ".djvu",
+        ".cbz", ".cbr", ".cb7",
+        ".mp3", ".m4a", ".m4b", ".m4p", ".flac", ".ogg", ".wma", ".opus", ".aiff", ".aac", ".wav"
+    };
+
     public LibraryCleanupService(
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
@@ -47,139 +64,110 @@ public class LibraryCleanupService
 
         var supportedExts = GetSupportedExtensions(config);
 
-        var totalFiles = 0;
-        var processed = 0;
-        var allFiles = new List<(string FilePath, ManagedSourceDirectory Dir)>();
+        var libraryGroups = dirs
+            .GroupBy(d => d.LibraryPath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
-        foreach (var dir in dirs)
+        var grandTotal = 0;
+        var grandProcessed = 0;
+
+        foreach (var libGroup in libraryGroups)
         {
-            if (!Directory.Exists(dir.LibraryPath))
+            var libraryRoot = libGroup.Key;
+            ct.ThrowIfCancellationRequested();
+
+            if (!Directory.Exists(libraryRoot))
             {
-                await logCallback($"Library path does not exist, skipping: {dir.LibraryPath}").ConfigureAwait(false);
+                await logCallback($"[{libraryRoot}] Path does not exist, skipping.").ConfigureAwait(false);
                 continue;
             }
 
-            var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
-                .Where(f => supportedExts.Contains(Path.GetExtension(f)))
+            var libFiles = libGroup
+                .SelectMany(d => Directory.EnumerateFiles(d.LibraryPath, "*", SearchOption.AllDirectories)
+                    .Where(f => supportedExts.Contains(Path.GetExtension(f))))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            totalFiles += files.Count;
-            allFiles.AddRange(files.Select(f => (f, dir)));
-        }
-
-        await logCallback($"Found {totalFiles} files to check across {dirs.Count} directories.").ConfigureAwait(false);
-        progress.Report(0.0);
-
-        var enrichmentQueue = new List<(string FilePath, ManagedSourceDirectory Dir, FileMetadata Metadata)>();
-
-        foreach (var (file, dir) in allFiles)
-        {
-            if (ct.IsCancellationRequested)
+            if (libFiles.Count == 0)
             {
-                await logCallback("Cleanup cancelled.").ConfigureAwait(false);
-                break;
+                await logCallback($"[{libraryRoot}] No files found.").ConfigureAwait(false);
+                await CleanupNonBookDirectories(libGroup, result, logCallback, ct).ConfigureAwait(false);
+                continue;
             }
 
-            processed++;
+            grandTotal += libFiles.Count;
+            var libResult = new CleanupResult();
+            var libLabel = Path.GetFileName(libraryRoot.TrimEnd(Path.DirectorySeparatorChar, Path.PathSeparator));
 
-            try
+            await logCallback($"[{libLabel}] Scanning {libFiles.Count} files for metadata...").ConfigureAwait(false);
+
+            var fileData = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
+            var enrichmentQueue = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
+
+            foreach (var file in libFiles)
             {
-                var metadata = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
-                if (metadata is null)
-                    metadata = CreateMinimalMetadata(file);
-
-                var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
-                    ? "{Author}/{Series}/{Title}"
-                    : dir.OrganizeTemplate;
-
-                if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
-                {
-                    enrichmentQueue.Add((file, dir, metadata));
-                    continue;
-                }
-
-                var expectedPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
-
-                if (string.Equals(file, expectedPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    result.FilesSkipped++;
-                    continue;
-                }
-
-                var dirToClean = Path.GetDirectoryName(file);
-
-                var moveResult = await _organization.MoveFile(file, expectedPath, copy: false, logCallback).ConfigureAwait(false);
-                if (moveResult.Success)
-                {
-                    result.FilesMoved++;
-                    await logCallback($"Moved: {file} -> {expectedPath}").ConfigureAwait(false);
-
-                    _groupingService.UpdateFormatPath(file, expectedPath);
-
-                    await CleanupEmptyDirectories(dirToClean, result, logCallback).ConfigureAwait(false);
-                }
-                else if (moveResult.Skipped)
-                {
-                    result.FilesSkipped++;
-                }
-                else
-                {
-                    await logCallback($"Failed to move {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
-                    result.Errors++;
-                }
-            }
-            catch (Exception ex)
-            {
-                await logCallback($"Error processing {file}: {ex.Message}").ConfigureAwait(false);
-                result.Errors++;
-            }
-
-            if (totalFiles > 0)
-                progress.Report((double)processed / totalFiles);
-        }
-
-        var enrichmentIssues = new List<string>();
-
-        if (enrichmentQueue.Count > 0)
-        {
-            await logCallback($"Metadata missing for {enrichmentQueue.Count} files. Starting enrichment pass...").ConfigureAwait(false);
-
-            foreach (var (file, dir, rawMetadata) in enrichmentQueue)
-            {
-                if (ct.IsCancellationRequested)
-                {
-                    await logCallback("Enrichment pass cancelled.").ConfigureAwait(false);
-                    break;
-                }
+                ct.ThrowIfCancellationRequested();
 
                 try
                 {
-                    var enriched = await _enrichment.EnrichAsync(
-                        rawMetadata,
-                        config.HardcoverApiKey,
-                        config.GoogleBooksApiKey,
-                        config.HardcoverEnabled,
-                        config.GoogleBooksEnabled,
-                        config.OpenLibraryEnabled,
-                        ct).ConfigureAwait(false);
+                    var metadata = await _fileExtractor.ExtractAsync(file, ct).ConfigureAwait(false);
+                    if (metadata is null)
+                        metadata = CreateMinimalMetadata(file);
+
+                    var dir = libGroup
+                        .Where(d => file.StartsWith(d.LibraryPath, StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(d => d.LibraryPath.Length)
+                        .First();
 
                     var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
                         ? "{Author}/{Series}/{Title}"
                         : dir.OrganizeTemplate;
 
-                    if (NeedsEnrichment(enriched, template))
+                    if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
                     {
-                        enrichmentIssues.Add(file);
-                        result.FilesSkipped++;
-                        await logCallback($"Enrichment could not resolve template fields, skipped: {file}").ConfigureAwait(false);
-                        continue;
+                        enrichmentQueue.Add((file, metadata, dir, template));
                     }
+                    else
+                    {
+                        fileData.Add((file, metadata, dir, template));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await logCallback($"[{libLabel}] Error reading {file}: {ex.Message}").ConfigureAwait(false);
+                    libResult.Errors++;
+                }
+            }
 
-                    var expectedPath = _organization.BuildTargetPath(dir.LibraryPath, enriched, template);
+            var duplicateIndex = BuildDuplicateIndex(fileData);
+
+            var processed = 0;
+
+            foreach (var (file, metadata, dir, template) in fileData)
+            {
+                ct.ThrowIfCancellationRequested();
+                processed++;
+
+                try
+                {
+                    var expectedPath = _organization.BuildTargetPath(libraryRoot, metadata, template);
 
                     if (string.Equals(file, expectedPath, StringComparison.OrdinalIgnoreCase))
                     {
-                        result.FilesSkipped++;
+                        libResult.FilesSkipped++;
+                        continue;
+                    }
+
+                    var dup = FindDuplicate(file, metadata, duplicateIndex);
+                    if (dup is not null)
+                    {
+                        File.Delete(file);
+                        libResult.DuplicatesFound++;
+                        await logCallback($"[{libLabel}] Duplicate of {dup}, removed: {file}").ConfigureAwait(false);
+
+                        var dupDir = Path.GetDirectoryName(file);
+                        await MoveCompanionImagesAsync(dupDir, Path.GetDirectoryName(expectedPath), logCallback).ConfigureAwait(false);
+                        await CleanupEmptyDirectories(dupDir, libResult, logCallback).ConfigureAwait(false);
                         continue;
                     }
 
@@ -188,52 +176,338 @@ public class LibraryCleanupService
 
                     if (moveResult.Success)
                     {
-                        result.FilesMoved++;
-                        await logCallback($"Moved (enriched): {file} -> {expectedPath}").ConfigureAwait(false);
+                        libResult.FilesMoved++;
+                        await logCallback($"[{libLabel}] Moved: {file} -> {expectedPath}").ConfigureAwait(false);
                         _groupingService.UpdateFormatPath(file, expectedPath);
-                        await CleanupEmptyDirectories(dirToClean, result, logCallback).ConfigureAwait(false);
+
+                        var targetDir = Path.GetDirectoryName(expectedPath);
+                        await MoveCompanionImagesAsync(dirToClean, targetDir, logCallback).ConfigureAwait(false);
+                        await CleanupEmptyDirectories(dirToClean, libResult, logCallback).ConfigureAwait(false);
                     }
                     else if (moveResult.Skipped)
                     {
-                        result.FilesSkipped++;
+                        libResult.FilesSkipped++;
                     }
                     else
                     {
-                        await logCallback($"Failed to move (enriched) {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
-                        result.Errors++;
+                        await logCallback($"[{libLabel}] Failed to move {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
+                        libResult.Errors++;
                     }
                 }
                 catch (Exception ex)
                 {
-                    await logCallback($"Error enriching {file}: {ex.Message}").ConfigureAwait(false);
-                    result.Errors++;
+                    await logCallback($"[{libLabel}] Error processing {file}: {ex.Message}").ConfigureAwait(false);
+                    libResult.Errors++;
                 }
+
+                grandProcessed++;
+                if (grandTotal > 0)
+                    progress.Report((double)grandProcessed / grandTotal);
             }
 
-            if (enrichmentIssues.Count > 0)
+            if (enrichmentQueue.Count > 0)
             {
-                var appPaths = _appPaths;
-                if (appPaths is not null)
+                await logCallback($"[{libLabel}] Enriching {enrichmentQueue.Count} files...").ConfigureAwait(false);
+                var enrichmentIssues = new List<string>();
+
+                foreach (var (file, rawMetadata, dir, template) in enrichmentQueue)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        var enriched = await _enrichment.EnrichAsync(
+                            rawMetadata,
+                            config.HardcoverApiKey,
+                            config.GoogleBooksApiKey,
+                            config.HardcoverEnabled,
+                            config.GoogleBooksEnabled,
+                            config.OpenLibraryEnabled,
+                            titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
+                            title: rawMetadata.Title,
+                            author: rawMetadata.Authors.Count > 0 ? rawMetadata.Authors[0] : null,
+                            ct: ct).ConfigureAwait(false);
+
+                        if (NeedsEnrichment(enriched, template))
+                        {
+                            enrichmentIssues.Add(file);
+                            libResult.FilesSkipped++;
+                            await logCallback($"[{libLabel}] Enrichment could not resolve fields, skipped: {file}").ConfigureAwait(false);
+                            continue;
+                        }
+
+                        var expectedPath = _organization.BuildTargetPath(libraryRoot, enriched, template);
+
+                        if (string.Equals(file, expectedPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            libResult.FilesSkipped++;
+                            continue;
+                        }
+
+                        var dup = FindDuplicate(file, enriched, duplicateIndex);
+                        if (dup is not null)
+                        {
+                            File.Delete(file);
+                            libResult.DuplicatesFound++;
+                            await logCallback($"[{libLabel}] Duplicate (enriched) of {dup}, removed: {file}").ConfigureAwait(false);
+
+                            var dupDir = Path.GetDirectoryName(file);
+                            await MoveCompanionImagesAsync(dupDir, Path.GetDirectoryName(expectedPath), logCallback).ConfigureAwait(false);
+                            await CleanupEmptyDirectories(dupDir, libResult, logCallback).ConfigureAwait(false);
+                            continue;
+                        }
+
+                        var dirToClean = Path.GetDirectoryName(file);
+                        var moveResult = await _organization.MoveFile(file, expectedPath, copy: false, logCallback).ConfigureAwait(false);
+
+                        if (moveResult.Success)
+                        {
+                            libResult.FilesMoved++;
+                            await logCallback($"[{libLabel}] Moved (enriched): {file} -> {expectedPath}").ConfigureAwait(false);
+                            _groupingService.UpdateFormatPath(file, expectedPath);
+
+                            var targetDir = Path.GetDirectoryName(expectedPath);
+                            await MoveCompanionImagesAsync(dirToClean, targetDir, logCallback).ConfigureAwait(false);
+                            await CleanupEmptyDirectories(dirToClean, libResult, logCallback).ConfigureAwait(false);
+                        }
+                        else if (moveResult.Skipped)
+                        {
+                            libResult.FilesSkipped++;
+                        }
+                        else
+                        {
+                            await logCallback($"[{libLabel}] Failed to move (enriched) {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
+                            libResult.Errors++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        await logCallback($"[{libLabel}] Error enriching {file}: {ex.Message}").ConfigureAwait(false);
+                        libResult.Errors++;
+                    }
+
+                    grandProcessed++;
+                    if (grandTotal > 0)
+                        progress.Report((double)grandProcessed / grandTotal);
+                }
+
+                if (enrichmentIssues.Count > 0 && _appPaths is not null)
                 {
                     var summaryPath = Path.Combine(
-                        appPaths.LogDirectoryPath,
+                        _appPaths.LogDirectoryPath,
                         $"log_LibraryCleanup-{DateTime.Now:yyyyMMdd}-enrichment-issues.log");
                     await File.WriteAllLinesAsync(summaryPath, enrichmentIssues, ct).ConfigureAwait(false);
-                    await logCallback($"Wrote enrichment issues log ({enrichmentIssues.Count} files): {summaryPath}").ConfigureAwait(false);
+                    await logCallback($"[{libLabel}] Wrote enrichment issues log ({enrichmentIssues.Count} files): {summaryPath}").ConfigureAwait(false);
                 }
+
+                await logCallback($"[{libLabel}] Enrichment pass complete — {enrichmentQueue.Count} processed, {enrichmentIssues.Count} unresolved.").ConfigureAwait(false);
             }
 
-            await logCallback($"Enrichment pass complete — {enrichmentQueue.Count} files processed, {enrichmentIssues.Count} skipped due to unresolved fields.").ConfigureAwait(false);
+            await CleanupNonBookDirectories(libGroup, libResult, logCallback, ct).ConfigureAwait(false);
+
+            await logCallback(
+                $"[{libLabel}] Library complete — " +
+                $"Moved: {libResult.FilesMoved}, Skipped: {libResult.FilesSkipped}, " +
+                $"Errors: {libResult.Errors}, Duplicates: {libResult.DuplicatesFound}, " +
+                $"Empty dirs: {libResult.EmptyDirectoriesRemoved}, " +
+                $"Non-book dirs: {libResult.NonBookDirectoriesRemoved}").ConfigureAwait(false);
+
+            result.FilesMoved += libResult.FilesMoved;
+            result.FilesSkipped += libResult.FilesSkipped;
+            result.Errors += libResult.Errors;
+            result.DuplicatesFound += libResult.DuplicatesFound;
+            result.EmptyDirectoriesRemoved += libResult.EmptyDirectoriesRemoved;
+            result.NonBookDirectoriesRemoved += libResult.NonBookDirectoriesRemoved;
         }
 
         await logCallback(
-            $"Cleanup complete — Checked: {totalFiles}, Moved: {result.FilesMoved}, " +
-            $"Already correct: {result.FilesSkipped}, Errors: {result.Errors}, " +
-            $"Empty dirs removed: {result.EmptyDirectoriesRemoved}").ConfigureAwait(false);
+            $"Cleanup complete — Libraries: {libraryGroups.Count}, " +
+            $"Moved: {result.FilesMoved}, Skipped: {result.FilesSkipped}, " +
+            $"Errors: {result.Errors}, Duplicates: {result.DuplicatesFound}, " +
+            $"Empty dirs removed: {result.EmptyDirectoriesRemoved}, " +
+            $"Non-book dirs removed: {result.NonBookDirectoriesRemoved}").ConfigureAwait(false);
         await logCallback("IMPORTANT: Run a Jellyfin library scan to re-link moved files to library items.").ConfigureAwait(false);
 
         progress.Report(1.0);
         return result;
+    }
+
+    private Dictionary<string, List<(long Size, string Path, string Title, string Author)>> BuildDuplicateIndex(
+        List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)> fileData)
+    {
+        var index = new Dictionary<string, List<(long Size, string Path, string Title, string Author)>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (path, metadata, _, _) in fileData)
+        {
+            var ext = Path.GetExtension(path);
+            var size = new FileInfo(path).Length;
+            var title = NormalizeString(metadata.Title);
+            var author = metadata.Authors.Count > 0 ? NormalizeString(metadata.Authors[0]) : string.Empty;
+
+            if (!index.TryGetValue(ext, out var list))
+            {
+                list = new List<(long, string, string, string)>();
+                index[ext] = list;
+            }
+
+            list.Add((size, path, title, author));
+        }
+
+        return index;
+    }
+
+    private static string? FindDuplicate(
+        string sourcePath,
+        FileMetadata metadata,
+        Dictionary<string, List<(long Size, string Path, string Title, string Author)>> index)
+    {
+        var ext = Path.GetExtension(sourcePath);
+        if (!index.TryGetValue(ext, out var candidates))
+            return null;
+
+        var sourceSize = new FileInfo(sourcePath).Length;
+        var sourceTitle = NormalizeString(metadata.Title);
+        var sourceAuthor = metadata.Authors.Count > 0 ? NormalizeString(metadata.Authors[0]) : string.Empty;
+
+        foreach (var (size, path, title, author) in candidates)
+        {
+            if (string.Equals(path, sourcePath, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (size != sourceSize)
+                continue;
+
+            if (!string.IsNullOrWhiteSpace(sourceTitle) &&
+                !string.IsNullOrWhiteSpace(title) &&
+                string.Equals(title, sourceTitle, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(author, sourceAuthor, StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+        }
+
+        return null;
+    }
+
+    private static string NormalizeString(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        var normalized = value.Trim().ToLowerInvariant();
+
+        var result = new System.Text.StringBuilder(normalized.Length);
+        var prevWasSpace = false;
+        foreach (var c in normalized)
+        {
+            if (char.IsWhiteSpace(c))
+            {
+                if (!prevWasSpace)
+                    result.Append(' ');
+                prevWasSpace = true;
+            }
+            else
+            {
+                result.Append(c);
+                prevWasSpace = false;
+            }
+        }
+
+        return result.ToString().Trim();
+    }
+
+    private async Task CleanupNonBookDirectories(
+        IEnumerable<ManagedSourceDirectory> libraryDirs,
+        CleanupResult result,
+        Func<string, Task> logCallback,
+        CancellationToken ct)
+    {
+        var supportedExts = GetSupportedExtensions(Config);
+
+        foreach (var dir in libraryDirs)
+        {
+            if (string.IsNullOrWhiteSpace(dir.SourcePath) || !Directory.Exists(dir.SourcePath))
+                continue;
+
+            try
+            {
+                var allDirs = Directory.GetDirectories(dir.SourcePath, "*", SearchOption.AllDirectories);
+                Array.Sort(allDirs, (a, b) => b.Length.CompareTo(a.Length));
+
+                foreach (var subDir in allDirs)
+                {
+                    ct.ThrowIfCancellationRequested();
+
+                    var hasBookFile = Directory.EnumerateFiles(subDir)
+                        .Any(f => supportedExts.Contains(Path.GetExtension(f)));
+
+                    if (!hasBookFile)
+                    {
+                        foreach (var file in Directory.EnumerateFiles(subDir, "*", SearchOption.AllDirectories))
+                        {
+                            await logCallback($"  Deleting file: {file}").ConfigureAwait(false);
+                        }
+
+                        Directory.Delete(subDir, recursive: true);
+                        result.NonBookDirectoriesRemoved++;
+                        await logCallback($"Removed non-book directory: {subDir}").ConfigureAwait(false);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await logCallback($"Failed to cleanup non-book directories under {dir.SourcePath}: {ex.Message}").ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task MoveCompanionImagesAsync(string? sourceDir, string? targetDir, Func<string, Task> logCallback)
+    {
+        if (string.IsNullOrWhiteSpace(sourceDir) || string.IsNullOrWhiteSpace(targetDir) || !Directory.Exists(sourceDir))
+            return;
+
+        if (sourceDir == targetDir)
+            return;
+
+        try
+        {
+            foreach (var imagePath in Directory.EnumerateFiles(sourceDir))
+            {
+                var ext = Path.GetExtension(imagePath);
+                if (!_imageExtensions.Contains(ext)) continue;
+
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(imagePath);
+
+                if (!_imageBaseNames.Contains(nameWithoutExt) && !nameWithoutExt.Contains("cover", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var targetPath = Path.Combine(targetDir, Path.GetFileName(imagePath));
+
+                if (File.Exists(targetPath))
+                {
+                    var sourceInfo = new FileInfo(imagePath);
+                    var targetInfo = new FileInfo(targetPath);
+                    if (sourceInfo.Exists && targetInfo.Exists && sourceInfo.Length == targetInfo.Length)
+                    {
+                        File.Delete(imagePath);
+                        await logCallback($"  Removed stale companion image (already at target): {imagePath}").ConfigureAwait(false);
+                    }
+                    continue;
+                }
+
+                Directory.CreateDirectory(targetDir);
+                File.Move(imagePath, targetPath);
+                await logCallback($"  Moved companion image: {imagePath} -> {targetPath}").ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await logCallback($"Failed to move companion images from {sourceDir}: {ex.Message}").ConfigureAwait(false);
+        }
     }
 
     private async Task CleanupEmptyDirectories(string? startPath, CleanupResult result, Func<string, Task> logCallback)
@@ -295,11 +569,15 @@ public class LibraryCleanupService
                 }
             }
         }
+
         return tokens;
     }
 
-    private static HashSet<string> GetSupportedExtensions(PluginConfiguration config)
+    private static HashSet<string> GetSupportedExtensions(PluginConfiguration? config)
     {
+        if (config is null)
+            return new HashSet<string>(_sharedExtensions, StringComparer.OrdinalIgnoreCase);
+
         if (config.IngestionFileExtensions is null || config.IngestionFileExtensions.Count == 0)
         {
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -329,5 +607,7 @@ public class CleanupResult
     public int FilesMoved { get; set; }
     public int FilesSkipped { get; set; }
     public int Errors { get; set; }
+    public int DuplicatesFound { get; set; }
     public int EmptyDirectoriesRemoved { get; set; }
+    public int NonBookDirectoriesRemoved { get; set; }
 }

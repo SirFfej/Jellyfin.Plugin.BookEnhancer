@@ -25,6 +25,7 @@ public class IngestionController : ControllerBase
             FilesFound = result.FilesFound,
             FilesAdded = result.FilesAdded,
             FilesSkipped = result.FilesSkipped,
+            EnrichmentFailures = result.EnrichmentFailures,
             Errors = result.Errors
         });
     }
