@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using Microsoft.Extensions.Logging;
@@ -17,7 +19,13 @@ public class MetronApiClient
         _logger = logger;
     }
 
-    public async Task<List<MetronSearchResult>> SearchIssuesAsync(string seriesName, string issueNumber, string apiKey, CancellationToken ct = default)
+    private static AuthenticationHeaderValue BasicAuthHeader(string username, string password)
+    {
+        var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
+        return new AuthenticationHeaderValue("Basic", credentials);
+    }
+
+    public async Task<List<MetronSearchResult>> SearchIssuesAsync(string seriesName, string issueNumber, string username, string password, CancellationToken ct = default)
     {
         try
         {
@@ -26,7 +34,7 @@ public class MetronApiClient
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Token", apiKey);
+            client.DefaultRequestHeaders.Authorization = BasicAuthHeader(username, password);
 
             var response = await client.GetFromJsonAsync<MetronListResponse>(url, ct).ConfigureAwait(false);
             if (response?.Results is null) return [];
@@ -43,7 +51,7 @@ public class MetronApiClient
         }
     }
 
-    public async Task<FileMetadata?> GetIssueDetailAsync(int issueId, string apiKey, CancellationToken ct = default)
+    public async Task<FileMetadata?> GetIssueDetailAsync(int issueId, string username, string password, CancellationToken ct = default)
     {
         try
         {
@@ -51,7 +59,7 @@ public class MetronApiClient
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Token", apiKey);
+            client.DefaultRequestHeaders.Authorization = BasicAuthHeader(username, password);
 
             var response = await client.GetFromJsonAsync<MetronIssueDetail>(url, ct).ConfigureAwait(false);
             return response is not null ? MapIssueDetail(response) : null;

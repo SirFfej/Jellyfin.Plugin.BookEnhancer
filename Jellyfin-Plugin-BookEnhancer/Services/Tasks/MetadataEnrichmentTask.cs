@@ -51,7 +51,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                 return;
             }
 
-            if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled && !config.MetronEnabled && !config.VerseDbEnabled))
+            if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled && !config.MetronEnabled && !config.VerseDbEnabled && !config.GrandComicsDbEnabled))
             {
                 logger.LogWarning("Online enrichment is disabled in plugin configuration");
                 return;
@@ -98,8 +98,9 @@ public class MetadataEnrichmentTask : IScheduledTask
                 $"Google Books: {(config.GoogleBooksEnabled ? "enabled" : "disabled")}, " +
                 $"OpenLibrary: {(config.OpenLibraryEnabled ? "enabled" : "disabled")}, " +
                 $"Comic Vine: {(config.ComicVineEnabled && !string.IsNullOrWhiteSpace(config.ComicVineApiKey) ? "enabled" : "disabled")}, " +
-                $"Metron: {(config.MetronEnabled && !string.IsNullOrWhiteSpace(config.MetronApiKey) ? "enabled" : "disabled")}, " +
-                $"VerseDB: {(config.VerseDbEnabled && !string.IsNullOrWhiteSpace(config.VerseDbApiKey) ? "enabled" : "disabled")}");
+                $"Metron: {(config.MetronEnabled && !string.IsNullOrWhiteSpace(config.MetronUsername) && !string.IsNullOrWhiteSpace(config.MetronPassword) ? "enabled" : "disabled")}, " +
+                $"VerseDB: {(config.VerseDbEnabled && !string.IsNullOrWhiteSpace(config.VerseDbApiKey) ? "enabled" : "disabled")}, " +
+                $"GrandComicsDb: {(config.GrandComicsDbEnabled && !string.IsNullOrWhiteSpace(config.GrandComicsDbUsername) && !string.IsNullOrWhiteSpace(config.GrandComicsDbPassword) ? "enabled" : "disabled")}");
 
             summaryBuffer.AppendLine("=== Metadata Enrichment Report ===");
             summaryBuffer.AppendLine($"Started: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
@@ -148,9 +149,13 @@ public class MetadataEnrichmentTask : IScheduledTask
                         comicVineEnabled: config.ComicVineEnabled,
                         comicVineApiKey: config.ComicVineApiKey ?? "",
                         metronEnabled: config.MetronEnabled,
-                        metronApiKey: config.MetronApiKey ?? "",
+                        metronUsername: config.MetronUsername ?? "",
+                        metronPassword: config.MetronPassword ?? "",
                         versedbEnabled: config.VerseDbEnabled,
                         versedbApiKey: config.VerseDbApiKey ?? "",
+                        grandComicsDbEnabled: config.GrandComicsDbEnabled,
+                        grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
+                        grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
                         ct: cancellationToken).ConfigureAwait(false);
 
                     var enrichedMeta = result.Metadata;

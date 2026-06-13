@@ -13,9 +13,13 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool ComicVineEnabled { get; set; } = false;
     public string ComicVineApiKey { get; set; } = string.Empty;
     public bool MetronEnabled { get; set; } = false;
-    public string MetronApiKey { get; set; } = string.Empty;
+    public string MetronUsername { get; set; } = string.Empty;
+    public string MetronPassword { get; set; } = string.Empty;
     public bool VerseDbEnabled { get; set; } = false;
     public string VerseDbApiKey { get; set; } = string.Empty;
+    public bool GrandComicsDbEnabled { get; set; } = false;
+    public string GrandComicsDbUsername { get; set; } = string.Empty;
+    public string GrandComicsDbPassword { get; set; } = string.Empty;
     public double MatchThreshold { get; set; } = 0.85;
 
     public bool EnableFormatGrouping { get; set; } = true;

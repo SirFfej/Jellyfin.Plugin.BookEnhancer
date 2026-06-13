@@ -91,6 +91,38 @@ public class ConfigController : ControllerBase
         }
     }
 
+    [HttpPost("TestGrandComicsDb")]
+    public async Task<ActionResult<TestResult>> TestGrandComicsDb([FromBody] TestBasicAuthRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            return Ok(new TestResult { Success = false, Message = "Username and password required." });
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(20);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{request.Username}:{request.Password}"));
+            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", credentials);
+
+            var resp = await client.GetAsync("https://www.comics.org/api/series/name/Batman/", ct).ConfigureAwait(false);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Grand Comics Database API test succeeded");
+                return Ok(new TestResult { Success = true, Message = "GCD credentials are valid." });
+            }
+
+            _logger.LogWarning("GCD API test failed: {StatusCode}", resp.StatusCode);
+            return Ok(new TestResult { Success = false, Message = $"GCD API returned {resp.StatusCode}. Check credentials." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GCD API test connection failed");
+            return Ok(new TestResult { Success = false, Message = $"Connection failed: {ex.Message}" });
+        }
+    }
+
     [HttpPost("TestConnectivity")]
     public async Task<ActionResult<ConnectivityResult>> TestConnectivity(CancellationToken ct)
     {
@@ -196,7 +228,7 @@ public class ConfigController : ControllerBase
         try
         {
             using var vdClient = _httpClientFactory.CreateClient();
-            vdClient.Timeout = TimeSpan.FromSeconds(10);
+            vdClient.Timeout = TimeSpan.FromSeconds(20);
             vdClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
             var vdResp = await vdClient.GetAsync("https://versedb.com/api", ct).ConfigureAwait(false);
             vdResult.Reachable = true;
@@ -208,6 +240,24 @@ public class ConfigController : ControllerBase
             vdResult.Error = ex.GetType().Name + ": " + ex.Message;
         }
         results.Add(vdResult);
+
+        // Grand Comics Database
+        var gcdResult = new ServiceConnectivity { Name = "Grand Comics Database", Url = "https://www.comics.org/api/issue/1033778/" };
+        try
+        {
+            using var gcdClient = _httpClientFactory.CreateClient();
+            gcdClient.Timeout = TimeSpan.FromSeconds(20);
+            gcdClient.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+            var gcdResp = await gcdClient.GetAsync("https://www.comics.org/api/issue/1033778/", ct).ConfigureAwait(false);
+            gcdResult.Reachable = true;
+            gcdResult.StatusCode = (int)gcdResp.StatusCode;
+        }
+        catch (Exception ex)
+        {
+            gcdResult.Reachable = false;
+            gcdResult.Error = ex.GetType().Name + ": " + ex.Message;
+        }
+        results.Add(gcdResult);
 
         return Ok(new ConnectivityResult { Results = results });
     }
@@ -261,6 +311,15 @@ public class TestKeyRequest
 {
     [JsonPropertyName("apiKey")]
     public string? ApiKey { get; set; }
+}
+
+public class TestBasicAuthRequest
+{
+    [JsonPropertyName("username")]
+    public string? Username { get; set; }
+
+    [JsonPropertyName("password")]
+    public string? Password { get; set; }
 }
 
 public class TestResult

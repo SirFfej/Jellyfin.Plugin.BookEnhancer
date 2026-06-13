@@ -25,6 +25,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddTransient<ComicVineApiClient>();
         serviceCollection.AddTransient<MetronApiClient>();
         serviceCollection.AddTransient<VerseDbApiClient>();
+        serviceCollection.AddTransient<GrandComicsDbApiClient>();
         serviceCollection.AddSingleton<MetadataEnrichmentService>();
 
         serviceCollection.AddSingleton<BookGroupingService>(sp =>

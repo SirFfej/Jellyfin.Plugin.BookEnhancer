@@ -9,6 +9,22 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.7.0.4 - Fix: GCD CoverUrl now populated from API response (was only setting HasCover=true). Fix: GCD test button JSON key casing mismatch (Username/Password → username/password) causing test to always fail. Fix: Metron auth changed from Bearer token to HTTP Basic Auth (username/password). Logging cleanup: GrandComicsDB → GrandComicsDb. Removed 5 unused GCD DTO fields. Build: 0W/0E.",
+        "checksum": "95e7041c71785f0a4c2c8df242b468f6",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.4/Jellyfin.Plugin.BookEnhancer_0.7.0.4.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.7.0.4"
+      },
+      {
+        "changelog": "v0.7.0.3 - Grand Comics Database API integration: new GrandComicsDbApiClient searches issues by series name + issue number via GCD's issue search endpoint (GET /api/series/name/{name}/issue/{number}/). Returns creative team credits, characters, cover art, publisher, and cover date. GCD added as 4th comic cascade tier (Comic Vine -> Metron -> VerseDB -> GCD), used only when previous tiers return nothing. Config page adds GCD toggle, username, and password fields. Connectivity test covers all 7 services. Build: 0W/0E.",
+        "checksum": "8681aab6780a4f6c8aed4cc2c48d0a91",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.3/Jellyfin.Plugin.BookEnhancer_0.7.0.3.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.7.0.3"
+      },
+      {
         "changelog": "v0.7.0.2 - Comic filename fallback: when ComicInfo.xml is missing or unreadable (e.g. RAR5 CBRs), SeriesName, SeriesNumber, and PublishYear are parsed from common filename patterns (e.g. 'All New X-Men 014 (2013)'). Comic files no longer require an ISBN to reach the enrichment cascade — filename-parsed series+issue now triggers Comic Vine / Metron / VerseDB search. MetadataEnrichmentTask skips ISBN gate for comic formats. Build: 0W/0E.",
         "checksum": "86d0361f7baed866ebb36c64a6e19d3f",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.7.0.2/Jellyfin.Plugin.BookEnhancer_0.7.0.2.zip",

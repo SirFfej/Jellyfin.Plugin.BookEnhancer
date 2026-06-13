@@ -249,7 +249,7 @@
                     <h4 style="font-size:1em;margin:10px 0 3px;">Metron</h4>
                     <p class="fieldDescription">
                         Community-run comic database alternative to Comic Vine. Provides creative team credits,
-                        characters, cover art, and publisher info. Free API token required.
+                        characters, cover art, and publisher info. Uses HTTP Basic Auth with your Metron account credentials.
                     </p>
 
                     <div class="checkboxContainer">
@@ -261,16 +261,20 @@
 
                     <div class="inputContainer" style="margin-top:8px;">
                         <div style="display:flex;gap:8px;align-items:center;">
-                            <input is="emby-input" id="txtMetronApiKey" type="password"
-                                   label="Metron API Token" style="flex:1;" />
+                            <input is="emby-input" id="txtMetronUsername" type="text"
+                                   label="Metron Username (email)" style="flex:1;" />
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+                            <input is="emby-input" id="txtMetronPassword" type="password"
+                                   label="Metron Password" style="flex:1;" />
                         </div>
                         <div id="testMetronResult" class="be-test-result" style="display:none;"></div>
                         <div class="fieldDescription">
-                            Paste your Metron API token here.
+                            Enter your Metron account credentials (username/email and password).
                             <a href="https://metron.cloud/accounts/signup/" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
                                 Sign up at Metron
                             </a>
-                            — create an account, then go to your profile settings to get an API token.
+                            — create a free account, then enter your credentials here.
                         </div>
                     </div>
 
@@ -307,12 +311,49 @@
 
                     <hr style="margin:15px 0;" />
 
+                    <h4 style="font-size:1em;margin:10px 0 3px;">Grand Comics Database</h4>
+                    <p class="fieldDescription">
+                        Open comic database with comprehensive creative team credits, characters, cover art,
+                        and publisher info. CC-licensed data, 2M+ issues. Used as final fallback in the comic cascade.
+                        Free account required for higher rate limits (2000/day vs 30/hr anonymous).
+                    </p>
+
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" id="chkGrandComicsDbEnabled" type="checkbox" />
+                            <span>Enable Grand Comics Database metadata lookup</span>
+                        </label>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtGrandComicsDbUsername" type="text"
+                                   label="GCD Username" style="flex:1;" />
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
+                            <input is="emby-input" id="txtGrandComicsDbPassword" type="password"
+                                   label="GCD Password" style="flex:1;" />
+                            <button is="emby-button" id="btnTestGrandComicsDb" type="button" class="raised"
+                                    style="white-space:nowrap;flex-shrink:0;">Test</button>
+                        </div>
+                        <div id="testGrandComicsDbResult" class="be-test-result" style="display:none;"></div>
+                        <div class="fieldDescription">
+                            Enter your comics.org account credentials. GCD uses HTTP Basic Auth for API access.
+                            <a href="https://www.comics.org/accounts/register/" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
+                                Sign up at comics.org
+                            </a>
+                            — free account raises rate limit from 30/hr to 2000/day.
+                        </div>
+                    </div>
+
+                    <hr style="margin:15px 0;" />
+
                     <div style="margin-top:8px;">
                         <button is="emby-button" id="btnTestConnectivity" type="button" class="raised"
                                 style="white-space:nowrap;">Test Enrichment Connectivity</button>
                         <div class="fieldDescription" style="margin-top:4px;">
                             Checks whether this server can reach Hardcover, Google Books, OpenLibrary,
-                            Comic Vine, Metron, and VerseDB. Useful for diagnosing network issues.
+                            Comic Vine, Metron, VerseDB, and Grand Comics Database. Useful for diagnosing network issues.
                         </div>
                         <div id="testConnectivityResult" class="be-test-result" style="display:none;"></div>
                     </div>
@@ -606,6 +647,36 @@
                     .catch(function (err) {
                         console.error("[BookEnhancers] Google Books API test failed:", err);
                         showTestResult("testGoogleBooksResult", false, "Request failed. Check server connectivity.");
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Test";
+                    });
+            });
+
+            document.getElementById("btnTestGrandComicsDb").addEventListener("click", function () {
+                var username = document.getElementById("txtGrandComicsDbUsername").value;
+                var password = document.getElementById("txtGrandComicsDbPassword").value;
+                if (!username || !password) {
+                    showTestResult("testGrandComicsDbResult", false, "Enter both username and password first.");
+                    return;
+                }
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Testing...";
+
+                authFetch("Books/Config/TestGrandComicsDb", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username: username, password: password })
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        showTestResult("testGrandComicsDbResult", result.success, result.message);
+                    })
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] GCD API test failed:", err);
+                        showTestResult("testGrandComicsDbResult", false, "Request failed. Check server connectivity.");
                     })
                     .finally(function () {
                         btn.disabled = false;
@@ -1148,9 +1219,13 @@
                     config.ComicVineEnabled = false;
                     config.ComicVineApiKey = "";
                     config.MetronEnabled = false;
-                    config.MetronApiKey = "";
+                    config.MetronUsername = "";
+                    config.MetronPassword = "";
                     config.VerseDbEnabled = false;
                     config.VerseDbApiKey = "";
+                    config.GrandComicsDbEnabled = false;
+                    config.GrandComicsDbUsername = "";
+                    config.GrandComicsDbPassword = "";
                     config.MatchThreshold = 0.85;
                     config.EnableFormatGrouping = true;
                     config.GroupingStrategy = "IsbnOnly";
@@ -1178,9 +1253,13 @@
                     document.getElementById("chkComicVineEnabled").checked = config.ComicVineEnabled || false;
                     document.getElementById("txtComicVineApiKey").value = config.ComicVineApiKey || "";
                     document.getElementById("chkMetronEnabled").checked = config.MetronEnabled || false;
-                    document.getElementById("txtMetronApiKey").value = config.MetronApiKey || "";
+                    document.getElementById("txtMetronUsername").value = config.MetronUsername || "";
+                    document.getElementById("txtMetronPassword").value = config.MetronPassword || "";
                     document.getElementById("chkVVerseDbEnabled").checked = config.VerseDbEnabled || false;
                     document.getElementById("txtVerseDbApiKey").value = config.VerseDbApiKey || "";
+                    document.getElementById("chkGrandComicsDbEnabled").checked = config.GrandComicsDbEnabled || false;
+                    document.getElementById("txtGrandComicsDbUsername").value = config.GrandComicsDbUsername || "";
+                    document.getElementById("txtGrandComicsDbPassword").value = config.GrandComicsDbPassword || "";
                     document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
 
                     document.getElementById("chkEnableFormatGrouping").checked = config.EnableFormatGrouping !== false;
@@ -1312,9 +1391,13 @@
                         config.ComicVineEnabled = document.getElementById("chkComicVineEnabled").checked;
                         config.ComicVineApiKey = document.getElementById("txtComicVineApiKey").value;
                         config.MetronEnabled = document.getElementById("chkMetronEnabled").checked;
-                        config.MetronApiKey = document.getElementById("txtMetronApiKey").value;
+                        config.MetronUsername = document.getElementById("txtMetronUsername").value;
+                        config.MetronPassword = document.getElementById("txtMetronPassword").value;
                         config.VerseDbEnabled = document.getElementById("chkVVerseDbEnabled").checked;
                         config.VerseDbApiKey = document.getElementById("txtVerseDbApiKey").value;
+                        config.GrandComicsDbEnabled = document.getElementById("chkGrandComicsDbEnabled").checked;
+                        config.GrandComicsDbUsername = document.getElementById("txtGrandComicsDbUsername").value;
+                        config.GrandComicsDbPassword = document.getElementById("txtGrandComicsDbPassword").value;
                         config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
 
                         config.EnableFormatGrouping = document.getElementById("chkEnableFormatGrouping").checked;

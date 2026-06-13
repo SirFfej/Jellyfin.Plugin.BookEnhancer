@@ -12,6 +12,7 @@ public class MetadataEnrichmentService
     private readonly ComicVineApiClient _comicVine;
     private readonly MetronApiClient _metron;
     private readonly VerseDbApiClient _verseDb;
+    private readonly GrandComicsDbApiClient _grandComicsDb;
     private readonly ILogger<MetadataEnrichmentService> _logger;
 
     public MetadataEnrichmentService(
@@ -21,6 +22,7 @@ public class MetadataEnrichmentService
         ComicVineApiClient comicVine,
         MetronApiClient metron,
         VerseDbApiClient verseDb,
+        GrandComicsDbApiClient grandComicsDb,
         ILogger<MetadataEnrichmentService> logger)
     {
         _hardcover = hardcover;
@@ -29,6 +31,7 @@ public class MetadataEnrichmentService
         _comicVine = comicVine;
         _metron = metron;
         _verseDb = verseDb;
+        _grandComicsDb = grandComicsDb;
         _logger = logger;
     }
 
@@ -42,9 +45,13 @@ public class MetadataEnrichmentService
         bool comicVineEnabled = false,
         string comicVineApiKey = "",
         bool metronEnabled = false,
-        string metronApiKey = "",
+        string metronUsername = "",
+        string metronPassword = "",
         bool versedbEnabled = false,
         string versedbApiKey = "",
+        bool grandComicsDbEnabled = false,
+        string grandComicsDbUsername = "",
+        string grandComicsDbPassword = "",
         bool titleAuthorSearchEnabled = true,
         string? title = null,
         string? author = null,
@@ -71,7 +78,7 @@ public class MetadataEnrichmentService
 
         if (!apiMatchFound)
         {
-            apiMatchFound = await SearchByComicCascade(source, comicVineEnabled, comicVineApiKey, metronEnabled, metronApiKey, versedbEnabled, versedbApiKey, ct).ConfigureAwait(false);
+            apiMatchFound = await SearchByComicCascade(source, comicVineEnabled, comicVineApiKey, metronEnabled, metronUsername, metronPassword, versedbEnabled, versedbApiKey, grandComicsDbEnabled, grandComicsDbUsername, grandComicsDbPassword, ct).ConfigureAwait(false);
         }
 
         return new EnrichmentResult
@@ -194,9 +201,13 @@ public class MetadataEnrichmentService
         bool comicVineEnabled,
         string comicVineApiKey,
         bool metronEnabled,
-        string metronApiKey,
+        string metronUsername,
+        string metronPassword,
         bool versedbEnabled,
         string versedbApiKey,
+        bool grandComicsDbEnabled,
+        string grandComicsDbUsername,
+        string grandComicsDbPassword,
         CancellationToken ct)
     {
         var series = source.SeriesName;
@@ -226,12 +237,12 @@ public class MetadataEnrichmentService
             }
         }
 
-        if (metronEnabled && !string.IsNullOrWhiteSpace(metronApiKey) && !string.IsNullOrWhiteSpace(issue))
+        if (metronEnabled && !string.IsNullOrWhiteSpace(metronUsername) && !string.IsNullOrWhiteSpace(metronPassword) && !string.IsNullOrWhiteSpace(issue))
         {
-            var mtResults = await _metron.SearchIssuesAsync(series, issue, metronApiKey, ct).ConfigureAwait(false);
+            var mtResults = await _metron.SearchIssuesAsync(series, issue, metronUsername, metronPassword, ct).ConfigureAwait(false);
             if (mtResults.Count > 0)
             {
-                var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, metronApiKey, ct).ConfigureAwait(false);
+                var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, metronUsername, metronPassword, ct).ConfigureAwait(false);
                 if (detail is not null)
                 {
                     MergeNulls(source, detail);
@@ -258,6 +269,17 @@ public class MetadataEnrichmentService
                     _logger.LogDebug("VerseDB enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
                     return true;
                 }
+            }
+        }
+
+        if (grandComicsDbEnabled && !string.IsNullOrWhiteSpace(grandComicsDbUsername) && !string.IsNullOrWhiteSpace(grandComicsDbPassword) && !string.IsNullOrWhiteSpace(issue))
+        {
+            var gcdMeta = await _grandComicsDb.SearchBySeriesAndIssueAsync(series, issue, grandComicsDbUsername, grandComicsDbPassword, ct).ConfigureAwait(false);
+            if (gcdMeta is not null)
+            {
+                MergeNulls(source, gcdMeta);
+                _logger.LogDebug("Grand Comics Database enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                return true;
             }
         }
 
