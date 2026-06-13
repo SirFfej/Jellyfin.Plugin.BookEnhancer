@@ -57,6 +57,12 @@ Unified enrichment can be toggled on/off per source directory. When off, only ra
 - **Test Enrichment Connectivity** button on the Metadata config tab — pings all 3 enrichment APIs (Hardcover, Google Books, OpenLibrary) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
 
+### Enrichment Cascade (v0.6.0)
+- **Rate limiting** — 250ms delay between API calls to prevent hitting rate limits on all 3 services
+- **Google Books API key guard** — unauthenticated requests no longer sent when no key is configured
+- **Accurate match reporting** — cascade now returns whether any API actually responded with data, independent of whether local metadata was already complete (fixes "No enrichment found" for files with rich embedded metadata)
+- **Ingestion folder protection** — cleanup no longer scans or removes directories from source/ingestion paths, only from library paths
+
 ### Ingestion
 - **Managed source directories** — configure source folders → organize into library paths
 - **Per-source organize templates** — customize folder structure with `{Author}`, `{Series}`, `{Title}`, `{Publisher}` tokens
