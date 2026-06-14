@@ -43,6 +43,8 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public string BackupDirectory { get; set; } = string.Empty;
     public int BackupCleanupIntervalDays { get; set; } = 30;
+
+    public bool EnableNonBookDirectoryCleanup { get; set; }
 }
 
 public class FormatPriorityEntry

@@ -43,6 +43,7 @@ public class LibraryOrganizationService
         return part
             .Replace("{Author}", GetAuthorDirectoryName(metadata))
             .Replace("{Series}", GetSeriesDirectoryName(metadata))
+            .Replace("{Volume}", GetVolumeDirectoryName(metadata))
             .Replace("{Title}", GetTitleDirectoryName(metadata))
             .Replace("{Publisher}", GetPublisherDirectoryName(metadata));
     }
@@ -144,6 +145,18 @@ public class LibraryOrganizationService
         }
 
         return "Standalone";
+    }
+
+    private static string GetVolumeDirectoryName(FileMetadata metadata)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.Volume))
+        {
+            var volume = SanitizePathComponent(metadata.Volume);
+            if (!string.IsNullOrWhiteSpace(volume))
+                return volume;
+        }
+
+        return string.Empty;
     }
 
     private static string GetTitleDirectoryName(FileMetadata metadata)

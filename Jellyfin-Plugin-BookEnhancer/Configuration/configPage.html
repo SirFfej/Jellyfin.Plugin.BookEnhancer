@@ -160,6 +160,18 @@
                         </div>
                     </div>
 
+                    <div class="checkboxContainer" style="margin-top:10px;">
+                        <label>
+                            <input is="emby-checkbox" id="chkEnableNonBookDirectoryCleanup" type="checkbox" />
+                            <span>Remove non-book directories during cleanup</span>
+                        </label>
+                        <div class="fieldDescription">
+                            <strong>Dangerous:</strong> When enabled, Library Cleanup will move any folder that does not
+                            contain a supported book file to trash. Disable (default) to preserve companion folders,
+                            artwork, metadata sidecars, and unrelated subdirectories.
+                        </div>
+                    </div>
+
                     <hr style="margin:15px 0;" />
 
                     <h3 style="font-size:1.1em;margin:12px 0 6px;">Backup Directory (CBR/CB7 Originals)</h3>
@@ -1246,7 +1258,7 @@
                             '<input is="emby-input" class="dir-library" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.LibraryPath || '') + '" />' +
                         '</div>' +
                         '<div class="inputContainer">' +
-                            '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {Publisher}</span></label>' +
+                            '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Volume} {Title} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>' +
                         '<div style="display:flex;gap:16px;margin-top:8px;">' +
@@ -1258,7 +1270,7 @@
                                 '<input is="emby-checkbox" class="dir-metadata-write" type="checkbox" data-idx="' + idx + '"' + (dir.EnableMetadataWriting ? ' checked' : '') + ' />' +
                                 '<span>Write Metadata to Files</span>' +
                             '</label>' +
-                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Series books go into {Publisher}/{Series}/file.cbz; standalone books get {Publisher}/{Title}/file.cbz">' +
+                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Only removes the per-title folder from the default template. Series books go into {Publisher}/{Series}/file.cbz; standalone books keep {Publisher}/{Title}/file.cbz. Does not affect {Volume} or any other custom template tokens.">' +
                                 '<input is="emby-checkbox" class="dir-flat-series" type="checkbox" data-idx="' + idx + '"' + (dir.FlatSeriesStructure ? ' checked' : '') + ' />' +
                                 '<span>Flat Series Folders</span>' +
                             '</label>' +
@@ -1622,6 +1634,7 @@
                     config.IncludedLibraryIds = [];
                     config.TrashDirectory = "";
                     config.TrashCleanupIntervalDays = 7;
+                    config.EnableNonBookDirectoryCleanup = false;
                     config.BackupDirectory = "";
                     config.BackupCleanupIntervalDays = 30;
                     config.EnrichmentCooldownDays = 7;
@@ -1656,6 +1669,7 @@
 
                     document.getElementById("txtTrashDirectory").value = config.TrashDirectory || "";
                     document.getElementById("txtTrashCleanupInterval").value = config.TrashCleanupIntervalDays || 7;
+                    document.getElementById("chkEnableNonBookDirectoryCleanup").checked = config.EnableNonBookDirectoryCleanup || false;
                     document.getElementById("txtBackupDirectory").value = config.BackupDirectory || "";
                     document.getElementById("txtBackupCleanupInterval").value = config.BackupCleanupIntervalDays || 30;
 
@@ -1811,6 +1825,7 @@
 
                         config.TrashDirectory = document.getElementById("txtTrashDirectory").value.trim();
                         config.TrashCleanupIntervalDays = parseInt(document.getElementById("txtTrashCleanupInterval").value) || 0;
+                        config.EnableNonBookDirectoryCleanup = document.getElementById("chkEnableNonBookDirectoryCleanup").checked;
                         config.BackupDirectory = document.getElementById("txtBackupDirectory").value.trim();
                         config.BackupCleanupIntervalDays = parseInt(document.getElementById("txtBackupCleanupInterval").value) || 0;
 

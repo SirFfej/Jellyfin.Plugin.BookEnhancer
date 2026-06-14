@@ -40,7 +40,7 @@ public class BookGroupingService
 
             CREATE TABLE IF NOT EXISTS book_formats (
                 Id TEXT PRIMARY KEY,
-                GroupId TEXT NOT NULL REFERENCES book_groups(Id),
+                GroupId TEXT NOT NULL REFERENCES book_groups(Id) ON DELETE CASCADE,
                 FilePath TEXT NOT NULL,
                 FormatType TEXT NOT NULL,
                 JellyfinItemId TEXT,
@@ -56,6 +56,7 @@ public class BookGroupingService
         cmd.ExecuteNonQuery();
 
         MigrateAddEnrichedAt(conn);
+        MigrateUniqueFilePath(conn);
     }
 
     private static void MigrateAddEnrichedAt(SqliteConnection conn)
@@ -82,6 +83,32 @@ public class BookGroupingService
         }
     }
 
+    private static void MigrateUniqueFilePath(SqliteConnection conn)
+    {
+        using var check = conn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = 'idx_formats_path_unique'";
+        var existing = Convert.ToInt32(check.ExecuteScalar());
+        if (existing > 0)
+            return;
+
+        using var dedupe = conn.CreateCommand();
+        dedupe.CommandText = """
+            DELETE FROM book_formats
+            WHERE Id NOT IN (
+                SELECT Id FROM (
+                    SELECT Id, ROW_NUMBER() OVER (PARTITION BY FilePath ORDER BY AddedAt ASC) AS rn
+                    FROM book_formats
+                )
+                WHERE rn = 1
+            )
+            """;
+        dedupe.ExecuteNonQuery();
+
+        using var createIndex = conn.CreateCommand();
+        createIndex.CommandText = "CREATE UNIQUE INDEX idx_formats_path_unique ON book_formats(FilePath)";
+        createIndex.ExecuteNonQuery();
+    }
+
     private static Dictionary<string, int> GetFormatPriorityMap()
     {
         var config = Plugin.Instance?.Configuration;
@@ -104,7 +131,7 @@ public class BookGroupingService
 
     private SqliteConnection CreateConnection()
     {
-        return new SqliteConnection($"Data Source={_dbPath}");
+        return new SqliteConnection($"Data Source={_dbPath};Foreign Keys=True");
     }
 
     public BookGroup? GetGroupByIsbn(string? isbn)
@@ -118,6 +145,45 @@ public class BookGroupingService
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "SELECT Id, Isbn, Title, Author, CreatedAt, UpdatedAt FROM book_groups WHERE Isbn = @Isbn";
         cmd.Parameters.AddWithValue("@Isbn", isbn);
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+            return null;
+
+        var group = new BookGroup
+        {
+            Id = reader.GetString(0),
+            Isbn = reader.IsDBNull(1) ? null : reader.GetString(1),
+            Title = reader.IsDBNull(2) ? null : reader.GetString(2),
+            Author = reader.IsDBNull(3) ? null : reader.GetString(3),
+            CreatedAt = DateTime.Parse(reader.GetString(4), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal),
+            UpdatedAt = DateTime.Parse(reader.GetString(5), CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal),
+            Formats = GetFormatsForGroup(reader.GetString(0))
+        };
+
+        return group;
+    }
+
+    public BookGroup? GetGroupByTitleAuthor(string? title, string? author)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return null;
+
+        using var conn = CreateConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        if (string.IsNullOrWhiteSpace(author))
+        {
+            cmd.CommandText = "SELECT Id, Isbn, Title, Author, CreatedAt, UpdatedAt FROM book_groups WHERE Title = @Title AND (Author IS NULL OR Author = '')";
+        }
+        else
+        {
+            cmd.CommandText = "SELECT Id, Isbn, Title, Author, CreatedAt, UpdatedAt FROM book_groups WHERE Title = @Title AND Author = @Author";
+            cmd.Parameters.AddWithValue("@Author", author);
+        }
+
+        cmd.Parameters.AddWithValue("@Title", title);
 
         using var reader = cmd.ExecuteReader();
         if (!reader.Read())
@@ -174,6 +240,15 @@ public class BookGroupingService
     {
         using var conn = CreateConnection();
         conn.Open();
+
+        using var check = conn.CreateCommand();
+        check.CommandText = "SELECT Id, GroupId, FilePath, FormatType, JellyfinItemId, IsPrimary, AddedAt, EnrichedAt FROM book_formats WHERE FilePath = @FilePath LIMIT 1";
+        check.Parameters.AddWithValue("@FilePath", filePath);
+        using var reader = check.ExecuteReader();
+        if (reader.Read())
+        {
+            return ReadFormat(reader);
+        }
 
         var format = new BookFormat
         {
@@ -349,11 +424,9 @@ public class BookGroupingService
         return formats;
     }
 
-    public BookGroup? RegisterFile(string path, FileMetadata metadata, bool isPrimary)
+    public BookGroup? RegisterFile(string path, FileMetadata metadata, bool isPrimary, string strategy = "IsbnOnly")
     {
-        var existingGroup = !string.IsNullOrWhiteSpace(metadata.Isbn)
-            ? GetGroupByIsbn(metadata.Isbn)
-            : null;
+        var existingGroup = FindExistingGroup(metadata, strategy);
 
         if (existingGroup is null && isPrimary)
         {
@@ -369,6 +442,57 @@ public class BookGroupingService
         }
 
         return null;
+    }
+
+    private BookGroup? FindExistingGroup(FileMetadata metadata, string strategy)
+    {
+        var normalizedTitle = metadata.Title?.Trim() ?? string.Empty;
+        var normalizedAuthor = metadata.Authors.Count > 0
+            ? string.Join("; ", metadata.Authors).Trim()
+            : string.Empty;
+
+        if (strategy.Equals("IsbnOnly", StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.IsNullOrWhiteSpace(metadata.Isbn)
+                ? GetGroupByIsbn(metadata.Isbn)
+                : null;
+        }
+
+        if (strategy.Equals("TitleAuthor", StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.IsNullOrWhiteSpace(normalizedTitle)
+                ? GetGroupByTitleAuthor(normalizedTitle, normalizedAuthor)
+                : null;
+        }
+
+        if (strategy.Equals("Both", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(metadata.Isbn))
+            {
+                var byIsbn = GetGroupByIsbn(metadata.Isbn);
+                if (byIsbn is not null)
+                    return byIsbn;
+            }
+
+            if (!string.IsNullOrWhiteSpace(normalizedTitle))
+                return GetGroupByTitleAuthor(normalizedTitle, normalizedAuthor);
+
+            return null;
+        }
+
+        if (strategy.Equals("FileNamePrefix", StringComparison.OrdinalIgnoreCase))
+        {
+            var prefix = !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                ? metadata.SeriesName.Trim()
+                : normalizedTitle;
+            return !string.IsNullOrWhiteSpace(prefix)
+                ? GetGroupByTitleAuthor(prefix, string.Empty)
+                : null;
+        }
+
+        return !string.IsNullOrWhiteSpace(metadata.Isbn)
+            ? GetGroupByIsbn(metadata.Isbn)
+            : null;
     }
 
     public List<BookGroup> GetAllGroupsWithMultipleFormats()

@@ -121,20 +121,9 @@ public class GroupingPostProcessingService
                     if (metadata is null)
                         continue;
 
-                    if (!string.IsNullOrWhiteSpace(metadata.Isbn))
-                    {
-                        _groupingService.RegisterFile(file, metadata, isPrimary: true);
+                    var group = _groupingService.RegisterFile(file, metadata, isPrimary: true, config.GroupingStrategy);
+                    if (group is not null)
                         registered++;
-                    }
-                    else if (!string.IsNullOrWhiteSpace(metadata.Title) && metadata.Authors.Count > 0)
-                    {
-                        var existing = _groupingService.GetGroupByIsbn(metadata.Isbn);
-                        if (existing is not null)
-                        {
-                            _groupingService.RegisterFile(file, metadata, isPrimary: false);
-                            registered++;
-                        }
-                    }
                 }
                 catch (Exception ex)
                 {

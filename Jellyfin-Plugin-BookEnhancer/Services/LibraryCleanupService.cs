@@ -101,7 +101,8 @@ public class LibraryCleanupService
             if (libFiles.Count == 0)
             {
                 await logCallback($"[{libraryRoot}] No files found.").ConfigureAwait(false);
-                await CleanupNonBookDirectories(libGroup, result, logCallback, ct).ConfigureAwait(false);
+                if (config.EnableNonBookDirectoryCleanup)
+                    await CleanupNonBookDirectories(libGroup, result, logCallback, ct).ConfigureAwait(false);
                 continue;
             }
 
@@ -206,7 +207,7 @@ public class LibraryCleanupService
                         await logCallback($"[{libLabel}] Moved: {file} -> {expectedPath}").ConfigureAwait(false);
                         var updated = _groupingService.UpdateFormatPath(file, expectedPath);
                         if (updated == 0)
-                            _groupingService.RegisterFile(expectedPath, metadata, isPrimary: true);
+                            _groupingService.RegisterFile(expectedPath, metadata, isPrimary: true, config.GroupingStrategy);
 
                         var targetDir = Path.GetDirectoryName(expectedPath);
                         await MoveCompanionImagesAsync(dirToClean, targetDir, logCallback).ConfigureAwait(false);
@@ -308,7 +309,7 @@ public class LibraryCleanupService
                             var updated = _groupingService.UpdateFormatPath(file, expectedPath);
                             if (updated == 0)
                             {
-                                _groupingService.RegisterFile(expectedPath, enriched, isPrimary: true);
+                                _groupingService.RegisterFile(expectedPath, enriched, isPrimary: true, config.GroupingStrategy);
                                 _groupingService.SetLastEnrichmentTime(expectedPath);
                             }
 
@@ -349,7 +350,8 @@ public class LibraryCleanupService
                 await logCallback($"[{libLabel}] Enrichment pass complete — {enrichmentQueue.Count} processed, {enrichmentIssues.Count} unresolved.").ConfigureAwait(false);
             }
 
-            await CleanupNonBookDirectories(libGroup, libResult, logCallback, ct).ConfigureAwait(false);
+            if (config.EnableNonBookDirectoryCleanup)
+                await CleanupNonBookDirectories(libGroup, libResult, logCallback, ct).ConfigureAwait(false);
 
             var removedEmpty = await SweepEmptyDirectoriesAsync(libraryRoot, logCallback, ct).ConfigureAwait(false);
             libResult.EmptyDirectoriesRemoved += removedEmpty;
@@ -385,10 +387,10 @@ public class LibraryCleanupService
         return result;
     }
 
-    private Dictionary<string, List<(long Size, string Path, string Title, string Author)>> BuildDuplicateIndex(
+    private Dictionary<string, List<(long Size, string Path, string Isbn, string SeriesName, string SeriesNumber, string Volume, string Title, string Author)>> BuildDuplicateIndex(
         List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)> fileData)
     {
-        var index = new Dictionary<string, List<(long Size, string Path, string Title, string Author)>>(StringComparer.OrdinalIgnoreCase);
+        var index = new Dictionary<string, List<(long Size, string Path, string Isbn, string SeriesName, string SeriesNumber, string Volume, string Title, string Author)>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (path, metadata, _, _) in fileData)
         {
@@ -397,16 +399,20 @@ public class LibraryCleanupService
                 continue;
 
             var size = new FileInfo(path).Length;
+            var isbn = metadata.Isbn ?? string.Empty;
+            var seriesName = metadata.SeriesName ?? string.Empty;
+            var seriesNumber = metadata.SeriesNumber ?? string.Empty;
+            var volume = metadata.Volume ?? string.Empty;
             var title = NormalizeString(metadata.Title);
             var author = metadata.Authors.Count > 0 ? NormalizeString(metadata.Authors[0]) : string.Empty;
 
             if (!index.TryGetValue(ext, out var list))
             {
-                list = new List<(long, string, string, string)>();
+                list = new List<(long, string, string, string, string, string, string, string)>();
                 index[ext] = list;
             }
 
-            list.Add((size, path, title, author));
+            list.Add((size, path, isbn, seriesName, seriesNumber, volume, title, author));
         }
 
         return index;
@@ -415,17 +421,21 @@ public class LibraryCleanupService
     private static string? FindDuplicate(
         string sourcePath,
         FileMetadata metadata,
-        Dictionary<string, List<(long Size, string Path, string Title, string Author)>> index)
+        Dictionary<string, List<(long Size, string Path, string Isbn, string SeriesName, string SeriesNumber, string Volume, string Title, string Author)>> index)
     {
         var ext = Path.GetExtension(sourcePath);
         if (!index.TryGetValue(ext, out var candidates) || !File.Exists(sourcePath))
             return null;
 
         var sourceSize = new FileInfo(sourcePath).Length;
+        var sourceIsbn = metadata.Isbn ?? string.Empty;
+        var sourceSeriesName = metadata.SeriesName ?? string.Empty;
+        var sourceSeriesNumber = metadata.SeriesNumber ?? string.Empty;
+        var sourceVolume = metadata.Volume ?? string.Empty;
         var sourceTitle = NormalizeString(metadata.Title);
         var sourceAuthor = metadata.Authors.Count > 0 ? NormalizeString(metadata.Authors[0]) : string.Empty;
 
-        foreach (var (size, path, title, author) in candidates)
+        foreach (var (size, path, isbn, seriesName, seriesNumber, volume, title, author) in candidates)
         {
             if (string.Equals(path, sourcePath, StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -433,8 +443,27 @@ public class LibraryCleanupService
             if (size != sourceSize)
                 continue;
 
+            // ISBN match (books/audiobooks)
+            if (!string.IsNullOrWhiteSpace(sourceIsbn) &&
+                !string.IsNullOrWhiteSpace(isbn) &&
+                string.Equals(isbn, sourceIsbn, StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+
+            // Comic series + issue match (volume must match when present)
+            if (!string.IsNullOrWhiteSpace(sourceSeriesName) &&
+                !string.IsNullOrWhiteSpace(sourceSeriesNumber) &&
+                string.Equals(seriesName, sourceSeriesName, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(seriesNumber, sourceSeriesNumber, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(volume, sourceVolume, StringComparison.OrdinalIgnoreCase))
+            {
+                return path;
+            }
+
+            // Title + author fallback for non-ISBN, non-comic books
             if (!string.IsNullOrWhiteSpace(sourceTitle) &&
-                !string.IsNullOrWhiteSpace(title) &&
+                !string.IsNullOrWhiteSpace(sourceAuthor) &&
                 string.Equals(title, sourceTitle, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(author, sourceAuthor, StringComparison.OrdinalIgnoreCase))
             {

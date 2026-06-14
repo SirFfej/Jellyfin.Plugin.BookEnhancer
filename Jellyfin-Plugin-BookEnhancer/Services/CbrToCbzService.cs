@@ -214,7 +214,7 @@ public class CbrToCbzService
                 await LogAsync(logCallback, $"  Warning: Failed to write ComicInfo.xml.").ConfigureAwait(false);
 
             // Step 7: Track converted file in grouping DB
-            _grouping.RegisterFile(cbzPath, metadata, isPrimary: true);
+            _grouping.RegisterFile(cbzPath, metadata, isPrimary: true, config.GroupingStrategy);
         }
         finally
         {

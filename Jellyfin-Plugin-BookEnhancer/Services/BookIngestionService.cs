@@ -204,7 +204,7 @@ public class BookIngestionService
 
                 if (moveResult.Success)
                 {
-                    _groupingService.RegisterFile(targetPath, metadata, isPrimary: true);
+                    _groupingService.RegisterFile(targetPath, metadata, isPrimary: true, Config?.GroupingStrategy ?? "IsbnOnly");
                     if (enrichmentAttempted)
                         _groupingService.SetLastEnrichmentTime(targetPath);
                     result.FilesAdded++;
@@ -220,7 +220,7 @@ public class BookIngestionService
                     if (dir.EnableMetadataWriting)
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
 
-                    var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false);
+                    var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false, Config?.GroupingStrategy ?? "IsbnOnly");
                     if (enrichmentAttempted)
                         _groupingService.SetLastEnrichmentTime(targetPath);
                     result.FilesSkipped++;

@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.1.0 - New: grouping strategies are now fully implemented. IsbnOnly, TitleAuthor, and Both (ISBN first, then title+author) are respected by RegisterFile, grouping scan, and grouping preview. FileNamePrefix strategy is also supported. New: {Volume} organize template token; skipped when no volume is present. New: filename volume extraction for comics (v/vol/volume/vol. prefix). Safety: duplicate detection now requires ISBN match, or comic Series+Issue+Volume+size, or non-empty Title+Author+size; non-book directory cleanup is now opt-in (default off); book_formats has unique FilePath index and ON DELETE CASCADE; AddFormatToGroup prevents duplicate paths. Fix: dead title/author branch in grouping scan removed. AGENTS.md updated. Build: 0W/0E.",
+        "checksum": "2C153AFA886151DAE19AAB4FE7BA8B57",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.1.0/Jellyfin.Plugin.BookEnhancer_0.8.1.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.8.1.0"
+      },
+      {
         "changelog": "v0.8.0.2 - New: per-library 'Flat Series Folders' toggle. When enabled and no custom template is set, books with a series use {Publisher}/{Series}/file.cbz or {Author}/{Series}/file.cbz, while standalone books keep their own {Publisher}/{Title}/file.cbz folder. Fix: UnifiedMetadataProvider now returns locally extracted metadata when enrichment cooldown is active instead of returning empty metadata. Fix: CBR/CB7→CBZ conversion now respects per-directory Title/Author Search setting, registers converted files in bookgroups.db, and records enrichment timestamps. Build: 0W/0E.",
         "checksum": "72E53F354E25E81D6A6BC0222795D244",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.0.2/Jellyfin.Plugin.BookEnhancer_0.8.0.2.zip",

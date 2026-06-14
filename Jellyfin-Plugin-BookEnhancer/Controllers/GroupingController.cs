@@ -95,7 +95,10 @@ public class GroupingController : ControllerBase
                         if (meta is null)
                             continue;
 
-                        var matchKey = BuildMatchKey(meta);
+                        var matchKey = BuildMatchKey(meta, config.GroupingStrategy ?? "IsbnOnly");
+                        if (string.IsNullOrWhiteSpace(matchKey))
+                            continue;
+
                         var formatType = GetFormatType(file);
                         var priority = BookGroupingService.GetFormatPriority(formatType);
 
@@ -160,14 +163,39 @@ public class GroupingController : ControllerBase
         return Ok(result);
     }
 
-    private static string BuildMatchKey(FileMetadata meta)
+    private static string BuildMatchKey(FileMetadata meta, string strategy)
     {
-        if (!string.IsNullOrWhiteSpace(meta.Isbn))
-            return $"isbn:{new string(meta.Isbn.Where(char.IsDigit).ToArray())}";
+        var normalizedIsbn = !string.IsNullOrWhiteSpace(meta.Isbn)
+            ? $"isbn:{new string(meta.Isbn.Where(char.IsDigit).ToArray())}"
+            : string.Empty;
 
-        var title = meta.Title?.Trim().ToLowerInvariant() ?? "";
-        var author = meta.Authors.Count > 0 ? meta.Authors[0].Trim().ToLowerInvariant() : "";
-        return $"title:{title}|author:{author}";
+        var title = meta.Title?.Trim().ToLowerInvariant() ?? string.Empty;
+        var author = meta.Authors.Count > 0 ? meta.Authors[0].Trim().ToLowerInvariant() : string.Empty;
+        var titleAuthorKey = !string.IsNullOrWhiteSpace(title)
+            ? $"title:{title}|author:{author}"
+            : string.Empty;
+
+        var prefix = !string.IsNullOrWhiteSpace(meta.SeriesName)
+            ? meta.SeriesName.Trim().ToLowerInvariant()
+            : title;
+        var fileNamePrefixKey = !string.IsNullOrWhiteSpace(prefix)
+            ? $"prefix:{prefix}"
+            : string.Empty;
+
+        if (strategy.Equals("IsbnOnly", StringComparison.OrdinalIgnoreCase))
+            return normalizedIsbn;
+
+        if (strategy.Equals("TitleAuthor", StringComparison.OrdinalIgnoreCase))
+            return titleAuthorKey;
+
+        if (strategy.Equals("FileNamePrefix", StringComparison.OrdinalIgnoreCase))
+            return fileNamePrefixKey;
+
+        // "Both" — ISBN first, then title/author
+        if (!string.IsNullOrWhiteSpace(normalizedIsbn))
+            return normalizedIsbn;
+
+        return titleAuthorKey;
     }
 
     private static string GetFormatType(string filePath)

@@ -29,6 +29,11 @@ public class ComicInfoParser : IFileParser
         @"^(.{3,}?)\s+(\d{1,4})$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>Matches "Series Name v1 01", "Series Name vol. 1 #01", "Series Name Volume 1 01" etc.</summary>
+    private static readonly Regex ComicVolumeIssuePattern = new(
+        @"^(.+?)\s+(?:v|vol\.?|volume)\s*(\d+)\s*#?(\d+)$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public bool CanParse(string filePath)
     {
         var ext = Path.GetExtension(filePath);
@@ -108,31 +113,38 @@ public class ComicInfoParser : IFileParser
             meta.SeriesNumber = match.Value.Number;
             if (float.TryParse(meta.SeriesNumber, out var num))
                 meta.SeriesIndex = num;
+
+            if (!string.IsNullOrWhiteSpace(match.Value.Volume))
+                meta.Volume = match.Value.Volume.Trim();
         }
 
         return meta;
     }
 
-    private static (string Series, string Number)? TryMatchComicPattern(string name)
+    private static (string Series, string Number, string? Volume)? TryMatchComicPattern(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             return null;
 
-        var match = ComicSeriesYearPattern.Match(name);
+        var match = ComicVolumeIssuePattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value);
+            return (match.Groups[1].Value, match.Groups[3].Value, match.Groups[2].Value);
+
+        match = ComicSeriesYearPattern.Match(name);
+        if (match.Success)
+            return (match.Groups[1].Value, match.Groups[2].Value, null);
 
         match = ComicHashPattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value);
+            return (match.Groups[1].Value, match.Groups[2].Value, null);
 
         match = ComicUnderscorePattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value);
+            return (match.Groups[1].Value, match.Groups[2].Value, null);
 
         match = ComicTrailingNumberPattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value);
+            return (match.Groups[1].Value, match.Groups[2].Value, null);
 
         return null;
     }
