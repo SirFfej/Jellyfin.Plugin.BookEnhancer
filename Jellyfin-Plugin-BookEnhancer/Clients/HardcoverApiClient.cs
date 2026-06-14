@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -34,7 +35,8 @@ public class HardcoverApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Hardcover title/author search failed for {Title} by {Author}", title, author);
+            ApiResponseLogger.Log("Hardcover", $"title/author search failed for \"{title}\" by \"{author}\"", ex);
+            _logger.LogDebug("Hardcover title/author search failed for {Title} by {Author}; details in api-responses log", title, author);
             return null;
         }
     }
@@ -143,7 +145,8 @@ query($title: String!) {
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Hardcover API lookup failed for ISBN {Isbn}", isbn);
+            ApiResponseLogger.Log("Hardcover", $"ISBN lookup failed for \"{isbn}\"", ex);
+            _logger.LogDebug("Hardcover API lookup failed for ISBN {Isbn}; details in api-responses log", isbn);
             return null;
         }
     }
@@ -285,7 +288,8 @@ query($bookId: Int!) {
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to parse Hardcover cached_tags for book {BookId}", book.Id);
+                ApiResponseLogger.Log("Hardcover", $"Failed to parse cached_tags for book {book.Id}", ex);
+                _logger.LogDebug("Failed to parse Hardcover cached_tags for book {BookId}; details in api-responses log", book.Id);
             }
         }
 

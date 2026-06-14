@@ -19,7 +19,12 @@ public class PdfParser : IFileParser
         return filePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
     }
 
-    public Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
+    public async Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
+    {
+        return await Task.Run(() => ExtractInternal(filePath), ct).ConfigureAwait(false);
+    }
+
+    private FileMetadata? ExtractInternal(string filePath)
     {
         try
         {
@@ -53,19 +58,19 @@ public class PdfParser : IFileParser
 
             meta.HasCover = doc.NumberOfPages > 0;
 
-            return Task.FromResult<FileMetadata?>(meta);
+            return meta;
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PdfPig failed to parse {FilePath}; falling back to filename metadata", filePath);
 
-            return Task.FromResult<FileMetadata?>(new FileMetadata
+            return new FileMetadata
             {
                 FilePath = filePath,
                 FileFormat = "PDF",
                 Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(filePath)),
                 HasCover = false
-            });
+            };
         }
     }
 }

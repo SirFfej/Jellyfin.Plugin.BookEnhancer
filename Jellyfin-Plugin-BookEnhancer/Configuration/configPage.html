@@ -546,6 +546,9 @@
                         your Jellyfin library organized as <code>Author / Book Title / file</code>.
                         Each source folder can target a different library folder (e.g., separate
                         folders for print books and audiobooks).
+                        <strong>The target library's collection type</strong> (Books, Comics, etc.)
+                        controls which Jellyfin home screen section the items appear in. Comics
+                        organized into a Books-type library will still show under Latest Books.
                     </p>
 
                     <div id="managedDirsContainer" style="margin-top:16px;"></div>
@@ -1267,11 +1270,17 @@
                     row.style.cssText = "border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:8px;background:var(--card-background);";
 
                     var libOpts = '<option value="">-- Select Library --</option>';
+                    var selectedLib = null;
                     availableLibs.forEach(function (lib) {
                         var sel = lib.id === dir.LibraryId ? ' selected' : '';
+                        if (sel) selectedLib = lib;
                         libOpts += '<option value="' + escapeHtml(lib.id) + '"' + sel + '>'
                             + escapeHtml(lib.name) + ' (' + escapeHtml(lib.collectionType) + ')</option>';
                     });
+                    var libTypeNote = selectedLib
+                        ? '<div class="fieldDescription" style="margin-top:4px;">Collection type: <strong>' + escapeHtml(selectedLib.collectionType) + '</strong>. ' +
+                          'Items will appear in the corresponding Jellyfin home section.</div>'
+                        : '';
 
                     var enabledApis = dir.EnabledApiSources || [];
                     var apiCheckboxes = apiSourceOptions.map(function (api) {
@@ -1301,6 +1310,7 @@
                         '<div class="inputContainer">' +
                             '<label class="inputLabel inputLabelUnfocused">Target Library</label>' +
                             '<select is="emby-select" class="dir-library-select" data-idx="' + idx + '">' + libOpts + '</select>' +
+                            libTypeNote +
                         '</div>' +
                         '<div class="inputContainer">' +
                             '<label class="inputLabel inputLabelUnfocused">Library Path (auto-filled from library)</label>' +
@@ -1325,7 +1335,7 @@
                             '</label>' +
                         '</div>' +
                         '<details style="margin-top:10px;">' +
-                            '<summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);">Per-directory API selection (unchecked = use global)</summary>' +
+                            '<summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);text-decoration:underline;">Per-directory API selection (unchecked = use global)</summary>' +
                             '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;">' + apiCheckboxes + '</div>' +
                         '</details>';
 

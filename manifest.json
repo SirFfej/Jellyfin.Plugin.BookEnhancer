@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.6.0 - New: dedicated api-responses log. All 7 API clients now write full error/exception details to plugins/BookEnhancer/api-responses/ instead of the main Jellyfin log, keeping the console clean. Parser async cleanup: ComicInfoParser, PdfParser, and AudioParser now offload sync I/O to Task.Run. Config page now shows target library collection type per managed directory and explains why library type controls home-screen sections (e.g., Latest Books vs Latest Comics). Build: 0W/0E.",
+        "checksum": "210B7A1A00CC553DE32A199D5395DC4A",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.6.0/Jellyfin.Plugin.BookEnhancer_0.8.6.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.6.0"
+      },
+      {
         "changelog": "v0.8.5.0 - New: enrichment cooldown logs now mention which API last enriched the file. New: per-managed-directory API selection via EnabledApiSources; each directory can override global API toggles in the Ingestion tab. Refactored MetadataEnrichmentService to use EnrichmentApiConfig. Database schema updated with EnrichedBy column. Build: 0W/0E.",
         "checksum": "097ABA62A17CFFCEEBD8CB233B0DA82E",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.5.0/Jellyfin.Plugin.BookEnhancer_0.8.5.0.zip",

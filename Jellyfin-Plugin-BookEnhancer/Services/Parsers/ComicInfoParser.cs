@@ -42,7 +42,12 @@ public class ComicInfoParser : IFileParser
                ext.Equals(".cb7", StringComparison.OrdinalIgnoreCase);
     }
 
-    public Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
+    public async Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
+    {
+        return await Task.Run(() => ExtractInternal(filePath), ct).ConfigureAwait(false);
+    }
+
+    private static FileMetadata? ExtractInternal(string filePath)
     {
         try
         {
@@ -57,12 +62,12 @@ public class ComicInfoParser : IFileParser
             };
 
             if (doc is null)
-                return Task.FromResult<FileMetadata?>(ParseFromFileName(filePath));
-            return Task.FromResult<FileMetadata?>(ParseComicInfo(doc, filePath));
+                return ParseFromFileName(filePath);
+            return ParseComicInfo(doc, filePath);
         }
         catch
         {
-            return Task.FromResult<FileMetadata?>(ParseFromFileName(filePath));
+            return ParseFromFileName(filePath);
         }
     }
 

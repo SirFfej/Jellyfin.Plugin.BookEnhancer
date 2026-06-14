@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -38,7 +39,8 @@ public class ComicVineApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Comic Vine search failed for query {Query}", query);
+            ApiResponseLogger.Log("Comic Vine", $"search failed for query \"{query}\"", ex);
+            _logger.LogDebug("Comic Vine search failed for query {Query}; details in api-responses log", query);
             return [];
         }
     }
@@ -58,7 +60,8 @@ public class ComicVineApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Comic Vine issue lookup failed for ID {IssueId}", issueId);
+            ApiResponseLogger.Log("Comic Vine", $"issue lookup failed for ID {issueId}", ex);
+            _logger.LogDebug("Comic Vine issue lookup failed for ID {IssueId}; details in api-responses log", issueId);
             return null;
         }
     }

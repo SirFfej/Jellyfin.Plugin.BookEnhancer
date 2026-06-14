@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -39,7 +40,8 @@ public class VerseDbApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "VerseDB search failed for query {Query}", query);
+            ApiResponseLogger.Log("VerseDB", $"search failed for query \"{query}\"", ex);
+            _logger.LogDebug("VerseDB search failed for query {Query}; details in api-responses log", query);
             return [];
         }
     }
@@ -60,7 +62,8 @@ public class VerseDbApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "VerseDB issue detail failed for ID {IssueId}", issueId);
+            ApiResponseLogger.Log("VerseDB", $"issue detail failed for ID {issueId}", ex);
+            _logger.LogDebug("VerseDB issue detail failed for ID {IssueId}; details in api-responses log", issueId);
             return null;
         }
     }

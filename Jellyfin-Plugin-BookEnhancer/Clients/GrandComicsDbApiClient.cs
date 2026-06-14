@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -50,7 +51,8 @@ public class GrandComicsDbApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "GCD search failed for {Series} #{Issue}", seriesName, issueNumber);
+            ApiResponseLogger.Log("Grand Comics Database", $"search failed for \"{seriesName}\" #{issueNumber}", ex);
+            _logger.LogDebug("GCD search failed for {Series} #{Issue}; details in api-responses log", seriesName, issueNumber);
             return null;
         }
     }
@@ -73,7 +75,8 @@ public class GrandComicsDbApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "GCD issue detail failed for ID {IssueId}", issueId);
+            ApiResponseLogger.Log("Grand Comics Database", $"issue detail failed for ID {issueId}", ex);
+            _logger.LogDebug("GCD issue detail failed for ID {IssueId}; details in api-responses log", issueId);
             return null;
         }
     }

@@ -23,7 +23,12 @@ public class AudioParser : IFileParser
         return !string.IsNullOrEmpty(ext) && _extensions.Contains(ext);
     }
 
-    public Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
+    public async Task<FileMetadata?> ExtractAsync(string filePath, CancellationToken ct = default)
+    {
+        return await Task.Run(() => ExtractInternal(filePath), ct).ConfigureAwait(false);
+    }
+
+    private static FileMetadata ExtractInternal(string filePath)
     {
         using var file = TagLib.File.Create(filePath);
 
@@ -102,7 +107,7 @@ public class AudioParser : IFileParser
             }
         }
 
-        return Task.FromResult<FileMetadata?>(meta);
+        return meta;
     }
 
     private static string? ExtractDiscNumber(string input)

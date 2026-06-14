@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -38,7 +39,8 @@ public class GoogleBooksApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Google Books title/author search failed for {Title} by {Author}", title, author);
+            ApiResponseLogger.Log("Google Books", $"title/author search failed for \"{title}\" by \"{author}\"", ex);
+            _logger.LogDebug("Google Books title/author search failed for {Title} by {Author}; details in api-responses log", title, author);
             return null;
         }
     }
@@ -67,7 +69,8 @@ public class GoogleBooksApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Google Books API lookup failed for ISBN {Isbn}", isbn);
+            ApiResponseLogger.Log("Google Books", $"ISBN lookup failed for \"{isbn}\"", ex);
+            _logger.LogDebug("Google Books API lookup failed for ISBN {Isbn}; details in api-responses log", isbn);
             return null;
         }
     }

@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -37,7 +38,8 @@ public class OpenLibraryApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "OpenLibrary title/author search failed for {Title} by {Author}", title, author);
+            ApiResponseLogger.Log("OpenLibrary", $"title/author search failed for \"{title}\" by \"{author}\"", ex);
+            _logger.LogDebug("OpenLibrary title/author search failed for {Title} by {Author}; details in api-responses log", title, author);
             return null;
         }
     }
@@ -101,7 +103,8 @@ public class OpenLibraryApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "OpenLibrary lookup failed for ISBN {Isbn}", isbn);
+            ApiResponseLogger.Log("OpenLibrary", $"ISBN lookup failed for \"{isbn}\"", ex);
+            _logger.LogDebug("OpenLibrary lookup failed for ISBN {Isbn}; details in api-responses log", isbn);
             return null;
         }
     }

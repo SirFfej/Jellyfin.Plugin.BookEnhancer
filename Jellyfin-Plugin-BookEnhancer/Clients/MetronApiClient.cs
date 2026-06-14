@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Clients;
@@ -48,7 +49,8 @@ public class MetronApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Metron search failed for {Series} #{Issue}", seriesName, issueNumber);
+            ApiResponseLogger.Log("Metron", $"search failed for \"{seriesName}\" #{issueNumber}", ex);
+            _logger.LogDebug("Metron search failed for {Series} #{Issue}; details in api-responses log", seriesName, issueNumber);
             return [];
         }
     }
@@ -69,7 +71,8 @@ public class MetronApiClient
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Metron issue detail failed for ID {IssueId}", issueId);
+            ApiResponseLogger.Log("Metron", $"issue detail failed for ID {issueId}", ex);
+            _logger.LogDebug("Metron issue detail failed for ID {IssueId}; details in api-responses log", issueId);
             return null;
         }
     }
