@@ -100,8 +100,22 @@ public class LibraryOrganizationService
         }
     }
 
-    public static string GetDefaultTemplate(FileMetadata metadata)
+    public static string GetDefaultTemplate(FileMetadata metadata, bool flatSeriesStructure = false)
     {
+        if (flatSeriesStructure)
+        {
+            if (!string.IsNullOrWhiteSpace(metadata.Publisher))
+            {
+                return !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                    ? "{Publisher}/{Series}"
+                    : "{Publisher}/{Title}";
+            }
+
+            return !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                ? "{Author}/{Series}"
+                : "{Author}/{Title}";
+        }
+
         if (!string.IsNullOrWhiteSpace(metadata.Publisher))
             return "{Publisher}/{Series}/{Title}";
 

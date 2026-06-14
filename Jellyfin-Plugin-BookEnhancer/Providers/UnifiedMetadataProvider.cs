@@ -57,42 +57,44 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             var dir = FindMatchingDirectory(config, info.Path);
             var titleAuthorEnabled = dir?.EnableTitleAuthorSearch ?? true;
 
+            FileMetadata enriched;
             if (config.EnrichmentCooldownDays > 0 && _grouping.IsEnrichmentOnCooldown(info.Path, config.EnrichmentCooldownDays))
             {
                 _logger.LogDebug("Skipped enrichment (cooldown) for {Path}", info.Path);
-                return result;
+                enriched = fileMeta;
+            }
+            else
+            {
+                var enrichmentResult = await _enrichment.EnrichAsync(
+                    fileMeta,
+                    config.HardcoverApiKey,
+                    config.GoogleBooksApiKey,
+                    config.HardcoverEnabled,
+                    config.GoogleBooksEnabled,
+                    config.OpenLibraryEnabled,
+                    comicVineEnabled: config.ComicVineEnabled,
+                    comicVineApiKey: config.ComicVineApiKey ?? "",
+                    metronEnabled: config.MetronEnabled,
+                    metronUsername: config.MetronUsername ?? "",
+                    metronPassword: config.MetronPassword ?? "",
+                    versedbEnabled: config.VerseDbEnabled,
+                    versedbApiKey: config.VerseDbApiKey ?? "",
+                    grandComicsDbEnabled: config.GrandComicsDbEnabled,
+                    grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
+                    grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                    titleAuthorSearchEnabled: titleAuthorEnabled,
+                    title: fileMeta.Title,
+                    author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
+                    ct: cancellationToken).ConfigureAwait(false);
+
+                _grouping.SetLastEnrichmentTime(info.Path);
+                enriched = enrichmentResult.Metadata;
+
+                if (dir?.EnableMetadataWriting == true && !string.IsNullOrWhiteSpace(info.Path) && File.Exists(info.Path))
+                    await _writer.WriteMetadataAsync(info.Path, enriched, cancellationToken).ConfigureAwait(false);
             }
 
-            var enrichmentResult = await _enrichment.EnrichAsync(
-                fileMeta,
-                config.HardcoverApiKey,
-                config.GoogleBooksApiKey,
-                config.HardcoverEnabled,
-                config.GoogleBooksEnabled,
-                config.OpenLibraryEnabled,
-                comicVineEnabled: config.ComicVineEnabled,
-                comicVineApiKey: config.ComicVineApiKey ?? "",
-                metronEnabled: config.MetronEnabled,
-                metronUsername: config.MetronUsername ?? "",
-                metronPassword: config.MetronPassword ?? "",
-                versedbEnabled: config.VerseDbEnabled,
-                versedbApiKey: config.VerseDbApiKey ?? "",
-                grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
-                titleAuthorSearchEnabled: titleAuthorEnabled,
-                title: fileMeta.Title,
-                author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
-                ct: cancellationToken).ConfigureAwait(false);
-
-            _grouping.SetLastEnrichmentTime(info.Path);
-
-            var enriched = enrichmentResult.Metadata;
-
             if (string.IsNullOrWhiteSpace(enriched.Title)) return result;
-
-            if (dir?.EnableMetadataWriting == true && !string.IsNullOrWhiteSpace(info.Path) && File.Exists(info.Path))
-                await _writer.WriteMetadataAsync(info.Path, enriched, cancellationToken).ConfigureAwait(false);
 
             if (config.EnableFormatGrouping && !string.IsNullOrWhiteSpace(enriched.Isbn))
             {

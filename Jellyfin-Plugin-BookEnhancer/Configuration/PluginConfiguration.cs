@@ -60,4 +60,5 @@ public class ManagedSourceDirectory
     public string OrganizeTemplate { get; set; } = string.Empty;
     public bool EnableTitleAuthorSearch { get; set; } = true;
     public bool EnableMetadataWriting { get; set; } = false;
+    public bool FlatSeriesStructure { get; set; }
 }

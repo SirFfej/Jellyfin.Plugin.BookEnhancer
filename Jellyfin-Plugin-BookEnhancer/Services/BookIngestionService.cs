@@ -195,7 +195,7 @@ public class BookIngestionService
                 }
 
                 var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
-                    ? LibraryOrganizationService.GetDefaultTemplate(metadata)
+                    ? LibraryOrganizationService.GetDefaultTemplate(metadata, dir.FlatSeriesStructure)
                     : dir.OrganizeTemplate;
                 var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
                 var sourceDir = Path.GetDirectoryName(file);

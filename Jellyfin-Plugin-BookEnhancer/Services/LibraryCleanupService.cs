@@ -130,7 +130,7 @@ public class LibraryCleanupService
                         .First();
 
                     var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
-                        ? LibraryOrganizationService.GetDefaultTemplate(metadata)
+                        ? LibraryOrganizationService.GetDefaultTemplate(metadata, dir.FlatSeriesStructure)
                         : dir.OrganizeTemplate;
 
                     if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))

@@ -164,10 +164,11 @@ public class CbrToCbzService
             }
 
             // Step 5: Run enrichment if unified metadata is enabled
+            var dir = FindMatchingDirectory(config, cbzPath);
             if (config.UnifiedMetadataEnabled)
             {
                 await LogAsync(logCallback, $"  Running metadata enrichment...").ConfigureAwait(false);
-                var template = LibraryOrganizationService.GetDefaultTemplate(metadata);
+                var template = LibraryOrganizationService.GetDefaultTemplate(metadata, dir?.FlatSeriesStructure == true);
                 if (NeedsEnrichment(metadata, template))
                 {
                     if (config.EnrichmentCooldownDays > 0 && _grouping.IsEnrichmentOnCooldown(cbzPath, config.EnrichmentCooldownDays))
@@ -193,7 +194,7 @@ public class CbrToCbzService
                             grandComicsDbEnabled: config.GrandComicsDbEnabled,
                             grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
                             grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
-                            titleAuthorSearchEnabled: true,
+                            titleAuthorSearchEnabled: dir?.EnableTitleAuthorSearch ?? true,
                             title: metadata.Title,
                             author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
                             ct: ct).ConfigureAwait(false);
@@ -211,6 +212,9 @@ public class CbrToCbzService
                 await LogAsync(logCallback, $"  ComicInfo.xml written successfully.").ConfigureAwait(false);
             else
                 await LogAsync(logCallback, $"  Warning: Failed to write ComicInfo.xml.").ConfigureAwait(false);
+
+            // Step 7: Track converted file in grouping DB
+            _grouping.RegisterFile(cbzPath, metadata, isPrimary: true);
         }
         finally
         {
@@ -344,6 +348,16 @@ public class CbrToCbzService
         }
 
         return tokens;
+    }
+
+    private static ManagedSourceDirectory? FindMatchingDirectory(PluginConfiguration config, string? itemPath)
+    {
+        if (string.IsNullOrWhiteSpace(itemPath)) return null;
+
+        return config.ManagedDirectories
+            .Where(d => d.Enabled && !string.IsNullOrWhiteSpace(d.LibraryPath))
+            .OrderByDescending(d => d.LibraryPath.Length)
+            .FirstOrDefault(d => itemPath.StartsWith(d.LibraryPath, StringComparison.OrdinalIgnoreCase));
     }
 
     private static async Task LogAsync(Func<string, Task>? logCallback, string message)

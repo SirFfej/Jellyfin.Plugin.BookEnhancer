@@ -481,7 +481,7 @@
                         </div>
                     </div>
 
-                    <hr style="margin:20px 0;" />
+
 
                     <h4 style="font-size:1em;margin:8px 0 3px;">Format Priority</h4>
                     <p class="fieldDescription">
@@ -1258,6 +1258,10 @@
                                 '<input is="emby-checkbox" class="dir-metadata-write" type="checkbox" data-idx="' + idx + '"' + (dir.EnableMetadataWriting ? ' checked' : '') + ' />' +
                                 '<span>Write Metadata to Files</span>' +
                             '</label>' +
+                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Series books go into {Publisher}/{Series}/file.cbz; standalone books get {Publisher}/{Title}/file.cbz">' +
+                                '<input is="emby-checkbox" class="dir-flat-series" type="checkbox" data-idx="' + idx + '"' + (dir.FlatSeriesStructure ? ' checked' : '') + ' />' +
+                                '<span>Flat Series Folders</span>' +
+                            '</label>' +
                         '</div>';
 
                     container.appendChild(row);
@@ -1350,6 +1354,7 @@
                     var tmplInput = container.querySelector('.dir-template[data-idx="' + idx + '"]');
                     var titleAuthorInput = container.querySelector('.dir-title-author-search[data-idx="' + idx + '"]');
                     var metadataWriteInput = container.querySelector('.dir-metadata-write[data-idx="' + idx + '"]');
+                    var flatSeriesInput = container.querySelector('.dir-flat-series[data-idx="' + idx + '"]');
 
                     dirs.push({
                         SourcePath: sourceInput ? sourceInput.value : "",
@@ -1358,7 +1363,8 @@
                         LibraryId: libSelect ? libSelect.value : "",
                         OrganizeTemplate: tmplInput ? tmplInput.value : "",
                         EnableTitleAuthorSearch: titleAuthorInput ? titleAuthorInput.checked : true,
-                        EnableMetadataWriting: metadataWriteInput ? metadataWriteInput.checked : false
+                        EnableMetadataWriting: metadataWriteInput ? metadataWriteInput.checked : false,
+                        FlatSeriesStructure: flatSeriesInput ? flatSeriesInput.checked : false
                     });
                 });
 
@@ -1367,7 +1373,7 @@
 
             document.getElementById("btnAddDirectory").addEventListener("click", function () {
                 var dirs = getCurrentDirectories();
-                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false });
+                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false, FlatSeriesStructure: false });
                 renderDirectories(dirs);
             });
 
