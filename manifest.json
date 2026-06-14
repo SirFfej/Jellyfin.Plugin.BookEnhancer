@@ -9,7 +9,15 @@
     "owner": "SirFfej",
     "versions": [
       {
-        "changelog": "v0.8.2.0 - New: multi-disc audiobook organization via {BookTitle} and {Disc} template tokens. AudioParser extracts BookTitle (title with author prefix and disc marker stripped) and DiscNumber (Disc NN) from title/album tags. New: resume checkpoint service for IngestionScanTask — persists checkpoints every 10 files in plugins/BookEnhancer/checkpoints/ and resumes from the last processed file within 24 h after a service restart. Logging: BookIngestionService now summarizes moves/skips per target directory instead of logging full source/target paths for every file. AGENTS.md updated. Build: 0W/0E.",
+        "changelog": "v0.8.2.1 - Fix: AudioParser now uses Album/SeriesName as the canonical {BookTitle} when present, so multi-disc audiobooks tagged with Album=Brave New World and Title=1a organize under Brave New World instead of under the track name. BookTitle falls back to the cleaned title tag only when no series/album is available. Build: 0W/0E.",
+        "checksum": "37CECE5AC111E3115C0CBE69F0FF939A",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.2.1/Jellyfin.Plugin.BookEnhancer_0.8.2.1.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.2.1"
+      },
+      {
+        "changelog": "v0.8.2.0 - New: multi-disc audiobook organization via {BookTitle} and {Disc} template tokens. AudioParser extracts BookTitle (title with author prefix and disc marker stripped) and DiscNumber (Disc NN) from title/album tags. New: resume checkpoint service for IngestionScanTask — persists checkpoints every 10 files in plugins/BookEnhancer/checkpoints/ and resumes from the last processed file within 24 h after a service restart. Logging: BookIngestionService now summarizes moves/skips per target directory instead of logging full source/target paths for every file. README and Metadata Guide modal updated. Build: 0W/0E.",
         "checksum": "C61D1702DC5D4B59ACD329F0DEBE710F",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.2.0/Jellyfin.Plugin.BookEnhancer_0.8.2.0.zip",
         "targetAbi": "10.11.8.0",

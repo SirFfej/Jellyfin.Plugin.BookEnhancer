@@ -58,7 +58,12 @@ public class AudioParser : IFileParser
                 if (!string.IsNullOrWhiteSpace(titleDisc))
                     meta.DiscNumber = titleDisc;
 
-                meta.BookTitle = NormalizeBookTitle(meta.Title, meta.Authors);
+                var cleanedTitle = NormalizeBookTitle(meta.Title, meta.Authors);
+
+                // Prefer the album/series as the canonical book title; fall back to the cleaned title tag.
+                meta.BookTitle = !string.IsNullOrWhiteSpace(meta.SeriesName)
+                    ? meta.SeriesName
+                    : cleanedTitle;
             }
 
             if (file.Tag.Year != 0)
