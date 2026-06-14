@@ -204,10 +204,26 @@ public class EpubParser : IFileParser
         if (coverEntry is null) return;
 
         using var coverStream = coverEntry.Open();
-        using var ms = new MemoryStream();
-        coverStream.CopyTo(ms);
-        meta.CoverBytes = ms.ToArray();
+        meta.CoverBytes = ReadStreamBytes(coverStream);
         meta.CoverMimeType = mediaType ?? "image/jpeg";
         meta.HasCover = true;
+    }
+
+    private static byte[] ReadStreamBytes(Stream stream)
+    {
+        if (stream.CanSeek)
+        {
+            var length = (int)stream.Length;
+            if (length == 0)
+                return Array.Empty<byte>();
+
+            var buffer = new byte[length];
+            stream.ReadExactly(buffer, 0, length);
+            return buffer;
+        }
+
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+        return ms.ToArray();
     }
 }

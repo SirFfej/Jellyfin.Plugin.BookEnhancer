@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.3.0 - Performance/resource optimization pass. Database: eliminated N+1 query in GetAllGroupsWithMultipleFormats via JOIN; SetPrimaryFormat and RegisterFile now use transactions; RegisterFile reuses a single SQLite connection for find/create/add operations instead of opening 3 connections per file. File I/O: removed materializing .ToList() in MetadataEnrichmentTask and LibraryCleanupService directory enumeration. Memory: EpubParser no longer double-buffers cover images (reads directly into byte[]). Resilience: PdfParser now catches parse failures (encrypted/malformed PDFs) and falls back to filename-based metadata instead of returning null. Allocations: optimized SanitizePathComponent to use single char-array scan. Build: 0W/0E.",
+        "checksum": "075E78879D2E885A78F3ED3B902F6BB8",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.3.0/Jellyfin.Plugin.BookEnhancer_0.8.3.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.3.0"
+      },
+      {
         "changelog": "v0.8.2.1 - Fix: AudioParser now uses Album/SeriesName as the canonical {BookTitle} when present, so multi-disc audiobooks tagged with Album=Brave New World and Title=1a organize under Brave New World instead of under the track name. BookTitle falls back to the cleaned title tag only when no series/album is available. Build: 0W/0E.",
         "checksum": "37CECE5AC111E3115C0CBE69F0FF939A",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.2.1/Jellyfin.Plugin.BookEnhancer_0.8.2.1.zip",

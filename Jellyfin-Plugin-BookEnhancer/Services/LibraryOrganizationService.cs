@@ -7,10 +7,8 @@ public class LibraryOrganizationService
 {
     private readonly ILogger<LibraryOrganizationService> _logger;
 
-    private static readonly HashSet<string> _invalidPathChars = new(
-        Path.GetInvalidFileNameChars()
-            .Concat(Path.GetInvalidPathChars())
-            .Select(c => c.ToString()));
+    private static readonly HashSet<char> _invalidPathChars = new(
+        Path.GetInvalidFileNameChars().Concat(Path.GetInvalidPathChars()));
 
     public LibraryOrganizationService(ILogger<LibraryOrganizationService> logger)
     {
@@ -28,11 +26,13 @@ public class LibraryOrganizationService
         var components = template.Split('/', '\\')
             .Select(part => SanitizePathComponent(ResolveToken(part.Trim(), metadata)))
             .Where(s => !string.IsNullOrWhiteSpace(s))
-            .ToList();
+            .ToArray();
 
         var fileName = GetFileName(metadata);
-        components.Add(fileName);
-        return Path.Combine(components.ToArray());
+        var allComponents = new string[components.Length + 1];
+        components.CopyTo(allComponents, 0);
+        allComponents[^1] = fileName;
+        return Path.Combine(allComponents);
     }
 
     private static string ResolveToken(string part, FileMetadata metadata)
@@ -224,17 +224,25 @@ public class LibraryOrganizationService
         if (string.IsNullOrWhiteSpace(input))
             return input;
 
-        input = input.Trim();
+        var trimmed = input.Trim();
+        var chars = trimmed.ToCharArray();
+        var changed = false;
 
-        foreach (var c in _invalidPathChars)
+        for (var i = 0; i < chars.Length; i++)
         {
-            input = input.Replace(c, "_");
+            if (_invalidPathChars.Contains(chars[i]))
+            {
+                chars[i] = '_';
+                changed = true;
+            }
         }
 
-        if (input.Length > 200)
-            input = input[..200];
+        var result = changed ? new string(chars) : trimmed;
 
-        return input.TrimEnd('.');
+        if (result.Length > 200)
+            result = result[..200];
+
+        return result.TrimEnd('.');
     }
 }
 

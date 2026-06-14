@@ -78,7 +78,7 @@ public class MetadataEnrichmentTask : IScheduledTask
 
             var supportedExts = GetSupportedExtensions(config);
 
-            var allFiles = new List<(string Path, ManagedSourceDirectory Dir)>();
+            var total = 0;
             foreach (var dir in dirs)
             {
                 if (!Directory.Exists(dir.LibraryPath))
@@ -87,14 +87,10 @@ public class MetadataEnrichmentTask : IScheduledTask
                     continue;
                 }
 
-                var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
-                    .Where(f => supportedExts.Contains(Path.GetExtension(f)))
-                    .ToList();
-
-                allFiles.AddRange(files.Select(f => (f, dir)));
+                total += Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
+                    .Count(f => supportedExts.Contains(Path.GetExtension(f)));
             }
 
-            var total = allFiles.Count;
             var enriched = 0;
             var noIsbn = 0;
             var noMatch = 0;
@@ -117,96 +113,108 @@ public class MetadataEnrichmentTask : IScheduledTask
             summaryBuffer.AppendLine($"Total files: {total}");
             summaryBuffer.AppendLine();
 
-            for (var i = 0; i < allFiles.Count; i++)
+            var processed = 0;
+            var cancelled = false;
+            foreach (var dir in dirs)
             {
-                if (cancellationToken.IsCancellationRequested)
-                {
-                    logger.LogWarning("Enrichment cancelled");
-                    break;
-                }
+                if (cancelled || !Directory.Exists(dir.LibraryPath))
+                    continue;
 
-                var (filePath, _) = allFiles[i];
+                var files = Directory.EnumerateFiles(dir.LibraryPath, "*", SearchOption.AllDirectories)
+                    .Where(f => supportedExts.Contains(Path.GetExtension(f)));
 
-                try
+                foreach (var filePath in files)
                 {
-                    var metadata = await _fileExtractor.ExtractAsync(filePath, cancellationToken).ConfigureAwait(false);
-                    if (metadata is null)
+                    if (cancellationToken.IsCancellationRequested)
                     {
-                        logger.LogError($"Could not extract metadata: {filePath}");
+                        logger.LogWarning("Enrichment cancelled");
+                        cancelled = true;
+                        break;
+                    }
+
+                    processed++;
+
+                    try
+                    {
+                        var metadata = await _fileExtractor.ExtractAsync(filePath, cancellationToken).ConfigureAwait(false);
+                        if (metadata is null)
+                        {
+                            logger.LogError($"Could not extract metadata: {filePath}");
+                            errors++;
+                            unenriched.Add($"PARSE ERROR: {filePath}");
+                            continue;
+                        }
+
+                        if (string.IsNullOrWhiteSpace(metadata.Isbn))
+                        {
+                            var isComic = string.Equals(metadata.FileFormat, "Comic", StringComparison.OrdinalIgnoreCase);
+                            if (!isComic)
+                            {
+                                noIsbn++;
+                                unenriched.Add($"NO ISBN: {filePath}");
+                                continue;
+                            }
+                        }
+
+                        var cooldown = config.EnrichmentCooldownDays;
+                        if (cooldown > 0)
+                        {
+                            var lastEnriched = _groupingService.GetLastEnrichmentTime(filePath);
+                            if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
+                            {
+                                skippedCooldown++;
+                                logger.LogInformation($"Skipped (cooldown): {filePath}");
+                                continue;
+                            }
+                        }
+
+                        var result = await _enrichment.EnrichAsync(
+                            metadata,
+                            config.HardcoverApiKey,
+                            config.GoogleBooksApiKey,
+                            config.HardcoverEnabled,
+                            config.GoogleBooksEnabled,
+                            config.OpenLibraryEnabled,
+                            comicVineEnabled: config.ComicVineEnabled,
+                            comicVineApiKey: config.ComicVineApiKey ?? "",
+                            metronEnabled: config.MetronEnabled,
+                            metronUsername: config.MetronUsername ?? "",
+                            metronPassword: config.MetronPassword ?? "",
+                            versedbEnabled: config.VerseDbEnabled,
+                            versedbApiKey: config.VerseDbApiKey ?? "",
+                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
+                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
+                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                            ct: cancellationToken).ConfigureAwait(false);
+
+                        _groupingService.SetLastEnrichmentTime(filePath);
+
+                        var enrichedMeta = result.Metadata;
+
+                        if (result.ApiMatchFound)
+                        {
+                            enriched++;
+                            logger.LogInformation($"Enriched: {filePath} (ISBN: {metadata.Isbn})");
+                        }
+                        else
+                        {
+                            noMatch++;
+                            unenriched.Add($"NO MATCH: {filePath} (ISBN: {metadata.Isbn})");
+                            logger.LogInformation($"No enrichment found: {filePath} (ISBN: {metadata.Isbn})");
+                        }
+
+                        await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError($"Error processing {filePath}: {ex.Message}");
                         errors++;
-                        unenriched.Add($"PARSE ERROR: {filePath}");
-                        continue;
+                        unenriched.Add($"ERROR: {filePath} — {ex.Message}");
                     }
 
-                    if (string.IsNullOrWhiteSpace(metadata.Isbn))
-                    {
-                        var isComic = string.Equals(metadata.FileFormat, "Comic", StringComparison.OrdinalIgnoreCase);
-                        if (!isComic)
-                        {
-                            noIsbn++;
-                            unenriched.Add($"NO ISBN: {filePath}");
-                            continue;
-                        }
-                    }
-
-                    var cooldown = config.EnrichmentCooldownDays;
-                    if (cooldown > 0)
-                    {
-                        var lastEnriched = _groupingService.GetLastEnrichmentTime(filePath);
-                        if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
-                        {
-                            skippedCooldown++;
-                            logger.LogInformation($"Skipped (cooldown): {filePath}");
-                            continue;
-                        }
-                    }
-
-                    var result = await _enrichment.EnrichAsync(
-                        metadata,
-                        config.HardcoverApiKey,
-                        config.GoogleBooksApiKey,
-                        config.HardcoverEnabled,
-                        config.GoogleBooksEnabled,
-                        config.OpenLibraryEnabled,
-                        comicVineEnabled: config.ComicVineEnabled,
-                        comicVineApiKey: config.ComicVineApiKey ?? "",
-                        metronEnabled: config.MetronEnabled,
-                        metronUsername: config.MetronUsername ?? "",
-                        metronPassword: config.MetronPassword ?? "",
-                        versedbEnabled: config.VerseDbEnabled,
-                        versedbApiKey: config.VerseDbApiKey ?? "",
-                        grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                        grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                        grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
-                        ct: cancellationToken).ConfigureAwait(false);
-
-                    _groupingService.SetLastEnrichmentTime(filePath);
-
-                    var enrichedMeta = result.Metadata;
-
-                    if (result.ApiMatchFound)
-                    {
-                        enriched++;
-                        logger.LogInformation($"Enriched: {filePath} (ISBN: {metadata.Isbn})");
-                    }
-                    else
-                    {
-                        noMatch++;
-                        unenriched.Add($"NO MATCH: {filePath} (ISBN: {metadata.Isbn})");
-                        logger.LogInformation($"No enrichment found: {filePath} (ISBN: {metadata.Isbn})");
-                    }
-
-                    await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                    if (total > 0)
+                        ((IProgress<double>)logger).Report((double)processed / total);
                 }
-                catch (Exception ex)
-                {
-                    logger.LogError($"Error processing {filePath}: {ex.Message}");
-                    errors++;
-                    unenriched.Add($"ERROR: {filePath} — {ex.Message}");
-                }
-
-                if (total > 0)
-                    ((IProgress<double>)logger).Report((double)i / total);
             }
 
             summaryBuffer.AppendLine($"Enriched:       {enriched}");

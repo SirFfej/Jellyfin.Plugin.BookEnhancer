@@ -95,28 +95,19 @@ public class LibraryCleanupService
             var libFiles = libGroup
                 .SelectMany(d => Directory.EnumerateFiles(d.LibraryPath, "*", SearchOption.AllDirectories)
                     .Where(f => supportedExts.Contains(Path.GetExtension(f))))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
+                .Distinct(StringComparer.OrdinalIgnoreCase);
 
-            if (libFiles.Count == 0)
-            {
-                await logCallback($"[{libraryRoot}] No files found.").ConfigureAwait(false);
-                if (config.EnableNonBookDirectoryCleanup)
-                    await CleanupNonBookDirectories(libGroup, result, logCallback, ct).ConfigureAwait(false);
-                continue;
-            }
-
-            grandTotal += libFiles.Count;
             var libResult = new CleanupResult();
             var libLabel = Path.GetFileName(libraryRoot.TrimEnd(Path.DirectorySeparatorChar, Path.PathSeparator));
-
-            await logCallback($"[{libLabel}] Scanning {libFiles.Count} files for metadata...").ConfigureAwait(false);
-
             var fileData = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
             var enrichmentQueue = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
 
+            await logCallback($"[{libLabel}] Scanning files for metadata...").ConfigureAwait(false);
+
+            var libFileCount = 0;
             foreach (var file in libFiles)
             {
+                libFileCount++;
                 ct.ThrowIfCancellationRequested();
 
                 try
@@ -165,6 +156,17 @@ public class LibraryCleanupService
                     libResult.Errors++;
                 }
             }
+
+            if (libFileCount == 0)
+            {
+                await logCallback($"[{libraryRoot}] No files found.").ConfigureAwait(false);
+                if (config.EnableNonBookDirectoryCleanup)
+                    await CleanupNonBookDirectories(libGroup, result, logCallback, ct).ConfigureAwait(false);
+                continue;
+            }
+
+            grandTotal += libFileCount;
+            await logCallback($"[{libLabel}] Scanned {libFileCount} files.").ConfigureAwait(false);
 
             var duplicateIndex = BuildDuplicateIndex(fileData);
 
