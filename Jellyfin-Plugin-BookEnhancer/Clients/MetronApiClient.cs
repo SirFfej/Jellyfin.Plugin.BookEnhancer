@@ -99,6 +99,7 @@ public class MetronApiClient
         var meta = new FileMetadata
         {
             FileFormat = "Comic",
+            IsComic = true,
             Title = detail.Name,
             SeriesName = detail.Series?.Name,
             SeriesNumber = detail.IssueNumber,

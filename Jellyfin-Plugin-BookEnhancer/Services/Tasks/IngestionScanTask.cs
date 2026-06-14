@@ -47,10 +47,20 @@ public class IngestionScanTask : IScheduledTask
             return Task.CompletedTask;
         };
 
+        var timeoutMinutes = config.IngestionScanTimeoutMinutes;
+        using var timeoutCts = timeoutMinutes > 0 ? new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes)) : null;
+        using var linkedCts = timeoutCts is not null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
+            : null;
+        var ct = linkedCts?.Token ?? cancellationToken;
+
         try
         {
             logger.LogInformation("Starting ingestion scan...");
-            var result = await _ingestionService.ScanAllAsync(logCallback, cancellationToken).ConfigureAwait(false);
+            if (timeoutCts is not null)
+                logger.LogInformation($"Ingestion scan timeout set to {timeoutMinutes} minutes");
+
+            var result = await _ingestionService.ScanAllAsync(logCallback, ct).ConfigureAwait(false);
             logger.LogInformation(
                 $"Scan complete — Found: {result.FilesFound}, Added: {result.FilesAdded}, " +
                 $"Skipped: {result.FilesSkipped}, Enrichment failures: {result.EnrichmentFailures}, Errors: {result.Errors}");
@@ -58,7 +68,10 @@ public class IngestionScanTask : IScheduledTask
         }
         catch (OperationCanceledException)
         {
-            logger.LogWarning("Ingestion scan was cancelled");
+            if (timeoutCts?.IsCancellationRequested == true)
+                logger.LogWarning($"Ingestion scan timed out after {timeoutMinutes} minutes");
+            else
+                logger.LogWarning("Ingestion scan was cancelled");
             throw;
         }
         catch (Exception ex)

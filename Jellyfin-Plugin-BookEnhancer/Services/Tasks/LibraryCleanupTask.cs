@@ -44,9 +44,19 @@ public class LibraryCleanupTask : IScheduledTask
 
         var logBuffer = new StringBuilder();
 
+        var timeoutMinutes = config.LibraryCleanupTimeoutMinutes;
+        using var timeoutCts = timeoutMinutes > 0 ? new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes)) : null;
+        using var linkedCts = timeoutCts is not null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
+            : null;
+        var ct = linkedCts?.Token ?? cancellationToken;
+
         try
         {
             logger.LogInformation("Starting library cleanup...");
+            if (timeoutCts is not null)
+                logger.LogInformation($"Library cleanup timeout set to {timeoutMinutes} minutes");
+
             logBuffer.AppendLine("=== Library Cleanup & Reorganize ===");
             logBuffer.AppendLine($"Started at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             logBuffer.AppendLine();
@@ -57,7 +67,7 @@ public class LibraryCleanupTask : IScheduledTask
                 logBuffer.AppendLine(message);
             }
 
-            var result = await _cleanupService.RunCleanupAsync(progress, LogCallback, cancellationToken).ConfigureAwait(false);
+            var result = await _cleanupService.RunCleanupAsync(progress, LogCallback, ct).ConfigureAwait(false);
 
             logBuffer.AppendLine();
             logBuffer.AppendLine("=== Summary ===");
@@ -69,14 +79,17 @@ public class LibraryCleanupTask : IScheduledTask
             logBuffer.AppendLine($"Completed at: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
             var logPath = Path.Combine(logDir, $"log_LibraryCleanup-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
-            await File.WriteAllTextAsync(logPath, logBuffer.ToString(), cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(logPath, logBuffer.ToString(), ct).ConfigureAwait(false);
 
             logger.LogInformation($"Cleanup complete. Summary written to: {logPath}");
             ((IProgress<double>)logger).Report(1.0);
         }
         catch (OperationCanceledException)
         {
-            logger.LogWarning("Library cleanup was cancelled");
+            if (timeoutCts?.IsCancellationRequested == true)
+                logger.LogWarning($"Library cleanup timed out after {timeoutMinutes} minutes");
+            else
+                logger.LogWarning("Library cleanup was cancelled");
             throw;
         }
         catch (Exception ex)

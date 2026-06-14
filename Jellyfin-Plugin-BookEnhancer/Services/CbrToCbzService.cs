@@ -159,6 +159,7 @@ public class CbrToCbzService
                 {
                     FilePath = cbzPath,
                     FileFormat = "Comic",
+                    IsComic = true,
                     Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(cbzPath))
                 };
             }

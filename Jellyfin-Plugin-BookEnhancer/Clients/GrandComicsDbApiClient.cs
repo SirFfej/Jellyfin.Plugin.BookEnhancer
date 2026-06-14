@@ -176,6 +176,7 @@ public class GrandComicsDbApiClient
         var meta = new FileMetadata
         {
             FileFormat = "Comic",
+            IsComic = true,
             Title = !string.IsNullOrWhiteSpace(detail.Title)
                 ? detail.Title
                 : $"{detail.SeriesName} #{detail.Number}",

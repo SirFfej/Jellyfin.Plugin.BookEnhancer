@@ -90,6 +90,7 @@ public class VerseDbApiClient
         var meta = new FileMetadata
         {
             FileFormat = "Comic",
+            IsComic = true,
             Title = detail.Name,
             SeriesName = detail.SeriesName,
             SeriesNumber = detail.IssueNumber,

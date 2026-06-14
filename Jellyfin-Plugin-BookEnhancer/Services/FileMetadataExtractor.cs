@@ -51,6 +51,7 @@ public class FileMetadataExtractor
         if (result is not null)
         {
             FillNullsFromDb(filePath, result);
+            ApplyComicLibraryFallback(result);
             return result;
         }
 
@@ -190,6 +191,56 @@ public class FileMetadataExtractor
         {
             _logger.LogWarning(ex, "Jellyfin DB fallback failed for {Path}", filePath);
             return null;
+        }
+    }
+
+    private void ApplyComicLibraryFallback(FileMetadata metadata)
+    {
+        if (metadata.IsComic)
+            return;
+
+        if (!IsComicLibraryPath(metadata.FilePath))
+            return;
+
+        metadata.IsComic = true;
+        ComicInfoParser.ApplyFallback(metadata);
+    }
+
+    private static bool IsComicLibraryPath(string filePath)
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.ManagedDirectories is null || config.ManagedDirectories.Count == 0)
+            return false;
+
+        foreach (var dir in config.ManagedDirectories)
+        {
+            if (!dir.IsComicLibrary)
+                continue;
+
+            if (IsPathUnderDirectory(filePath, dir.SourcePath) || IsPathUnderDirectory(filePath, dir.LibraryPath))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsPathUnderDirectory(string filePath, string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+            return false;
+
+        try
+        {
+            var normalizedDir = Path.GetFullPath(directoryPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var normalizedFile = Path.GetFullPath(filePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var separator = Path.DirectorySeparatorChar;
+
+            return normalizedFile.StartsWith(normalizedDir + separator, StringComparison.OrdinalIgnoreCase) ||
+                   normalizedFile.Equals(normalizedDir, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 }

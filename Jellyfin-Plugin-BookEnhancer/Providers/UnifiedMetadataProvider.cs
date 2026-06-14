@@ -330,7 +330,8 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
 
     private static bool HasComicMetadata(FileMetadata meta)
     {
-        return !string.IsNullOrWhiteSpace(meta.SeriesName) ||
+        return meta.IsComic ||
+               !string.IsNullOrWhiteSpace(meta.SeriesName) ||
                !string.IsNullOrWhiteSpace(meta.SeriesNumber) ||
                meta.ComicPeople.Count > 0;
     }

@@ -292,6 +292,40 @@ public class ConfigController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("DownloadComicInfoTemplate")]
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Authorized endpoint used for user-configured template paths only.")]
+    public async Task<ActionResult<DownloadTemplateResult>> DownloadComicInfoTemplate(
+        [FromBody] DownloadTemplateRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Url))
+            return Ok(new DownloadTemplateResult { Success = false, Message = "No URL provided." });
+
+        if (string.IsNullOrWhiteSpace(request.DestinationPath))
+            return Ok(new DownloadTemplateResult { Success = false, Message = "No destination path provided." });
+
+        try
+        {
+            using var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(30);
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
+
+            var success = await ComicInfoTemplateLoader.DownloadTemplateAsync(request.Url, request.DestinationPath, client, ct).ConfigureAwait(false);
+            if (success)
+            {
+                _logger.LogInformation("Downloaded ComicInfo template from {Url} to {Path}", request.Url, request.DestinationPath);
+                return Ok(new DownloadTemplateResult { Success = true, Message = "Template downloaded successfully." });
+            }
+
+            return Ok(new DownloadTemplateResult { Success = false, Message = "Downloaded content was not a valid ComicInfo.xml document." });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to download ComicInfo template from {Url}", request.Url);
+            return Ok(new DownloadTemplateResult { Success = false, Message = $"Download failed: {ex.Message}" });
+        }
+    }
+
     [HttpPost("ValidateDirectory")]
     [Authorize]
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Authorized endpoint used for user-configured source directories only.")]
@@ -406,4 +440,22 @@ public class ServiceConnectivity
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }
+}
+
+public class DownloadTemplateRequest
+{
+    [JsonPropertyName("url")]
+    public string Url { get; set; } = string.Empty;
+
+    [JsonPropertyName("destinationPath")]
+    public string DestinationPath { get; set; } = string.Empty;
+}
+
+public class DownloadTemplateResult
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
 }

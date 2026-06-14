@@ -35,6 +35,21 @@ public class PluginConfiguration : BasePluginConfiguration
     public List<ManagedSourceDirectory> ManagedDirectories { get; set; } = new();
     public int AutoScanIntervalMinutes { get; set; } = 0;
 
+    /// <summary>
+    /// Gets or sets the maximum runtime in minutes for the ingestion scan task. 0 = no limit.
+    /// </summary>
+    public int IngestionScanTimeoutMinutes { get; set; } = 30;
+
+    /// <summary>
+    /// Gets or sets the maximum runtime in minutes for the library cleanup task. 0 = no limit.
+    /// </summary>
+    public int LibraryCleanupTimeoutMinutes { get; set; } = 180;
+
+    /// <summary>
+    /// Gets or sets the maximum runtime in minutes for the metadata enrichment task. 0 = no limit.
+    /// </summary>
+    public int MetadataEnrichmentTimeoutMinutes { get; set; } = 120;
+
     public List<string> IncludedLibraryIds { get; set; } = new();
 
     public int EnrichmentCooldownDays { get; set; } = 7;
@@ -61,6 +76,16 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the custom template for series-first organization.
     /// </summary>
     public string SeriesFirstTemplate { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the local file path to a ComicInfo.xml template used as fallback metadata for comics.
+    /// </summary>
+    public string ComicInfoTemplatePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets an optional URL from which to download the ComicInfo.xml template.
+    /// </summary>
+    public string ComicInfoTemplateUrl { get; set; } = string.Empty;
 
     /// <summary>
     /// Resolves the effective API configuration for a managed source directory.
@@ -119,6 +144,12 @@ public class ManagedSourceDirectory
     public bool EnableTitleAuthorSearch { get; set; } = true;
     public bool EnableMetadataWriting { get; set; } = false;
     public bool FlatSeriesStructure { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether files in this directory should be treated as comics.
+    /// When true, PDF files are parsed with comic filename rules and the ComicIssue grouping strategy applies.
+    /// </summary>
+    public bool IsComicLibrary { get; set; }
 
     /// <summary>
     /// Gets or sets the list of API source names enabled for this directory.

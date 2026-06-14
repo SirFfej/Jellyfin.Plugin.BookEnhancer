@@ -5,6 +5,12 @@ public class FileMetadata
     public string FilePath { get; set; } = string.Empty;
     public string FileFormat { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the file should be treated as a comic for grouping and parsing purposes.
+    /// True for CBZ/CBR/CB7 files and for PDFs located in a comic library.
+    /// </summary>
+    public bool IsComic { get; set; }
+
     public string? Title { get; set; }
     public string? Subtitle { get; set; }
     public List<string> Authors { get; set; } = new();

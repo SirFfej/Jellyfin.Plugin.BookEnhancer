@@ -135,6 +135,20 @@ public class BookGroupingService
         createIndex.ExecuteNonQuery();
     }
 
+    private static string? NormalizeIssueNumber(FileMetadata metadata)
+    {
+        if (metadata.SeriesIndex.HasValue)
+            return metadata.SeriesIndex.Value.ToString(CultureInfo.InvariantCulture);
+
+        if (!string.IsNullOrWhiteSpace(metadata.SeriesNumber) &&
+            float.TryParse(metadata.SeriesNumber, NumberStyles.Any, CultureInfo.InvariantCulture, out var num))
+        {
+            return num.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return metadata.SeriesNumber?.Trim();
+    }
+
     private static Dictionary<string, int> GetFormatPriorityMap()
     {
         var config = Plugin.Instance?.Configuration;
@@ -245,20 +259,32 @@ public class BookGroupingService
     {
         using var conn = CreateConnection();
         conn.Open();
-        return CreateGroup(conn, metadata);
+        return CreateGroup(conn, metadata, "IsbnOnly");
     }
 
-    private static BookGroup CreateGroup(SqliteConnection conn, FileMetadata metadata)
+    private static BookGroup CreateGroup(SqliteConnection conn, FileMetadata metadata, string strategy)
     {
         var group = new BookGroup
         {
             Id = Guid.NewGuid().ToString("N"),
             Isbn = metadata.Isbn,
-            Title = metadata.Title,
-            Author = metadata.Authors.Count > 0 ? string.Join("; ", metadata.Authors) : null,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
+
+        if (strategy.Equals("ComicIssue", StringComparison.OrdinalIgnoreCase) &&
+            metadata.IsComic)
+        {
+            group.Title = !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                ? metadata.SeriesName.Trim()
+                : metadata.Title?.Trim();
+            group.Author = NormalizeIssueNumber(metadata);
+        }
+        else
+        {
+            group.Title = metadata.Title;
+            group.Author = metadata.Authors.Count > 0 ? string.Join("; ", metadata.Authors) : null;
+        }
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = """
@@ -525,7 +551,7 @@ public class BookGroupingService
             string? groupId;
             if (existingGroupId is null && isPrimary)
             {
-                groupId = CreateGroup(conn, metadata).Id;
+                groupId = CreateGroup(conn, metadata, strategy).Id;
             }
             else
             {
@@ -595,6 +621,24 @@ public class BookGroupingService
                 : null;
         }
 
+        if (strategy.Equals("ComicIssue", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!metadata.IsComic)
+            {
+                return !string.IsNullOrWhiteSpace(normalizedTitle)
+                    ? GetGroupIdByTitleAuthor(conn, normalizedTitle, normalizedAuthor)
+                    : null;
+            }
+
+            var series = !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                ? metadata.SeriesName.Trim()
+                : normalizedTitle;
+            var issue = NormalizeIssueNumber(metadata);
+            return !string.IsNullOrWhiteSpace(series) && !string.IsNullOrWhiteSpace(issue)
+                ? GetGroupIdByTitleAuthor(conn, series, issue)
+                : null;
+        }
+
         return !string.IsNullOrWhiteSpace(metadata.Isbn)
             ? GetGroupIdByIsbn(conn, metadata.Isbn)
             : null;
@@ -643,6 +687,24 @@ public class BookGroupingService
                 : normalizedTitle;
             return !string.IsNullOrWhiteSpace(prefix)
                 ? GetGroupByTitleAuthor(prefix, string.Empty)
+                : null;
+        }
+
+        if (strategy.Equals("ComicIssue", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!metadata.IsComic)
+            {
+                return !string.IsNullOrWhiteSpace(normalizedTitle)
+                    ? GetGroupByTitleAuthor(normalizedTitle, normalizedAuthor)
+                    : null;
+            }
+
+            var series = !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                ? metadata.SeriesName.Trim()
+                : normalizedTitle;
+            var issue = NormalizeIssueNumber(metadata);
+            return !string.IsNullOrWhiteSpace(series) && !string.IsNullOrWhiteSpace(issue)
+                ? GetGroupByTitleAuthor(series, issue)
                 : null;
         }
 

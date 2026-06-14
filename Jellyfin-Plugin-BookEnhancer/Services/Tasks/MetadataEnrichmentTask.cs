@@ -58,8 +58,18 @@ public class MetadataEnrichmentTask : IScheduledTask
 
         var summaryBuffer = new StringBuilder();
 
+        var timeoutMinutes = config.MetadataEnrichmentTimeoutMinutes;
+        using var timeoutCts = timeoutMinutes > 0 ? new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes)) : null;
+        using var linkedCts = timeoutCts is not null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
+            : null;
+        var ct = linkedCts?.Token ?? cancellationToken;
+
         try
         {
+            if (timeoutCts is not null)
+                logger.LogInformation($"Metadata enrichment timeout set to {timeoutMinutes} minutes");
+
             if (!config.UnifiedMetadataEnabled || (!config.HardcoverEnabled && !config.GoogleBooksEnabled && !config.OpenLibraryEnabled && !config.ComicVineEnabled && !config.MetronEnabled && !config.VerseDbEnabled && !config.GrandComicsDbEnabled))
             {
                 logger.LogWarning("Online enrichment is disabled in plugin configuration");
@@ -125,7 +135,7 @@ public class MetadataEnrichmentTask : IScheduledTask
 
                 foreach (var filePath in files)
                 {
-                    if (cancellationToken.IsCancellationRequested)
+                    if (ct.IsCancellationRequested)
                     {
                         logger.LogWarning("Enrichment cancelled");
                         cancelled = true;
@@ -136,7 +146,7 @@ public class MetadataEnrichmentTask : IScheduledTask
 
                     try
                     {
-                        var metadata = await _fileExtractor.ExtractAsync(filePath, cancellationToken).ConfigureAwait(false);
+                        var metadata = await _fileExtractor.ExtractAsync(filePath, ct).ConfigureAwait(false);
                         if (metadata is null)
                         {
                             logger.LogError($"Could not extract metadata: {filePath}");
@@ -147,8 +157,7 @@ public class MetadataEnrichmentTask : IScheduledTask
 
                         if (string.IsNullOrWhiteSpace(metadata.Isbn))
                         {
-                            var isComic = string.Equals(metadata.FileFormat, "Comic", StringComparison.OrdinalIgnoreCase);
-                            if (!isComic)
+                            if (!metadata.IsComic)
                             {
                                 noIsbn++;
                                 unenriched.Add($"NO ISBN: {filePath}");
@@ -173,7 +182,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                         var result = await _enrichment.EnrichAsync(
                             metadata,
                             apiConfig,
-                            ct: cancellationToken).ConfigureAwait(false);
+                            ct: ct).ConfigureAwait(false);
 
                         if (result.ApiMatchFound)
                             _groupingService.SetLastEnrichmentTime(filePath, result.EnrichedBy);
@@ -192,7 +201,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                             logger.LogInformation($"No enrichment found: {filePath} (ISBN: {metadata.Isbn})");
                         }
 
-                        await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                        await Task.Delay(250, ct).ConfigureAwait(false);
                     }
                     catch (Exception ex)
                     {
@@ -230,7 +239,7 @@ public class MetadataEnrichmentTask : IScheduledTask
             summaryBuffer.AppendLine($"Completed: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
 
             var summaryPath = Path.Combine(logDir, $"MetadataEnrichment-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
-            await File.WriteAllTextAsync(summaryPath, summaryBuffer.ToString(), cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(summaryPath, summaryBuffer.ToString(), ct).ConfigureAwait(false);
 
             logger.LogInformation($"Enrichment complete — Enriched: {enriched}, No ISBN: {noIsbn}, No match: {noMatch}, Errors: {errors}, Skipped (cooldown): {skippedCooldown}");
             logger.LogInformation($"Summary written to: {summaryPath}");
@@ -238,7 +247,10 @@ public class MetadataEnrichmentTask : IScheduledTask
         }
         catch (OperationCanceledException)
         {
-            logger.LogWarning("Enrichment was cancelled");
+            if (timeoutCts?.IsCancellationRequested == true)
+                logger.LogWarning($"Metadata enrichment timed out after {timeoutMinutes} minutes");
+            else
+                logger.LogWarning("Enrichment was cancelled");
             throw;
         }
         catch (Exception ex)

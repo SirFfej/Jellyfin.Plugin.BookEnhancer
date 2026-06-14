@@ -14,9 +14,9 @@ public class ComicInfoParser : IFileParser
         @"^(.+?)\s+(\d+)\s*\((\d{4})\)$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    /// <summary>Matches "Series Name #123" — hash separator.</summary>
+    /// <summary>Matches "Series Name #123", "Series Name#123", "Series Name #123 Title", "Series Name#123 of 6".</summary>
     private static readonly Regex ComicHashPattern = new(
-        @"^(.+?)\s+#(\d+)$",
+        @"^(.+?)\s*#(\d+)(?:\s*of\s*\d+)?(?:\s+(.+))?$",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     /// <summary>Matches "Series_Name_123" — underscore separator with trailing digits.</summary>
@@ -71,6 +71,17 @@ public class ComicInfoParser : IFileParser
         }
     }
 
+    private static string NormalizeComicFileName(string name)
+    {
+        // Strip common leading numeric ordering prefixes such as "001 - ", "001_", "01 -".
+        name = Regex.Replace(name, @"^\d+\s*[-_]\s*", string.Empty, RegexOptions.IgnoreCase);
+
+        // Normalize underscores to spaces so "Batman_Death_and_the_Maidens_01" parses like "Batman Death and the Maidens 01".
+        name = name.Replace('_', ' ');
+
+        return SceneTagCleaner.Clean(name);
+    }
+
     private static XDocument? ExtractFromZip(string filePath, string entryName)
     {
         using var stream = File.OpenRead(filePath);
@@ -99,12 +110,13 @@ public class ComicInfoParser : IFileParser
         if (string.IsNullOrWhiteSpace(nameWithoutExt))
             return null;
 
-        var cleanedName = SceneTagCleaner.Clean(nameWithoutExt);
+        var cleanedName = NormalizeComicFileName(nameWithoutExt);
 
         var meta = new FileMetadata
         {
             FilePath = filePath,
             FileFormat = "Comic",
+            IsComic = true,
             Title = cleanedName
         };
 
@@ -121,35 +133,79 @@ public class ComicInfoParser : IFileParser
 
             if (!string.IsNullOrWhiteSpace(match.Value.Volume))
                 meta.Volume = match.Value.Volume.Trim();
+
+            if (!string.IsNullOrWhiteSpace(match.Value.Title))
+                meta.Title = SceneTagCleaner.Clean(match.Value.Title).Trim();
         }
+
+        var template = ComicInfoTemplateLoader.LoadTemplate();
+        ComicInfoTemplateLoader.MergeTemplate(meta, template);
 
         return meta;
     }
 
-    private static (string Series, string Number, string? Volume)? TryMatchComicPattern(string name)
+    public static void ApplyFallback(FileMetadata metadata)
+    {
+        if (string.IsNullOrWhiteSpace(metadata.FilePath))
+            return;
+
+        var nameWithoutExt = Path.GetFileNameWithoutExtension(metadata.FilePath);
+        if (string.IsNullOrWhiteSpace(nameWithoutExt))
+            return;
+
+        var cleanedName = NormalizeComicFileName(nameWithoutExt);
+        var match = TryMatchComicPattern(cleanedName);
+        if (match is null)
+            return;
+
+        var cleanedSeries = SceneTagCleaner.Clean(match.Value.Series);
+        if (string.IsNullOrWhiteSpace(metadata.SeriesName) && !string.IsNullOrWhiteSpace(cleanedSeries))
+            metadata.SeriesName = cleanedSeries.Trim();
+
+        if (string.IsNullOrWhiteSpace(metadata.SeriesNumber) && !string.IsNullOrWhiteSpace(match.Value.Number))
+        {
+            metadata.SeriesNumber = match.Value.Number;
+            if (float.TryParse(metadata.SeriesNumber, out var num))
+                metadata.SeriesIndex = num;
+        }
+
+        if (string.IsNullOrWhiteSpace(metadata.Volume) && !string.IsNullOrWhiteSpace(match.Value.Volume))
+            metadata.Volume = match.Value.Volume.Trim();
+
+        if (string.IsNullOrWhiteSpace(metadata.Title) && !string.IsNullOrWhiteSpace(match.Value.Title))
+            metadata.Title = SceneTagCleaner.Clean(match.Value.Title).Trim();
+
+        var template = ComicInfoTemplateLoader.LoadTemplate();
+        ComicInfoTemplateLoader.MergeTemplate(metadata, template);
+    }
+
+    private static (string Series, string Number, string? Volume, string? Title)? TryMatchComicPattern(string name)
     {
         if (string.IsNullOrWhiteSpace(name))
             return null;
 
         var match = ComicVolumeIssuePattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[3].Value, match.Groups[2].Value);
+            return (match.Groups[1].Value, match.Groups[3].Value, match.Groups[2].Value, null);
 
         match = ComicSeriesYearPattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value, null);
+            return (match.Groups[1].Value, match.Groups[2].Value, null, null);
 
         match = ComicHashPattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value, null);
+        {
+            var title = match.Groups[3].Success ? match.Groups[3].Value : null;
+            return (match.Groups[1].Value, match.Groups[2].Value, null, title);
+        }
 
         match = ComicUnderscorePattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value, null);
+            return (match.Groups[1].Value, match.Groups[2].Value, null, null);
 
         match = ComicTrailingNumberPattern.Match(name);
         if (match.Success)
-            return (match.Groups[1].Value, match.Groups[2].Value, null);
+            return (match.Groups[1].Value, match.Groups[2].Value, null, null);
 
         return null;
     }
@@ -163,6 +219,7 @@ public class ComicInfoParser : IFileParser
         {
             FilePath = filePath,
             FileFormat = "Comic",
+            IsComic = true,
             Title = root.Element("Title")?.Value
         };
 
@@ -173,6 +230,24 @@ public class ComicInfoParser : IFileParser
         meta.SeriesNumber = root.Element("Number")?.Value;
         if (meta.SeriesNumber != null && float.TryParse(meta.SeriesNumber, out var num))
             meta.SeriesIndex = num;
+
+        if (string.IsNullOrWhiteSpace(meta.SeriesName) || string.IsNullOrWhiteSpace(meta.SeriesNumber))
+        {
+            var cleanedName = NormalizeComicFileName(Path.GetFileNameWithoutExtension(filePath));
+            var fallback = TryMatchComicPattern(cleanedName);
+            if (fallback is not null)
+            {
+                if (string.IsNullOrWhiteSpace(meta.SeriesName) && !string.IsNullOrWhiteSpace(fallback.Value.Series))
+                    meta.SeriesName = SceneTagCleaner.Clean(fallback.Value.Series).Trim();
+
+                if (string.IsNullOrWhiteSpace(meta.SeriesNumber) && !string.IsNullOrWhiteSpace(fallback.Value.Number))
+                {
+                    meta.SeriesNumber = fallback.Value.Number;
+                    if (float.TryParse(meta.SeriesNumber, out var fallbackNum))
+                        meta.SeriesIndex = fallbackNum;
+                }
+            }
+        }
 
         meta.Volume = root.Element("Volume")?.Value;
         meta.Description = root.Element("Summary")?.Value;
@@ -222,6 +297,9 @@ public class ComicInfoParser : IFileParser
         AddComicPeople(meta.ComicPeople, root.Element("CoverArtist")?.Value, "CoverArtist");
         AddComicPeople(meta.ComicPeople, root.Element("Editor")?.Value, "Editor");
         AddComicPeople(meta.ComicPeople, root.Element("Translator")?.Value, "Translator");
+
+        var template = ComicInfoTemplateLoader.LoadTemplate();
+        ComicInfoTemplateLoader.MergeTemplate(meta, template);
 
         return meta;
     }

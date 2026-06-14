@@ -87,6 +87,7 @@ public class ComicVineApiClient
         var meta = new FileMetadata
         {
             FileFormat = "Comic",
+            IsComic = true,
             Title = detail.Name ?? string.Empty,
             SeriesName = detail.Volume?.Name,
             SeriesNumber = detail.IssueNumber,

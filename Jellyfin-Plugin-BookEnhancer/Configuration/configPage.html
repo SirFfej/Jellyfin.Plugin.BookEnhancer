@@ -35,6 +35,15 @@
             border-radius:3px; cursor:pointer; font-size:12px;
             background:var(--card-background);
         }
+        .be-dir-options {
+            display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 8px;
+        }
+        .be-dir-options label {
+            display:flex; align-items:center; gap:3px;
+            padding:3px 8px; border:1px solid var(--border-color);
+            border-radius:3px; cursor:pointer; font-size:12px;
+            background:var(--card-background);
+        }
         .be-test-result {
             margin-top:3px; padding:3px 8px; border-radius:3px; font-size:12px;
         }
@@ -122,6 +131,29 @@
                             Minimum confidence score (0.0–1.0) for fuzzy title matching.
                             Higher values require closer matches. Default: 0.85.
                         </div>
+                    </div>
+
+                    <hr style="margin:15px 0;" />
+
+                    <h3 style="font-size:1.1em;margin:12px 0 6px;">Task Runtime Limits</h3>
+                    <p class="fieldDescription">
+                        Maximum wall-clock time per scheduled task. Set to 0 to disable the limit. Tasks are cancelled
+                        gracefully and can resume from checkpoints on the next run.
+                    </p>
+                    <div class="inputContainer">
+                        <input is="emby-input" id="txtIngestionScanTimeout" type="number"
+                               min="0" max="1440" step="5" label="Ingestion scan timeout (minutes)" />
+                        <div class="fieldDescription">Default: 30 minutes.</div>
+                    </div>
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <input is="emby-input" id="txtLibraryCleanupTimeout" type="number"
+                               min="0" max="1440" step="5" label="Library cleanup timeout (minutes)" />
+                        <div class="fieldDescription">Default: 180 minutes (3 hours).</div>
+                    </div>
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <input is="emby-input" id="txtMetadataEnrichmentTimeout" type="number"
+                               min="0" max="1440" step="5" label="Metadata enrichment timeout (minutes)" />
+                        <div class="fieldDescription">Default: 120 minutes (2 hours).</div>
                     </div>
 
                     <hr style="margin:15px 0;" />
@@ -466,6 +498,36 @@
                         </div>
                         <div id="testConnectivityResult" class="be-test-result" style="display:none;"></div>
                     </div>
+
+                    <hr style="margin:15px 0;" />
+
+                    <h4 style="font-size:1em;margin:10px 0 3px;">ComicInfo Template</h4>
+                    <p class="fieldDescription">
+                        Provide a base <code>ComicInfo.xml</code> file whose values are merged into comics that lack metadata.
+                        Useful for setting a default publisher, age rating, manga flag, genres, or tags across an entire library.
+                        Existing values in a comic file are never overwritten.
+                    </p>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <input is="emby-input" id="txtComicInfoTemplatePath" type="text"
+                               label="Local ComicInfo.xml template path" />
+                        <div class="fieldDescription">
+                            Absolute path on the Jellyfin server to a <code>ComicInfo.xml</code> file.
+                        </div>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input is="emby-input" id="txtComicInfoTemplateUrl" type="text"
+                                   label="Template URL (optional)" style="flex:1;" />
+                            <button is="emby-button" id="btnDownloadComicInfoTemplate" type="button" class="raised"
+                                    style="white-space:nowrap;flex-shrink:0;">Download</button>
+                        </div>
+                        <div id="downloadComicInfoTemplateResult" class="be-test-result" style="display:none;"></div>
+                        <div class="fieldDescription">
+                            Optional URL to download the template from. Clicking Download fetches the URL and saves it to the local path above.
+                        </div>
+                    </div>
                 </div>
 
                 <div class="tab-content" id="tab-grouping" style="display:none;">
@@ -488,9 +550,10 @@
                             <option value="IsbnOnly">ISBN only (exact match, recommended)</option>
                             <option value="TitleAuthor">Title + Author (fuzzy match)</option>
                             <option value="Both">ISBN first, then Title + Author</option>
+                            <option value="ComicIssue">Comic issue (Series + Issue, comics only)</option>
                         </select>
                         <div class="fieldDescription">
-                            How to determine if two files represent the same book.
+                            How to determine if two files represent the same book. Comic issue groups alternate formats of the same issue using the parsed series name and issue number; non-comic files fall back to Title + Author.
                         </div>
                     </div>
 
@@ -765,6 +828,7 @@
                 <li><strong>Set Publisher (Studio):</strong> Edit Metadata &rarr; Main tab &rarr; Studios &rarr; type <code>Image Comics</code> &mdash; maps to <code>{Publisher}</code> token</li>
                 <li><strong>Set Series:</strong> Series is <em>not</em> shown in the Book Edit Metadata UI, so set it in the file's <code>ComicInfo.xml</code> (<code>&lt;Series&gt;Scarlet&lt;/Series&gt;</code>) using ComicTagger or ComicRack before scanning</li>
                 <li><strong>Set Issue Number:</strong> Also not shown in the UI &#8212; set <code>&lt;Number&gt;4&lt;/Number&gt;</code> in ComicInfo.xml before scanning</li>
+                <li><strong>Bulk fix with a template:</strong> If many files share the same missing Publisher, configure a ComicInfo template on the Metadata tab with <code>&lt;Publisher&gt;Image Comics&lt;/Publisher&gt;</code> so every empty Publisher field inherits it without overwriting existing values.</li>
             </ol>
             <p>After enrichment, the plugin writes enriched metadata back into the ComicInfo.xml. On next library scan, the template produces <code>Image Comics / Scarlet / Scarlet 04.cbz</code>.</p>
             <p>Alternatively, let the <strong>comic API cascade</strong> (ComicVine &rarr; Metron &rarr; VerseDB &rarr; GCD) populate Series + Issue Number automatically &#8212; just ensure <strong>Studios</strong> is set in Edit Metadata for the <code>{Publisher}</code> directory.</p>
@@ -774,8 +838,9 @@
                 <tr><th>You set this</th><th>Cascade that runs</th></tr>
                 <tr><td>Name + Author People</td><td>Title+Author: Hardcover &rarr; Google Books &rarr; OpenLibrary</td></tr>
                 <tr><td>ISBN</td><td>ISBN: Hardcover &rarr; Google Books &rarr; OpenLibrary</td></tr>
-                <tr><td>Series name</td><td>Comic: ComicVine &rarr; Metron &rarr; VerseDB &rarr; GrandComicsDB</td></tr>
-                <tr><td>Series + Index Number</td><td>Comic with issue-scoped query</td></tr>
+                <tr><td>Series name (comic file)</td><td>Comic: ComicVine &rarr; Metron &rarr; VerseDB &rarr; GrandComicsDB</td></tr>
+                <tr><td>Series + Index Number (comic file)</td><td>Comic with issue-scoped query</td></tr>
+                <tr><td>PDF in a Comic Library directory</td><td>Filename parsed as comic, then comic cascade above</td></tr>
                 <tr><td>None of the above</td><td>No enrichment &mdash; file uses whatever tags exist</td></tr>
             </table>
 
@@ -803,6 +868,39 @@
                 <li><code>{Author}/{Series}/{Disc}</code> &rarr; <code>Aldous Huxley/Brave New World/Disc 01/1a.m4a</code></li>
             </ul>
             <p><code>{BookTitle}</code> is derived from the audio <code>Title</code> tag by removing the author prefix and disc marker. <code>{Disc}</code> is extracted from markers like <code>Disc 08</code>, <code>[Disc 1]</code>, <code>CD 2</code>, or <code>Part 3 of 12</code>.</p>
+
+            <h3>Comic Library toggle</h3>
+            <p>
+                In the Ingestion tab, expand any managed directory and check <strong>Comic Library</strong> to treat every file
+                in that source as a comic. This enables filename-based series/issue parsing for PDFs (not just CBZ/CBR/CB7)
+                and makes those files eligible for the <strong>ComicIssue</strong> grouping strategy and the comic enrichment cascade.
+            </p>
+
+            <h3>ComicInfo.xml template fallback</h3>
+            <p>
+                On the Metadata tab you can configure a <strong>ComicInfo template</strong> file (local path or downloadable URL).
+                When a comic archive has empty or missing fields, the template supplies defaults (for example, setting Publisher
+                to <code>Marvel</code> for an entire publisher dump). Template values never overwrite fields that already exist
+                in the archive's ComicInfo.xml.
+            </p>
+
+            <h3>Grouping strategies</h3>
+            <p>
+                The Grouping tab lets you choose how alternate formats of the same item are matched:
+            </p>
+            <ul>
+                <li><strong>ISBN only</strong> — exact ISBN match (recommended for books/audiobooks)</li>
+                <li><strong>Title + Author</strong> — exact title and author match</li>
+                <li><strong>FileNamePrefix</strong> — groups by series name or title prefix</li>
+                <li><strong>ComicIssue</strong> — groups by parsed <code>SeriesName</code> + issue number. Use this for comic libraries to keep sub-series separate (e.g., <code>Star Wars</code> vs <code>Star Wars - Darth Vader</code>) while still grouping CBZ + CBR of the same issue.</li>
+            </ul>
+
+            <h3>Task runtime limits</h3>
+            <p>
+                The Main tab has <strong>Task Runtime Limits</strong> for Ingestion Scan, Library Cleanup, and Metadata Enrichment.
+                When a task exceeds its limit it is cancelled gracefully. Ingestion Scan resumes from its last checkpoint on the
+                next run; cleanup and enrichment simply stop and continue from where they left off on the next scheduled run.
+            </p>
 
             <h3>Per-directory API selection</h3>
             <p>
@@ -1066,6 +1164,64 @@
                     });
             });
 
+            document.getElementById("btnDownloadComicInfoTemplate").addEventListener("click", function () {
+                var btn = this;
+                btn.disabled = true;
+                btn.textContent = "Downloading...";
+                var resultEl = document.getElementById("downloadComicInfoTemplateResult");
+                resultEl.style.display = "block";
+                resultEl.innerHTML = '<div class="loading-spinner"></div> Downloading template...';
+
+                var url = document.getElementById("txtComicInfoTemplateUrl").value.trim();
+                var path = document.getElementById("txtComicInfoTemplatePath").value.trim();
+
+                if (!url) {
+                    resultEl.innerHTML = '<span style="color:var(--red,#f44336);">Enter a template URL first.</span>';
+                    resultEl.style.background = "var(--red-background,rgba(244,67,54,0.15))";
+                    resultEl.style.border = "1px solid var(--red,#f44336)";
+                    btn.disabled = false;
+                    btn.textContent = "Download";
+                    return;
+                }
+
+                if (!path) {
+                    resultEl.innerHTML = '<span style="color:var(--red,#f44336);">Enter a local template path first.</span>';
+                    resultEl.style.background = "var(--red-background,rgba(244,67,54,0.15))";
+                    resultEl.style.border = "1px solid var(--red,#f44336)";
+                    btn.disabled = false;
+                    btn.textContent = "Download";
+                    return;
+                }
+
+                authFetch("Books/Config/DownloadComicInfoTemplate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: url, destinationPath: path })
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (result) {
+                        if (result.success) {
+                            resultEl.innerHTML = '<span style="color:var(--green,#4caf50);">Template downloaded to ' + escapeHtml(path) + '</span>';
+                            resultEl.style.background = "var(--green-background,rgba(0,200,83,0.15))";
+                            resultEl.style.border = "1px solid var(--green,#4caf50)";
+                        } else {
+                            resultEl.innerHTML = '<span style="color:var(--red,#f44336);">Download failed: ' + escapeHtml(result.message || "unknown error") + '</span>';
+                            resultEl.style.background = "var(--red-background,rgba(244,67,54,0.15))";
+                            resultEl.style.border = "1px solid var(--red,#f44336)";
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error("[BookEnhancers] Template download failed:", err);
+                        resultEl.innerHTML = '<span style="color:var(--red,#f44336);">Request failed: ' + escapeHtml(err.message || "unknown error") + '</span>';
+                        resultEl.style.background = "var(--red-background,rgba(244,67,54,0.15))";
+                        resultEl.style.border = "1px solid var(--red,#f44336)";
+                    })
+                    .finally(function () {
+                        btn.disabled = false;
+                        btn.textContent = "Download";
+                    });
+            });
+
             function renderFormatPriority(entries) {
                 var container = document.getElementById("beFormatPriorityList");
                 container.innerHTML = "";
@@ -1307,36 +1463,40 @@
                                 '<span class="dir-status" data-idx="' + idx + '" style="font-size:11px;white-space:nowrap;"></span>' +
                             '</div>' +
                         '</div>' +
-                        '<div class="inputContainer">' +
+                        '<div class="inputContainer" style="margin-bottom:4px;">' +
                             '<label class="inputLabel inputLabelUnfocused">Target Library</label>' +
                             '<select is="emby-select" class="dir-library-select" data-idx="' + idx + '">' + libOpts + '</select>' +
                             libTypeNote +
                         '</div>' +
-                        '<div class="inputContainer">' +
+                        '<div class="inputContainer" style="margin-bottom:4px;">' +
                             '<label class="inputLabel inputLabelUnfocused">Library Path (auto-filled from library)</label>' +
                             '<input is="emby-input" class="dir-library" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.LibraryPath || '') + '" />' +
                         '</div>' +
-                        '<div class="inputContainer">' +
+                        '<div class="inputContainer" style="margin-bottom:4px;">' +
                             '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {BookTitle} {Disc} {Volume} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>' +
-                        '<div style="display:flex;gap:16px;margin-top:8px;">' +
-                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">' +
+                        '<div class="be-dir-options">' +
+                            '<label title="Enable title/author online search for this directory">' +
                                 '<input is="emby-checkbox" class="dir-title-author-search" type="checkbox" data-idx="' + idx + '"' + (dir.EnableTitleAuthorSearch !== false ? ' checked' : '') + ' />' +
                                 '<span>Title/Author Search</span>' +
                             '</label>' +
-                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;">' +
+                            '<label title="Write enriched metadata back into files">' +
                                 '<input is="emby-checkbox" class="dir-metadata-write" type="checkbox" data-idx="' + idx + '"' + (dir.EnableMetadataWriting ? ' checked' : '') + ' />' +
-                                '<span>Write Metadata to Files</span>' +
+                                '<span>Write Metadata</span>' +
                             '</label>' +
-                            '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;" title="Only removes the per-title folder from the default template. Series books go into {Publisher}/{Series}/file.cbz; standalone books keep {Publisher}/{Title}/file.cbz. Does not affect {Volume} or any other custom template tokens.">' +
+                            '<label title="Treat PDF and archive files in this directory as comics (parse issue numbers, apply ComicIssue grouping)">' +
+                                '<input is="emby-checkbox" class="dir-comic-library" type="checkbox" data-idx="' + idx + '"' + (dir.IsComicLibrary ? ' checked' : '') + ' />' +
+                                '<span>Comic Library</span>' +
+                            '</label>' +
+                            '<label title="Only removes the per-title folder from the default template. Series books go into {Publisher}/{Series}/file.cbz; standalone books keep {Publisher}/{Title}/file.cbz. Does not affect {Volume} or any other custom template tokens.">' +
                                 '<input is="emby-checkbox" class="dir-flat-series" type="checkbox" data-idx="' + idx + '"' + (dir.FlatSeriesStructure ? ' checked' : '') + ' />' +
-                                '<span>Flat Series Folders</span>' +
+                                '<span>Flat Series</span>' +
                             '</label>' +
                         '</div>' +
-                        '<details style="margin-top:10px;">' +
+                        '<details style="margin-top:6px;">' +
                             '<summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);text-decoration:underline;">Per-directory API selection (unchecked = use global)</summary>' +
-                            '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;">' + apiCheckboxes + '</div>' +
+                            '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">' + apiCheckboxes + '</div>' +
                         '</details>';
 
                     container.appendChild(row);
@@ -1430,6 +1590,7 @@
                     var titleAuthorInput = container.querySelector('.dir-title-author-search[data-idx="' + idx + '"]');
                     var metadataWriteInput = container.querySelector('.dir-metadata-write[data-idx="' + idx + '"]');
                     var flatSeriesInput = container.querySelector('.dir-flat-series[data-idx="' + idx + '"]');
+                    var comicLibraryInput = container.querySelector('.dir-comic-library[data-idx="' + idx + '"]');
                     var apiSourceInputs = container.querySelectorAll('.dir-api-source[data-idx="' + idx + '"]');
                     var enabledApiSources = [];
                     apiSourceInputs.forEach(function (cb) {
@@ -1445,6 +1606,7 @@
                         EnableTitleAuthorSearch: titleAuthorInput ? titleAuthorInput.checked : true,
                         EnableMetadataWriting: metadataWriteInput ? metadataWriteInput.checked : false,
                         FlatSeriesStructure: flatSeriesInput ? flatSeriesInput.checked : false,
+                        IsComicLibrary: comicLibraryInput ? comicLibraryInput.checked : false,
                         EnabledApiSources: enabledApiSources
                     });
                 });
@@ -1454,7 +1616,7 @@
 
             document.getElementById("btnAddDirectory").addEventListener("click", function () {
                 var dirs = getCurrentDirectories();
-                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false, FlatSeriesStructure: false, EnabledApiSources: [] });
+                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false, FlatSeriesStructure: false, IsComicLibrary: false, EnabledApiSources: [] });
                 renderDirectories(dirs);
             });
 
@@ -1700,6 +1862,9 @@
                     config.IngestionFileExtensions = DefaultExtensions.slice();
                     config.ManagedDirectories = [];
                     config.AutoScanIntervalMinutes = 0;
+                    config.IngestionScanTimeoutMinutes = 30;
+                    config.LibraryCleanupTimeoutMinutes = 180;
+                    config.MetadataEnrichmentTimeoutMinutes = 120;
                     config.IncludedLibraryIds = [];
                     config.TrashDirectory = "";
                     config.TrashCleanupIntervalDays = 7;
@@ -1734,7 +1899,14 @@
                     document.getElementById("txtGrandComicsDbPassword").value = config.GrandComicsDbPassword || "";
                     document.getElementById("txtMatchThreshold").value = config.MatchThreshold || 0.85;
 
+                    document.getElementById("txtComicInfoTemplatePath").value = config.ComicInfoTemplatePath || "";
+                    document.getElementById("txtComicInfoTemplateUrl").value = config.ComicInfoTemplateUrl || "";
+
                     document.getElementById("txtEnrichmentCooldown").value = config.EnrichmentCooldownDays ?? 7;
+
+                    document.getElementById("txtIngestionScanTimeout").value = config.IngestionScanTimeoutMinutes ?? 30;
+                    document.getElementById("txtLibraryCleanupTimeout").value = config.LibraryCleanupTimeoutMinutes ?? 180;
+                    document.getElementById("txtMetadataEnrichmentTimeout").value = config.MetadataEnrichmentTimeoutMinutes ?? 120;
 
                     document.getElementById("txtTrashDirectory").value = config.TrashDirectory || "";
                     document.getElementById("txtTrashCleanupInterval").value = config.TrashCleanupIntervalDays || 7;
@@ -1889,6 +2061,9 @@
                         config.GrandComicsDbPassword = document.getElementById("txtGrandComicsDbPassword").value;
                         config.MatchThreshold = parseFloat(document.getElementById("txtMatchThreshold").value) || 0.85;
 
+                        config.ComicInfoTemplatePath = document.getElementById("txtComicInfoTemplatePath").value.trim();
+                        config.ComicInfoTemplateUrl = document.getElementById("txtComicInfoTemplateUrl").value.trim();
+
                         var cooldownValue = parseInt(document.getElementById("txtEnrichmentCooldown").value);
                         config.EnrichmentCooldownDays = isNaN(cooldownValue) ? 7 : cooldownValue;
 
@@ -1909,6 +2084,9 @@
                         config.IngestionFileExtensions = exts.length > 0 ? exts : DefaultExtensions.slice();
 
                         config.AutoScanIntervalMinutes = parseInt(document.getElementById("txtAutoScanInterval").value) || 0;
+                        config.IngestionScanTimeoutMinutes = parseInt(document.getElementById("txtIngestionScanTimeout").value) || 0;
+                        config.LibraryCleanupTimeoutMinutes = parseInt(document.getElementById("txtLibraryCleanupTimeout").value) || 0;
+                        config.MetadataEnrichmentTimeoutMinutes = parseInt(document.getElementById("txtMetadataEnrichmentTimeout").value) || 0;
                         config.ManagedDirectories = getCurrentDirectories();
                         config.IncludedLibraryIds = getSelectedLibraryIds();
 

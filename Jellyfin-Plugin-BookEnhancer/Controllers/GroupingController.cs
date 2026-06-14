@@ -1,3 +1,4 @@
+using System.Globalization;
 using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Api;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
@@ -182,6 +183,17 @@ public class GroupingController : ControllerBase
             ? $"prefix:{prefix}"
             : string.Empty;
 
+        var isComic = meta.IsComic;
+        var series = !string.IsNullOrWhiteSpace(meta.SeriesName)
+            ? meta.SeriesName.Trim().ToLowerInvariant()
+            : title;
+        var issue = !string.IsNullOrWhiteSpace(meta.SeriesNumber)
+            ? meta.SeriesNumber.Trim().ToLowerInvariant()
+            : (meta.SeriesIndex.HasValue ? meta.SeriesIndex.Value.ToString(CultureInfo.InvariantCulture) : string.Empty);
+        var comicIssueKey = isComic && !string.IsNullOrWhiteSpace(series) && !string.IsNullOrWhiteSpace(issue)
+            ? $"series:{series}|issue:{issue}"
+            : titleAuthorKey;
+
         if (strategy.Equals("IsbnOnly", StringComparison.OrdinalIgnoreCase))
             return normalizedIsbn;
 
@@ -190,6 +202,9 @@ public class GroupingController : ControllerBase
 
         if (strategy.Equals("FileNamePrefix", StringComparison.OrdinalIgnoreCase))
             return fileNamePrefixKey;
+
+        if (strategy.Equals("ComicIssue", StringComparison.OrdinalIgnoreCase))
+            return comicIssueKey;
 
         // "Both" — ISBN first, then title/author
         if (!string.IsNullOrWhiteSpace(normalizedIsbn))

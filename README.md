@@ -42,8 +42,8 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 
 ### File Parsing
 - **EPUB** — title, authors, ISBN (3 extraction strategies), publisher, date, language, tags, series, cover image
-- **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count. **Filename fallback** — when ComicInfo.xml is missing or unreadable (e.g. RAR5 CBRs), series name, issue number, and year are parsed from common filename patterns like `Series Name 014 (2013)` to enable enrichment via the comic cascade.
-- **PDF** — title, author, subject, keywords, page count
+- **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count. **Filename fallback** — when ComicInfo.xml is missing, unreadable (e.g. RAR5 CBRs), or has empty `<Series>`/`<Number>` elements, series name, issue number, and year are parsed from common filename patterns like `Series Name 014 (2013)` to enable enrichment via the comic cascade. **ComicInfo template** — configure a template XML file to fill in missing defaults (e.g., Publisher) without overwriting existing values.
+- **PDF** — title, author, subject, keywords, page count. When the containing directory is flagged as a **Comic Library**, PDFs are also parsed with comic filename rules so they can be organized and grouped by series/issue.
 - **Audio** (MP3, M4B, FLAC, OGG, OPUS, M4A, WMA, AIFF) — title, artist, album/series, genres, narrators, duration, cover art. **Multi-disc audiobook extraction** — `BookTitle` and `DiscNumber` are derived from title/album tags for template-based organization of multi-disc books.
 
 ### Online Enrichment Cascade
@@ -67,6 +67,15 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 ### Network Diagnostics
 - **Test Enrichment Connectivity** button on the Metadata config tab — pings all 6 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
+
+### v0.8.6.1
+- **Task runtime limits** — scheduled tasks can now be capped: Ingestion Scan (default 30 min), Library Cleanup (default 3 hr), Metadata Enrichment (default 2 hr). Timeouts are cooperative; tasks log a timeout message and exit, and Ingestion Scan resumes from its checkpoint on the next run.
+- **ComicIssue grouping strategy** — groups alternate formats of the same comic issue by parsed `SeriesName` + issue number. Useful for franchises like Star Wars where sub-series (e.g., `Star Wars - Darth Vader`) should remain separate from the main line.
+- **Per-library comic toggle (`IsComicLibrary`)** — any managed directory can be flagged as a comic library. PDFs inside that directory are then parsed with comic filename rules and participate in `ComicIssue` grouping and comic enrichment.
+- **ComicInfo.xml template fallback** — configure a local `ComicInfo.xml` template (or download one from a URL) to supply default values (e.g., Publisher) when archive metadata is incomplete. Template values never overwrite existing XML fields.
+- **ComicInfo empty Series/Number fallback** — when a `ComicInfo.xml` file has empty `<Series>` or `<Number>` elements, the parser now falls back to the filename to populate them.
+- **Audiobook enrichment fix** — standalone audiobooks are no longer flagged as enrichment issues just because `{Series}` is missing.
+- **Comic filename parsing improvements** — leading numeric ordering prefixes (`001 - `, `01_`) are stripped and underscores are normalized to spaces before regex matching.
 
 ### v0.8.5.0
 - **Cooldown logging with API name** — enrichment-cooldown skip messages now include which API last enriched the file (e.g., `Skipped enrichment (cooldown, last by Hardcover)`)
@@ -104,6 +113,7 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 
 ### Grouping
 - **ISBN-based grouping** — same book in multiple formats grouped under a single Jellyfin item
+- **ComicIssue grouping** — groups alternate formats of the same comic issue by parsed `SeriesName` + issue number; keeps sub-series and different issue numbers separate
 - **Library-direct scanning** — grouping scans actual library directories on each run, not a stale SQLite cache; works independently of whether ingestion has ever run
 - **Grouping Preview** — dry-run view of how files will be grouped before processing
 - **Repair Format Paths** — cross-references `book_formats` against Jellyfin library items, populates `JellyfinItemId`, reports stale paths
@@ -125,10 +135,10 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 - **Per-file progress** — main task log shows each file's enrichment status
 
 ### Config Page (Dashboard → Plugins → BookEnhancers)
-- **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
+- **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation; **Task Runtime Limits**; **Comic Library** toggle per directory
 - **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons, **per-directory API selection** (expand a directory row to whitelist APIs for that source)
-- **Grouping** — Preview, Process, and Repair Format Paths buttons with results display
-- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, field mappings, and cooldown logging
+- **Grouping** — strategy selector (ISBN, Title/Author, FileNamePrefix, ComicIssue), Preview, Process, and Repair Format Paths buttons with results display
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **ComicInfo template** path/URL and download; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, field mappings, and cooldown logging
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging
@@ -145,6 +155,7 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
    - **Source Path**: where your book files live (e.g., `/media/books/import`)
    - **Target Library**: pick the Jellyfin library to organize into (auto-fills Library Path)
    - **Organize Template**: customize folder structure (optional)
+   - **Comic Library**: enable for directories whose PDF/CBZ/CBR/CB7 files should be treated as comics (filename issue parsing + ComicIssue grouping)
    - Click **Create** to create the target directory if it doesn't exist
  4. Go to the **Ingestion** tab to configure format priority and enrichment settings:
     - **Hardcover API Key** (required for enrichment) — get one free at https://hardcover.app/account/api
@@ -158,11 +169,13 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 
 | Task | Description |
 |------|-------------|
-| **Ingestion Scan** | Scans source directories, extracts metadata, organizes files into library paths |
+| **Ingestion Scan** | Scans source directories, extracts metadata, organizes files into library paths (default timeout: 30 min) |
 | **Grouping Process** | Scans library directories and groups book formats by ISBN |
 | **Full Maintenance** | Runs library cleanup → library scan → grouping (no ingestion) |
-| **Library Cleanup** | Reorganizes files to match current templates, enriches missing metadata, removes stale duplicates and empty directories |
-| **Metadata Enrichment** | Scans all library files, attempts online enrichment, reports items that could not be enriched |
+| **Library Cleanup** | Reorganizes files to match current templates, enriches missing metadata, removes stale duplicates and empty directories (default timeout: 3 hr) |
+| **Metadata Enrichment** | Scans all library files, attempts online enrichment, reports items that could not be enriched (default timeout: 2 hr) |
+
+Timeouts are cooperative and configurable on the Main tab. When a timeout fires, the task exits cleanly and can resume from checkpoints on the next run.
 
 ## Build from Source
 

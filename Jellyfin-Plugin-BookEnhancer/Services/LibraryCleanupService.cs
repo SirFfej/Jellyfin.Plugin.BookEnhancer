@@ -706,7 +706,8 @@ public class LibraryCleanupService
             return true;
 
         if (tokens.Contains("Series") &&
-            string.IsNullOrWhiteSpace(metadata.SeriesName))
+            string.IsNullOrWhiteSpace(metadata.SeriesName) &&
+            !string.Equals(metadata.FileFormat, "Audio", StringComparison.OrdinalIgnoreCase))
             return true;
 
         return false;
