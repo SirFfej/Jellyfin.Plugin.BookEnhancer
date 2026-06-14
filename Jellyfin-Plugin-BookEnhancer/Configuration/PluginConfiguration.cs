@@ -45,6 +45,21 @@ public class PluginConfiguration : BasePluginConfiguration
     public int BackupCleanupIntervalDays { get; set; } = 30;
 
     public bool EnableNonBookDirectoryCleanup { get; set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether files in a series that spans multiple authors are organized under the series folder first.
+    /// </summary>
+    public bool EnableSeriesFirstOrganization { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the minimum number of distinct authors a series must span before series-first organization is used.
+    /// </summary>
+    public int SeriesFirstAuthorThreshold { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the custom template for series-first organization.
+    /// </summary>
+    public string SeriesFirstTemplate { get; set; } = string.Empty;
 }
 
 public class FormatPriorityEntry

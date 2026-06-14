@@ -99,8 +99,7 @@ public class LibraryCleanupService
 
             var libResult = new CleanupResult();
             var libLabel = Path.GetFileName(libraryRoot.TrimEnd(Path.DirectorySeparatorChar, Path.PathSeparator));
-            var fileData = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
-            var enrichmentQueue = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
+            var scannedFiles = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir)>();
 
             await logCallback($"[{libLabel}] Scanning files for metadata...").ConfigureAwait(false);
 
@@ -121,34 +120,7 @@ public class LibraryCleanupService
                         .OrderByDescending(d => d.LibraryPath.Length)
                         .First();
 
-                    var template = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
-                        ? LibraryOrganizationService.GetDefaultTemplate(metadata, dir.FlatSeriesStructure)
-                        : dir.OrganizeTemplate;
-
-                    if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
-                    {
-                        var cooldown = config.EnrichmentCooldownDays;
-                        if (cooldown > 0)
-                        {
-                            var lastEnriched = _groupingService.GetLastEnrichmentTime(file);
-                            if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
-                            {
-                                fileData.Add((file, metadata, dir, template));
-                            }
-                            else
-                            {
-                                enrichmentQueue.Add((file, metadata, dir, template));
-                            }
-                        }
-                        else
-                        {
-                            enrichmentQueue.Add((file, metadata, dir, template));
-                        }
-                    }
-                    else
-                    {
-                        fileData.Add((file, metadata, dir, template));
-                    }
+                    scannedFiles.Add((file, metadata, dir));
                 }
                 catch (Exception ex)
                 {
@@ -167,6 +139,41 @@ public class LibraryCleanupService
 
             grandTotal += libFileCount;
             await logCallback($"[{libLabel}] Scanned {libFileCount} files.").ConfigureAwait(false);
+
+            var multiAuthorSeries = BuildMultiAuthorSeriesSet(scannedFiles);
+
+            var fileData = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
+            var enrichmentQueue = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
+
+            foreach (var (file, metadata, dir) in scannedFiles)
+            {
+                var template = ResolveTemplate(metadata, dir, multiAuthorSeries);
+
+                if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
+                {
+                    var cooldown = config.EnrichmentCooldownDays;
+                    if (cooldown > 0)
+                    {
+                        var lastEnriched = _groupingService.GetLastEnrichmentTime(file);
+                        if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
+                        {
+                            fileData.Add((file, metadata, dir, template));
+                        }
+                        else
+                        {
+                            enrichmentQueue.Add((file, metadata, dir, template));
+                        }
+                    }
+                    else
+                    {
+                        enrichmentQueue.Add((file, metadata, dir, template));
+                    }
+                }
+                else
+                {
+                    fileData.Add((file, metadata, dir, template));
+                }
+            }
 
             var duplicateIndex = BuildDuplicateIndex(fileData);
 
@@ -814,6 +821,70 @@ public class LibraryCleanupService
             FileFormat = Path.GetExtension(filePath).TrimStart('.').ToUpperInvariant(),
             Title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(filePath))
         };
+    }
+
+    private static HashSet<string> BuildMultiAuthorSeriesSet(List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir)> scannedFiles)
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config?.EnableSeriesFirstOrganization != true || config.SeriesFirstAuthorThreshold <= 1)
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        var seriesAuthors = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        var seriesAuthorFolders = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (_, metadata, _) in scannedFiles)
+        {
+            var series = !string.IsNullOrWhiteSpace(metadata.SeriesName)
+                ? metadata.SeriesName.Trim()
+                : null;
+
+            if (string.IsNullOrWhiteSpace(series))
+                continue;
+
+            var author = metadata.Authors.Count > 0 && !string.IsNullOrWhiteSpace(metadata.Authors[0])
+                ? metadata.Authors[0].Trim()
+                : "Unknown Author";
+
+            if (!seriesAuthors.TryGetValue(series, out var authors))
+            {
+                authors = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                seriesAuthors[series] = authors;
+            }
+
+            authors.Add(author);
+        }
+
+        var threshold = config.SeriesFirstAuthorThreshold;
+        var multiAuthorSeries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var kvp in seriesAuthors)
+        {
+            if (kvp.Value.Count >= threshold)
+                multiAuthorSeries.Add(kvp.Key);
+        }
+
+        return multiAuthorSeries;
+    }
+
+    private static string ResolveTemplate(FileMetadata metadata, ManagedSourceDirectory dir, HashSet<string> multiAuthorSeries)
+    {
+        var baseTemplate = string.IsNullOrWhiteSpace(dir.OrganizeTemplate)
+            ? LibraryOrganizationService.GetDefaultTemplate(metadata, dir.FlatSeriesStructure)
+            : dir.OrganizeTemplate;
+
+        var config = Plugin.Instance?.Configuration;
+        if (config?.EnableSeriesFirstOrganization != true)
+            return baseTemplate;
+
+        var series = !string.IsNullOrWhiteSpace(metadata.SeriesName)
+            ? metadata.SeriesName.Trim()
+            : null;
+
+        if (string.IsNullOrWhiteSpace(series) || !multiAuthorSeries.Contains(series))
+            return baseTemplate;
+
+        return !string.IsNullOrWhiteSpace(config.SeriesFirstTemplate)
+            ? config.SeriesFirstTemplate
+            : "{Series}/{Author}/{Title}";
     }
 }
 

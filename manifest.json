@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.4.0 - New: series-first organization. LibraryCleanupService now detects series that span multiple authors (configurable threshold, default 2) and reorganizes them under {Series}/{Author}/{Title} instead of {Author}/{Series}/{Title}. Use case: Wheel of Time books by Robert Jordan and Brandon Sanderson stay under one The Wheel of Time parent folder. Configurable via EnableSeriesFirstOrganization (default true), SeriesFirstAuthorThreshold, and SeriesFirstTemplate. AGENTS.md updated. Build: 0W/0E.",
+        "checksum": "23157526223FE60BD4480DEF1E8A969D",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.4.0/Jellyfin.Plugin.BookEnhancer_0.8.4.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.4.0"
+      },
+      {
         "changelog": "v0.8.3.0 - Performance/resource optimization pass. Database: eliminated N+1 query in GetAllGroupsWithMultipleFormats via JOIN; SetPrimaryFormat and RegisterFile now use transactions; RegisterFile reuses a single SQLite connection for find/create/add operations instead of opening 3 connections per file. File I/O: removed materializing .ToList() in MetadataEnrichmentTask and LibraryCleanupService directory enumeration. Memory: EpubParser no longer double-buffers cover images (reads directly into byte[]). Resilience: PdfParser now catches parse failures (encrypted/malformed PDFs) and falls back to filename-based metadata instead of returning null. Allocations: optimized SanitizePathComponent to use single char-array scan. Build: 0W/0E.",
         "checksum": "075E78879D2E885A78F3ED3B902F6BB8",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.3.0/Jellyfin.Plugin.BookEnhancer_0.8.3.0.zip",
