@@ -25,6 +25,16 @@ public class FileMetadata
     public string? SeriesNumber { get; set; }
     public string? Volume { get; set; }
 
+    /// <summary>
+    /// Gets or sets the cleaned book title derived from the audio title tag, used for organization of multi-disc audiobooks.
+    /// </summary>
+    public string? BookTitle { get; set; }
+
+    /// <summary>
+    /// Gets or sets the disc number extracted from audio title/album tags (e.g. "Disc 08"), used for organization.
+    /// </summary>
+    public string? DiscNumber { get; set; }
+
     public int? PageCount { get; set; }
     public long? DurationMs { get; set; }
 

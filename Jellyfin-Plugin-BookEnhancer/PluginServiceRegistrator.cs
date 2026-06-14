@@ -36,6 +36,14 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
             return new BookGroupingService(dbDir, logger);
         });
 
+        serviceCollection.AddSingleton<TaskCheckpointService>(sp =>
+        {
+            var paths = sp.GetRequiredService<IApplicationPaths>();
+            var logger = sp.GetRequiredService<ILogger<TaskCheckpointService>>();
+            var checkpointDir = Path.Combine(paths.DataPath, "plugins", "BookEnhancer", "checkpoints");
+            return new TaskCheckpointService(checkpointDir, logger);
+        });
+
         serviceCollection.AddTransient<GroupingPostProcessingService>();
         serviceCollection.AddSingleton<LibraryOrganizationService>();
         serviceCollection.AddTransient<BookIngestionService>();

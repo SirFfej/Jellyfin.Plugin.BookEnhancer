@@ -45,6 +45,8 @@ public class LibraryOrganizationService
             .Replace("{Series}", GetSeriesDirectoryName(metadata))
             .Replace("{Volume}", GetVolumeDirectoryName(metadata))
             .Replace("{Title}", GetTitleDirectoryName(metadata))
+            .Replace("{BookTitle}", GetBookTitleDirectoryName(metadata))
+            .Replace("{Disc}", GetDiscDirectoryName(metadata))
             .Replace("{Publisher}", GetPublisherDirectoryName(metadata));
     }
 
@@ -169,6 +171,30 @@ public class LibraryOrganizationService
             title = SceneTagCleaner.Clean(Path.GetFileNameWithoutExtension(metadata.FilePath));
 
         return SanitizePathComponent(title) ?? "Untitled";
+    }
+
+    private static string GetBookTitleDirectoryName(FileMetadata metadata)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.BookTitle))
+        {
+            var bookTitle = SanitizePathComponent(metadata.BookTitle);
+            if (!string.IsNullOrWhiteSpace(bookTitle))
+                return bookTitle;
+        }
+
+        return string.Empty;
+    }
+
+    private static string GetDiscDirectoryName(FileMetadata metadata)
+    {
+        if (!string.IsNullOrWhiteSpace(metadata.DiscNumber))
+        {
+            var disc = SanitizePathComponent(metadata.DiscNumber);
+            if (!string.IsNullOrWhiteSpace(disc))
+                return disc;
+        }
+
+        return string.Empty;
     }
 
     private static string GetPublisherDirectoryName(FileMetadata metadata)

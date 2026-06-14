@@ -6,12 +6,8 @@ namespace Jellyfin.Plugin.BookEnhancer.Services;
 
 public class BookIngestionService
 {
-    private readonly FileMetadataExtractor _fileExtractor;
-    private readonly MetadataEnrichmentService _enrichment;
-    private readonly BookGroupingService _groupingService;
-    private readonly LibraryOrganizationService _organization;
-    private readonly IFileMetadataWriter _writer;
-    private readonly ILogger<BookIngestionService> _logger;
+    private const int CheckpointInterval = 10;
+    private static readonly TimeSpan CheckpointMaxAge = TimeSpan.FromHours(24);
 
     private static readonly HashSet<string> _imageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -23,11 +19,20 @@ public class BookIngestionService
         "cover", "folder", "poster", "thumbnail", "thumb", "front", "back", "spine"
     };
 
+    private readonly FileMetadataExtractor _fileExtractor;
+    private readonly MetadataEnrichmentService _enrichment;
+    private readonly BookGroupingService _groupingService;
+    private readonly LibraryOrganizationService _organization;
+    private readonly TaskCheckpointService _checkpointService;
+    private readonly IFileMetadataWriter _writer;
+    private readonly ILogger<BookIngestionService> _logger;
+
     public BookIngestionService(
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
         BookGroupingService groupingService,
         LibraryOrganizationService organization,
+        TaskCheckpointService checkpointService,
         IFileMetadataWriter writer,
         ILogger<BookIngestionService> logger)
     {
@@ -35,6 +40,7 @@ public class BookIngestionService
         _enrichment = enrichment;
         _groupingService = groupingService;
         _organization = organization;
+        _checkpointService = checkpointService;
         _writer = writer;
         _logger = logger;
     }
@@ -133,13 +139,41 @@ public class BookIngestionService
         var supportedExts = GetSupportedExtensions();
         var files = Directory.EnumerateFiles(dir.SourcePath, "*", SearchOption.AllDirectories)
             .Where(f => supportedExts.Contains(Path.GetExtension(f)))
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         result.FilesFound = files.Count;
         await LogInfoAsync($"Found {files.Count} files in {dir.SourcePath}", logCallback, _logger).ConfigureAwait(false);
 
+        var checkpointKey = GetCheckpointKey(dir.SourcePath);
+        var checkpoint = _checkpointService.LoadCheckpoint(checkpointKey, CheckpointMaxAge);
+        var resumeFrom = checkpoint?.LastProcessedPath;
+        var resuming = !string.IsNullOrWhiteSpace(resumeFrom);
+        if (resuming)
+        {
+            await LogInfoAsync($"Resuming from checkpoint: {resumeFrom}", logCallback, _logger).ConfigureAwait(false);
+        }
+
+        var movedByDir = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var skippedByDir = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var processedSinceCheckpoint = 0;
+        var checkpointCleared = false;
+
         foreach (var file in files)
         {
+            if (resuming)
+            {
+                if (string.Equals(file, resumeFrom, StringComparison.OrdinalIgnoreCase))
+                {
+                    resuming = false;
+                }
+                else
+                {
+                    result.FilesSkipped++;
+                    continue;
+                }
+            }
+
             if (ct.IsCancellationRequested)
                 break;
 
@@ -200,7 +234,7 @@ public class BookIngestionService
                 var targetPath = _organization.BuildTargetPath(dir.LibraryPath, metadata, template);
                 var sourceDir = Path.GetDirectoryName(file);
                 var targetDir = Path.GetDirectoryName(targetPath);
-                var moveResult = await _organization.MoveFile(file, targetPath, Config?.CopyMode == true, logCallback).ConfigureAwait(false);
+                var moveResult = await _organization.MoveFile(file, targetPath, Config?.CopyMode == true, logCallback: null).ConfigureAwait(false);
 
                 if (moveResult.Success)
                 {
@@ -208,6 +242,17 @@ public class BookIngestionService
                     if (enrichmentAttempted)
                         _groupingService.SetLastEnrichmentTime(targetPath);
                     result.FilesAdded++;
+
+                    if (!string.IsNullOrWhiteSpace(targetDir))
+                    {
+                        if (!movedByDir.TryGetValue(targetDir, out var movedFiles))
+                        {
+                            movedFiles = new List<string>();
+                            movedByDir[targetDir] = movedFiles;
+                        }
+
+                        movedFiles.Add(Path.GetFileName(file));
+                    }
 
                     if (dir.EnableMetadataWriting)
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
@@ -225,6 +270,9 @@ public class BookIngestionService
                         _groupingService.SetLastEnrichmentTime(targetPath);
                     result.FilesSkipped++;
 
+                    if (!string.IsNullOrWhiteSpace(targetDir))
+                        skippedByDir[targetDir] = skippedByDir.GetValueOrDefault(targetDir) + 1;
+
                     await MoveCompanionImagesAsync(sourceDir, targetDir, logCallback).ConfigureAwait(false);
                     await CleanupEmptyDirectories(sourceDir, logCallback).ConfigureAwait(false);
                 }
@@ -232,6 +280,13 @@ public class BookIngestionService
                 {
                     await LogWarningAsync($"Failed to move file: {file} — {moveResult.ErrorMessage}", logCallback, _logger).ConfigureAwait(false);
                     result.Errors++;
+                }
+
+                processedSinceCheckpoint++;
+                if (processedSinceCheckpoint >= CheckpointInterval)
+                {
+                    _checkpointService.SaveCheckpoint(checkpointKey, file);
+                    processedSinceCheckpoint = 0;
                 }
             }
             catch (Exception ex)
@@ -241,7 +296,39 @@ public class BookIngestionService
             }
         }
 
+        if (!checkpointCleared)
+        {
+            _checkpointService.ClearCheckpoint(checkpointKey);
+            checkpointCleared = true;
+        }
+
+        await LogDirectorySummariesAsync(movedByDir, skippedByDir, logCallback).ConfigureAwait(false);
+
         return result;
+    }
+
+    private static string GetCheckpointKey(string sourcePath)
+    {
+        return $"IngestionScan:{sourcePath}";
+    }
+
+    private async Task LogDirectorySummariesAsync(
+        Dictionary<string, List<string>> movedByDir,
+        Dictionary<string, int> skippedByDir,
+        Func<string, Task>? logCallback)
+    {
+        foreach (var kvp in movedByDir.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var count = kvp.Value.Count;
+            var names = string.Join(", ", kvp.Value.Take(5));
+            var more = count > 5 ? $" and {count - 5} more" : string.Empty;
+            await LogInfoAsync($"Moved {count} files to {kvp.Key}: {names}{more}", logCallback, _logger).ConfigureAwait(false);
+        }
+
+        foreach (var kvp in skippedByDir.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            await LogInfoAsync($"Skipped {kvp.Value} existing files in {kvp.Key}", logCallback, _logger).ConfigureAwait(false);
+        }
     }
 
     private static FileMetadata CreateMinimalMetadata(string filePath)

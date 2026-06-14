@@ -779,8 +779,11 @@
             <table>
                 <tr><th>Token</th><th>Source</th><th>Fallback</th></tr>
                 <tr><td><code>{Author}</code></td><td>People &rarr; Author</td><td><code>Unknown Author</code></td></tr>
-                <tr><td><code>{Series}</code></td><td>Series field</td><td><code>Standalone</code></td></tr>
+                <tr><td><code>{Series}</code></td><td>Series field / Album tag</td><td><code>Standalone</code></td></tr>
                 <tr><td><code>{Title}</code></td><td>Name / filename</td><td><code>Untitled</code></td></tr>
+                <tr><td><code>{BookTitle}</code></td><td>Audio title with author prefix and disc marker stripped</td><td><em>empty (skipped)</em></td></tr>
+                <tr><td><code>{Disc}</code></td><td>Disc marker extracted from audio title/album (e.g. <code>Disc 08</code>)</td><td><em>empty (skipped)</em></td></tr>
+                <tr><td><code>{Volume}</code></td><td>Comic volume extracted from filename or ComicInfo.xml</td><td><em>empty (skipped)</em></td></tr>
                 <tr><td><code>{Publisher}</code></td><td>Studio(s)</td><td><code>Unknown Publisher</code></td></tr>
             </table>
 
@@ -789,6 +792,14 @@
             Otherwise &rarr; <code>{Author}/{Series}/{Title}</code>.</p>
             <p>Each managed directory can override this template in the Ingestion tab.</p>
 
+            <h3>Multi-disc audiobooks</h3>
+            <p>For audiobooks split into multiple discs, use <code>{BookTitle}</code> and <code>{Disc}</code> in the per-directory template. Examples:</p>
+            <ul>
+                <li><code>{Author}/{Series}/{BookTitle}/{Disc}</code> &rarr; <code>Anne Perry/Standalone/Dark Assassin/Disc 08/Anne Perry - Dark Assassin Disc 08.mp3</code></li>
+                <li><code>{Author}/{Series}/{Disc}</code> &rarr; <code>Aldous Huxley/Brave New World/Disc 01/1a.m4a</code></li>
+            </ul>
+            <p><code>{BookTitle}</code> is derived from the audio <code>Title</code> tag by removing the author prefix and disc marker. <code>{Disc}</code> is extracted from markers like <code>Disc 08</code>, <code>[Disc 1]</code>, <code>CD 2</code>, or <code>Part 3 of 12</code>.</p>
+
             <h3>How to pre-populate files before ingestion</h3>
             <table>
                 <tr><th>Goal</th><th>Tag to set</th><th>Tool</th></tr>
@@ -796,6 +807,9 @@
                 <tr><td><code>{Series}</code> directory</td><td><code>calibre:series</code> / ComicInfo Series / ID3 <code>TIT1</code></td><td>Calibre, ComicTagger, MP3Tag</td></tr>
                 <tr><td><code>{Publisher}</code> directory</td><td><code>dc:publisher</code> / ComicInfo Publisher / ID3 <code>TPUB</code></td><td>Calibre, ComicTagger, MP3Tag</td></tr>
                 <tr><td><code>{Title}</code> filename</td><td><code>dc:title</code> / ComicInfo Title / ID3 <code>TIT2</code></td><td>Calibre, ComicTagger, MP3Tag</td></tr>
+                <tr><td><code>{BookTitle}</code> directory (audio)</td><td>ID3 <code>TIT2</code> with book title + disc marker</td><td>MP3Tag, Kid3</td></tr>
+                <tr><td><code>{Disc}</code> directory (audio)</td><td>Disc marker in ID3 <code>TIT2</code> or <code>TALB</code></td><td>MP3Tag, Kid3</td></tr>
+                <tr><td><code>{Volume}</code> directory (comics)</td><td>ComicInfo <code>&lt;Volume&gt;</code> or filename <code>v1</code>/<code>vol 1</code></td><td>ComicTagger</td></tr>
                 <tr><td>ISBN for exact enrichment</td><td><code>dc:identifier[@scheme=ISBN]</code></td><td>Calibre</td></tr>
                 <tr><td>Series number for sorting</td><td><code>calibre:series_index</code> / ComicInfo Number</td><td>Calibre, ComicTagger</td></tr>
             </table>
@@ -1258,7 +1272,7 @@
                             '<input is="emby-input" class="dir-library" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.LibraryPath || '') + '" />' +
                         '</div>' +
                         '<div class="inputContainer">' +
-                            '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Volume} {Title} {Publisher}</span></label>' +
+                            '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {BookTitle} {Disc} {Volume} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>' +
                         '<div style="display:flex;gap:16px;margin-top:8px;">' +

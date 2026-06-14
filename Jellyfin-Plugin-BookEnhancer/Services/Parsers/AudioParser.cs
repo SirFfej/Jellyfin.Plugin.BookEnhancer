@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services.Parsers;
@@ -8,6 +9,13 @@ public class AudioParser : IFileParser
     {
         ".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma", ".opus", ".aiff"
     };
+
+    /// <summary>
+    /// Matches disc/part markers such as "Disc 08", "Disk 8", "CD 08", "Part 08", "Disc 08 of 12".
+    /// </summary>
+    private static readonly Regex DiscMarkerRegex = new(
+        @"[\(\[]?\b(?:disc|disk|cd|part)\s*(\d+)(?:\s*of\s*\d+)?\b[\)\]]?",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public bool CanParse(string filePath)
     {
@@ -37,8 +45,21 @@ public class AudioParser : IFileParser
             else if (!string.IsNullOrWhiteSpace(file.Tag.FirstAlbumArtist))
                 meta.Authors.Add(file.Tag.FirstAlbumArtist);
 
-            if (!string.IsNullOrWhiteSpace(file.Tag.Album))
-                meta.SeriesName = file.Tag.Album;
+            var album = file.Tag.Album;
+            if (!string.IsNullOrWhiteSpace(album))
+            {
+                meta.DiscNumber = ExtractDiscNumber(album);
+                meta.SeriesName = NormalizeBookTitle(album, meta.Authors);
+            }
+
+            if (!string.IsNullOrWhiteSpace(meta.Title))
+            {
+                var titleDisc = ExtractDiscNumber(meta.Title);
+                if (!string.IsNullOrWhiteSpace(titleDisc))
+                    meta.DiscNumber = titleDisc;
+
+                meta.BookTitle = NormalizeBookTitle(meta.Title, meta.Authors);
+            }
 
             if (file.Tag.Year != 0)
             {
@@ -77,5 +98,47 @@ public class AudioParser : IFileParser
         }
 
         return Task.FromResult<FileMetadata?>(meta);
+    }
+
+    private static string? ExtractDiscNumber(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return null;
+
+        var match = DiscMarkerRegex.Match(input);
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var disc))
+            return $"Disc {disc:00}";
+
+        return null;
+    }
+
+    private static string NormalizeBookTitle(string title, List<string> authors)
+    {
+        if (string.IsNullOrWhiteSpace(title))
+            return string.Empty;
+
+        var normalized = title.Trim();
+
+        // Strip leading author prefix when it matches a known author, e.g. "Anne Perry - Dark Assassin Disc 08"
+        foreach (var author in authors)
+        {
+            if (string.IsNullOrWhiteSpace(author))
+                continue;
+
+            var prefix = author.Trim() + " - ";
+            if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = normalized[prefix.Length..].Trim();
+                break;
+            }
+        }
+
+        // Strip disc/part markers, e.g. "Disc 08", "(Disc 08)", "[Disc 08 of 12]"
+        normalized = DiscMarkerRegex.Replace(normalized, string.Empty).Trim();
+
+        // Clean up trailing punctuation/spaces left after stripping markers
+        normalized = normalized.TrimEnd(' ', '-', '_', '(', '[', ')', ']');
+
+        return normalized;
     }
 }

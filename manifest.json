@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.2.0 - New: multi-disc audiobook organization via {BookTitle} and {Disc} template tokens. AudioParser extracts BookTitle (title with author prefix and disc marker stripped) and DiscNumber (Disc NN) from title/album tags. New: resume checkpoint service for IngestionScanTask — persists checkpoints every 10 files in plugins/BookEnhancer/checkpoints/ and resumes from the last processed file within 24 h after a service restart. Logging: BookIngestionService now summarizes moves/skips per target directory instead of logging full source/target paths for every file. AGENTS.md updated. Build: 0W/0E.",
+        "checksum": "C61D1702DC5D4B59ACD329F0DEBE710F",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.2.0/Jellyfin.Plugin.BookEnhancer_0.8.2.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-13T00:00:00Z",
+        "version": "0.8.2.0"
+      },
+      {
         "changelog": "v0.8.1.0 - New: grouping strategies are now fully implemented. IsbnOnly, TitleAuthor, and Both (ISBN first, then title+author) are respected by RegisterFile, grouping scan, and grouping preview. FileNamePrefix strategy is also supported. New: {Volume} organize template token; skipped when no volume is present. New: filename volume extraction for comics (v/vol/volume/vol. prefix). Safety: duplicate detection now requires ISBN match, or comic Series+Issue+Volume+size, or non-empty Title+Author+size; non-book directory cleanup is now opt-in (default off); book_formats has unique FilePath index and ON DELETE CASCADE; AddFormatToGroup prevents duplicate paths. Fix: dead title/author branch in grouping scan removed. AGENTS.md updated. Build: 0W/0E.",
         "checksum": "2C153AFA886151DAE19AAB4FE7BA8B57",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.1.0/Jellyfin.Plugin.BookEnhancer_0.8.1.0.zip",

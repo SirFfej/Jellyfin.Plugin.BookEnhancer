@@ -44,7 +44,7 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 - **EPUB** — title, authors, ISBN (3 extraction strategies), publisher, date, language, tags, series, cover image
 - **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count. **Filename fallback** — when ComicInfo.xml is missing or unreadable (e.g. RAR5 CBRs), series name, issue number, and year are parsed from common filename patterns like `Series Name 014 (2013)` to enable enrichment via the comic cascade.
 - **PDF** — title, author, subject, keywords, page count
-- **Audio** (MP3, M4B, FLAC, OGG, OPUS, M4A, WMA, AIFF) — title, artist, album/series, genres, narrators, duration, cover art
+- **Audio** (MP3, M4B, FLAC, OGG, OPUS, M4A, WMA, AIFF) — title, artist, album/series, genres, narrators, duration, cover art. **Multi-disc audiobook extraction** — `BookTitle` and `DiscNumber` are derived from title/album tags for template-based organization of multi-disc books.
 
 ### Online Enrichment Cascade
 1. **Hardcover** (tier 1) — highest quality via GraphQL API. Free API key required.
@@ -88,12 +88,14 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 
 ### Ingestion
 - **Managed source directories** — configure source folders → organize into library paths
-- **Per-source organize templates** — customize folder structure with `{Author}`, `{Series}`, `{Title}`, `{Publisher}` tokens
+- **Per-source organize templates** — customize folder structure with `{Author}`, `{Series}`, `{Title}`, `{BookTitle}`, `{Disc}`, `{Volume}`, `{Publisher}` tokens
   - Books/audiobooks default: `{Author}/{Series}/{Title}`
   - Comics default: `{Publisher}/{Series}`
+  - Multi-disc audiobook example: `{Author}/{Series}/{BookTitle}/{Disc}` → `Anne Perry/Standalone/Dark Assassin/Disc 08/...`
 - **Copy mode** — copy files instead of moving (keeps originals in source)
 - **Format priority** — when multiple formats of the same book exist, selects the preferred format (e.g., EPUB > MOBI > PDF)
 - **File extension filter** — limit which file types are ingested
+- **Resume checkpoints** — `IngestionScan` persists progress every 10 files in `plugins/BookEnhancer/checkpoints/` and resumes within 24 h after a Jellyfin service restart
 
 ### Grouping
 - **ISBN-based grouping** — same book in multiple formats grouped under a single Jellyfin item
