@@ -171,36 +171,26 @@ public class CbrToCbzService
                 var template = LibraryOrganizationService.GetDefaultTemplate(metadata, dir?.FlatSeriesStructure == true);
                 if (NeedsEnrichment(metadata, template))
                 {
-                    if (config.EnrichmentCooldownDays > 0 && _grouping.IsEnrichmentOnCooldown(cbzPath, config.EnrichmentCooldownDays))
+                    var cooldownInfo = _grouping.GetEnrichmentCooldownInfo(cbzPath, config.EnrichmentCooldownDays);
+                    if (cooldownInfo.OnCooldown)
                     {
-                        await LogAsync(logCallback, $"  Skipped enrichment (cooldown).").ConfigureAwait(false);
+                        var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
+                        await LogAsync(logCallback, $"  Skipped enrichment (cooldown, last by {by}).").ConfigureAwait(false);
                     }
                     else
                     {
+                        var apiConfig = config.GetEffectiveApiConfig(dir);
                         var enrichmentResult = await _enrichment.EnrichAsync(
                             metadata,
-                            config.HardcoverApiKey,
-                            config.GoogleBooksApiKey,
-                            config.HardcoverEnabled,
-                            config.GoogleBooksEnabled,
-                            config.OpenLibraryEnabled,
-                            comicVineEnabled: config.ComicVineEnabled,
-                            comicVineApiKey: config.ComicVineApiKey ?? "",
-                            metronEnabled: config.MetronEnabled,
-                            metronUsername: config.MetronUsername ?? "",
-                            metronPassword: config.MetronPassword ?? "",
-                            versedbEnabled: config.VerseDbEnabled,
-                            versedbApiKey: config.VerseDbApiKey ?? "",
-                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                            apiConfig,
                             titleAuthorSearchEnabled: dir?.EnableTitleAuthorSearch ?? true,
                             title: metadata.Title,
                             author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
                             ct: ct).ConfigureAwait(false);
 
                         metadata = enrichmentResult.Metadata;
-                        _grouping.SetLastEnrichmentTime(cbzPath);
+                        if (enrichmentResult.ApiMatchFound)
+                            _grouping.SetLastEnrichmentTime(cbzPath, enrichmentResult.EnrichedBy);
                     }
                 }
             }

@@ -37,21 +37,7 @@ public class MetadataEnrichmentService
 
     public async Task<EnrichmentResult> EnrichAsync(
         FileMetadata source,
-        string hardcoverApiKey,
-        string? googleBooksApiKey,
-        bool hardcoverEnabled,
-        bool googleBooksEnabled,
-        bool openLibraryEnabled,
-        bool comicVineEnabled = false,
-        string comicVineApiKey = "",
-        bool metronEnabled = false,
-        string metronUsername = "",
-        string metronPassword = "",
-        bool versedbEnabled = false,
-        string versedbApiKey = "",
-        bool grandComicsDbEnabled = false,
-        string grandComicsDbUsername = "",
-        string grandComicsDbPassword = "",
+        EnrichmentApiConfig apiConfig,
         bool titleAuthorSearchEnabled = true,
         string? title = null,
         string? author = null,
@@ -59,9 +45,11 @@ public class MetadataEnrichmentService
     {
         var apiMatchFound = false;
 
+        string? enrichedBy = null;
+
         if (!string.IsNullOrWhiteSpace(source.Isbn))
         {
-            apiMatchFound = await SearchByIsbnCascade(source, source.Isbn, hardcoverApiKey, googleBooksApiKey, hardcoverEnabled, googleBooksEnabled, openLibraryEnabled, ct).ConfigureAwait(false);
+            (apiMatchFound, enrichedBy) = await SearchByIsbnCascade(source, source.Isbn, apiConfig, ct).ConfigureAwait(false);
         }
 
         if (!apiMatchFound && titleAuthorSearchEnabled)
@@ -72,142 +60,134 @@ public class MetadataEnrichmentService
             if (!string.IsNullOrWhiteSpace(searchTitle))
             {
                 _logger.LogDebug("ISBN lookup returned no data, falling back to title/author search");
-                apiMatchFound = await SearchByTitleAuthorCascade(source, searchTitle, searchAuthor, hardcoverApiKey, googleBooksApiKey, hardcoverEnabled, googleBooksEnabled, openLibraryEnabled, ct).ConfigureAwait(false);
+                (apiMatchFound, enrichedBy) = await SearchByTitleAuthorCascade(source, searchTitle, searchAuthor, apiConfig, ct).ConfigureAwait(false);
             }
         }
 
         if (!apiMatchFound)
         {
-            apiMatchFound = await SearchByComicCascade(source, comicVineEnabled, comicVineApiKey, metronEnabled, metronUsername, metronPassword, versedbEnabled, versedbApiKey, grandComicsDbEnabled, grandComicsDbUsername, grandComicsDbPassword, ct).ConfigureAwait(false);
+            (apiMatchFound, enrichedBy) = await SearchByComicCascade(source, apiConfig, ct).ConfigureAwait(false);
         }
 
         return new EnrichmentResult
         {
             Metadata = source,
-            ApiMatchFound = apiMatchFound
+            ApiMatchFound = apiMatchFound,
+            EnrichedBy = enrichedBy
         };
     }
 
-    private async Task<bool> SearchByIsbnCascade(
+    private async Task<(bool Matched, string? ApiName)> SearchByIsbnCascade(
         FileMetadata source,
         string isbn,
-        string hardcoverApiKey,
-        string? googleBooksApiKey,
-        bool hardcoverEnabled,
-        bool googleBooksEnabled,
-        bool openLibraryEnabled,
+        EnrichmentApiConfig apiConfig,
         CancellationToken ct)
     {
         var anyApiReturnedData = false;
+        string? apiName = null;
 
-        if (hardcoverEnabled && !string.IsNullOrWhiteSpace(hardcoverApiKey))
+        if (apiConfig.HardcoverEnabled && !string.IsNullOrWhiteSpace(apiConfig.HardcoverApiKey))
         {
-            var hcMeta = await _hardcover.SearchByIsbnAsync(isbn, hardcoverApiKey, ct).ConfigureAwait(false);
+            var hcMeta = await _hardcover.SearchByIsbnAsync(isbn, apiConfig.HardcoverApiKey, ct).ConfigureAwait(false);
             if (hcMeta != null)
             {
                 anyApiReturnedData = true;
+                apiName ??= "Hardcover";
                 MergeSource(source, hcMeta);
                 _logger.LogDebug("Hardcover returned data for ISBN {Isbn}", isbn);
-                if (HasCompleteMetadata(source)) return true;
+                if (HasCompleteMetadata(source)) return (true, apiName);
             }
         }
 
-        if (googleBooksEnabled && !string.IsNullOrWhiteSpace(googleBooksApiKey))
+        if (apiConfig.GoogleBooksEnabled && !string.IsNullOrWhiteSpace(apiConfig.GoogleBooksApiKey))
         {
-            var gbMeta = await _googleBooks.SearchByIsbnAsync(isbn, googleBooksApiKey, ct).ConfigureAwait(false);
+            var gbMeta = await _googleBooks.SearchByIsbnAsync(isbn, apiConfig.GoogleBooksApiKey, ct).ConfigureAwait(false);
             if (gbMeta != null)
             {
                 anyApiReturnedData = true;
+                apiName ??= "Google Books";
                 MergeNulls(source, gbMeta);
                 _logger.LogDebug("Google Books returned data for ISBN {Isbn}", isbn);
-                if (HasCompleteMetadata(source)) return true;
+                if (HasCompleteMetadata(source)) return (true, apiName);
             }
         }
 
-        if (openLibraryEnabled)
+        if (apiConfig.OpenLibraryEnabled)
         {
             var olMeta = await _openLibrary.SearchByIsbnAsync(isbn, ct).ConfigureAwait(false);
             if (olMeta != null)
             {
                 anyApiReturnedData = true;
+                apiName ??= "OpenLibrary";
                 MergeNulls(source, olMeta);
                 _logger.LogDebug("OpenLibrary returned data for ISBN {Isbn}", isbn);
-                if (HasCompleteMetadata(source)) return true;
+                if (HasCompleteMetadata(source)) return (true, apiName);
             }
         }
 
-        return anyApiReturnedData;
+        return (anyApiReturnedData, apiName);
     }
 
-    private async Task<bool> SearchByTitleAuthorCascade(
+    private async Task<(bool Matched, string? ApiName)> SearchByTitleAuthorCascade(
         FileMetadata source,
         string title,
         string? author,
-        string hardcoverApiKey,
-        string? googleBooksApiKey,
-        bool hardcoverEnabled,
-        bool googleBooksEnabled,
-        bool openLibraryEnabled,
+        EnrichmentApiConfig apiConfig,
         CancellationToken ct)
     {
-        var anyApiReturnedData = false;
-
         if (string.IsNullOrWhiteSpace(author))
         {
             _logger.LogDebug("No author available for title/author search, skipping");
-            return false;
+            return (false, null);
         }
 
-        if (hardcoverEnabled && !string.IsNullOrWhiteSpace(hardcoverApiKey))
+        var anyApiReturnedData = false;
+        string? apiName = null;
+
+        if (apiConfig.HardcoverEnabled && !string.IsNullOrWhiteSpace(apiConfig.HardcoverApiKey))
         {
-            var hcMeta = await _hardcover.SearchByTitleAuthorAsync(title, author, hardcoverApiKey, ct).ConfigureAwait(false);
+            var hcMeta = await _hardcover.SearchByTitleAuthorAsync(title, author, apiConfig.HardcoverApiKey, ct).ConfigureAwait(false);
             if (hcMeta != null)
             {
                 anyApiReturnedData = true;
+                apiName ??= "Hardcover";
                 MergeSource(source, hcMeta);
                 _logger.LogDebug("Hardcover title/author search matched {Title}", title);
-                if (HasCompleteMetadata(source)) return true;
+                if (HasCompleteMetadata(source)) return (true, apiName);
             }
         }
 
-        if (googleBooksEnabled && !string.IsNullOrWhiteSpace(googleBooksApiKey))
+        if (apiConfig.GoogleBooksEnabled && !string.IsNullOrWhiteSpace(apiConfig.GoogleBooksApiKey))
         {
-            var gbMeta = await _googleBooks.SearchByTitleAuthorAsync(title, author, googleBooksApiKey, ct).ConfigureAwait(false);
+            var gbMeta = await _googleBooks.SearchByTitleAuthorAsync(title, author, apiConfig.GoogleBooksApiKey, ct).ConfigureAwait(false);
             if (gbMeta != null)
             {
                 anyApiReturnedData = true;
+                apiName ??= "Google Books";
                 MergeNulls(source, gbMeta);
                 _logger.LogDebug("Google Books title/author search matched {Title}", title);
-                if (HasCompleteMetadata(source)) return true;
+                if (HasCompleteMetadata(source)) return (true, apiName);
             }
         }
 
-        if (openLibraryEnabled)
+        if (apiConfig.OpenLibraryEnabled)
         {
             var olMeta = await _openLibrary.SearchByTitleAuthorAsync(title, author, ct).ConfigureAwait(false);
             if (olMeta != null)
             {
                 anyApiReturnedData = true;
+                apiName ??= "OpenLibrary";
                 MergeNulls(source, olMeta);
                 _logger.LogDebug("OpenLibrary title/author search matched {Title}", title);
             }
         }
 
-        return anyApiReturnedData;
+        return (anyApiReturnedData, apiName);
     }
 
-    private async Task<bool> SearchByComicCascade(
+    private async Task<(bool Matched, string? ApiName)> SearchByComicCascade(
         FileMetadata source,
-        bool comicVineEnabled,
-        string comicVineApiKey,
-        bool metronEnabled,
-        string metronUsername,
-        string metronPassword,
-        bool versedbEnabled,
-        string versedbApiKey,
-        bool grandComicsDbEnabled,
-        string grandComicsDbUsername,
-        string grandComicsDbPassword,
+        EnrichmentApiConfig apiConfig,
         CancellationToken ct)
     {
         var series = source.SeriesName;
@@ -216,74 +196,74 @@ public class MetadataEnrichmentService
         if (string.IsNullOrWhiteSpace(series))
         {
             _logger.LogDebug("No series info available for comic API search, skipping");
-            return false;
+            return (false, null);
         }
 
-        if (comicVineEnabled && !string.IsNullOrWhiteSpace(comicVineApiKey))
+        if (apiConfig.ComicVineEnabled && !string.IsNullOrWhiteSpace(apiConfig.ComicVineApiKey))
         {
             var query = issue is not null ? $"{series} {issue}" : series;
-            var cvResults = await _comicVine.SearchIssuesAsync(query, comicVineApiKey, ct).ConfigureAwait(false);
+            var cvResults = await _comicVine.SearchIssuesAsync(query, apiConfig.ComicVineApiKey, ct).ConfigureAwait(false);
             if (cvResults.Count > 0)
             {
-                var detail = await _comicVine.GetIssueDetailAsync(cvResults[0].Id, comicVineApiKey, ct).ConfigureAwait(false);
+                var detail = await _comicVine.GetIssueDetailAsync(cvResults[0].Id, apiConfig.ComicVineApiKey, ct).ConfigureAwait(false);
                 if (detail is not null)
                 {
                     MergeNulls(source, detail);
                     if (!string.IsNullOrWhiteSpace(cvResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
                         source.Publisher = cvResults[0].PublisherName;
                     _logger.LogDebug("Comic Vine enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                    return true;
+                    return (true, "Comic Vine");
                 }
             }
         }
 
-        if (metronEnabled && !string.IsNullOrWhiteSpace(metronUsername) && !string.IsNullOrWhiteSpace(metronPassword) && !string.IsNullOrWhiteSpace(issue))
+        if (apiConfig.MetronEnabled && !string.IsNullOrWhiteSpace(apiConfig.MetronUsername) && !string.IsNullOrWhiteSpace(apiConfig.MetronPassword) && !string.IsNullOrWhiteSpace(issue))
         {
-            var mtResults = await _metron.SearchIssuesAsync(series, issue, metronUsername, metronPassword, ct).ConfigureAwait(false);
+            var mtResults = await _metron.SearchIssuesAsync(series, issue, apiConfig.MetronUsername, apiConfig.MetronPassword, ct).ConfigureAwait(false);
             if (mtResults.Count > 0)
             {
-                var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, metronUsername, metronPassword, ct).ConfigureAwait(false);
+                var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, apiConfig.MetronUsername, apiConfig.MetronPassword, ct).ConfigureAwait(false);
                 if (detail is not null)
                 {
                     MergeNulls(source, detail);
                     if (!string.IsNullOrWhiteSpace(mtResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
                         source.Publisher = mtResults[0].PublisherName;
                     _logger.LogDebug("Metron enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                    return true;
+                    return (true, "Metron");
                 }
             }
         }
 
-        if (versedbEnabled && !string.IsNullOrWhiteSpace(versedbApiKey))
+        if (apiConfig.VerseDbEnabled && !string.IsNullOrWhiteSpace(apiConfig.VerseDbApiKey))
         {
             var query = issue is not null ? $"{series} {issue}" : series;
-            var vdResults = await _verseDb.SearchIssuesAsync(query, versedbApiKey, ct).ConfigureAwait(false);
+            var vdResults = await _verseDb.SearchIssuesAsync(query, apiConfig.VerseDbApiKey, ct).ConfigureAwait(false);
             if (vdResults.Count > 0)
             {
-                var detail = await _verseDb.GetIssueDetailAsync(vdResults[0].Id, versedbApiKey, ct).ConfigureAwait(false);
+                var detail = await _verseDb.GetIssueDetailAsync(vdResults[0].Id, apiConfig.VerseDbApiKey, ct).ConfigureAwait(false);
                 if (detail is not null)
                 {
                     MergeNulls(source, detail);
                     if (!string.IsNullOrWhiteSpace(vdResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
                         source.Publisher = vdResults[0].PublisherName;
                     _logger.LogDebug("VerseDB enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                    return true;
+                    return (true, "VerseDB");
                 }
             }
         }
 
-        if (grandComicsDbEnabled && !string.IsNullOrWhiteSpace(grandComicsDbUsername) && !string.IsNullOrWhiteSpace(grandComicsDbPassword) && !string.IsNullOrWhiteSpace(issue))
+        if (apiConfig.GrandComicsDbEnabled && !string.IsNullOrWhiteSpace(apiConfig.GrandComicsDbUsername) && !string.IsNullOrWhiteSpace(apiConfig.GrandComicsDbPassword) && !string.IsNullOrWhiteSpace(issue))
         {
-            var gcdMeta = await _grandComicsDb.SearchBySeriesAndIssueAsync(series, issue, grandComicsDbUsername, grandComicsDbPassword, ct).ConfigureAwait(false);
+            var gcdMeta = await _grandComicsDb.SearchBySeriesAndIssueAsync(series, issue, apiConfig.GrandComicsDbUsername, apiConfig.GrandComicsDbPassword, ct).ConfigureAwait(false);
             if (gcdMeta is not null)
             {
                 MergeNulls(source, gcdMeta);
                 _logger.LogDebug("Grand Comics Database enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                return true;
+                return (true, "Grand Comics Database");
             }
         }
 
-        return false;
+        return (false, null);
     }
 
     private static void MergeSource(FileMetadata target, FileMetadata source)

@@ -58,36 +58,26 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             var titleAuthorEnabled = dir?.EnableTitleAuthorSearch ?? true;
 
             FileMetadata enriched;
-            if (config.EnrichmentCooldownDays > 0 && _grouping.IsEnrichmentOnCooldown(info.Path, config.EnrichmentCooldownDays))
+            var cooldownInfo = _grouping.GetEnrichmentCooldownInfo(info.Path, config.EnrichmentCooldownDays);
+            if (cooldownInfo.OnCooldown)
             {
-                _logger.LogDebug("Skipped enrichment (cooldown) for {Path}", info.Path);
+                var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
+                _logger.LogDebug("Skipped enrichment (cooldown, last by {Api}) for {Path}", by, info.Path);
                 enriched = fileMeta;
             }
             else
             {
+                var apiConfig = config.GetEffectiveApiConfig(dir);
                 var enrichmentResult = await _enrichment.EnrichAsync(
                     fileMeta,
-                    config.HardcoverApiKey,
-                    config.GoogleBooksApiKey,
-                    config.HardcoverEnabled,
-                    config.GoogleBooksEnabled,
-                    config.OpenLibraryEnabled,
-                    comicVineEnabled: config.ComicVineEnabled,
-                    comicVineApiKey: config.ComicVineApiKey ?? "",
-                    metronEnabled: config.MetronEnabled,
-                    metronUsername: config.MetronUsername ?? "",
-                    metronPassword: config.MetronPassword ?? "",
-                    versedbEnabled: config.VerseDbEnabled,
-                    versedbApiKey: config.VerseDbApiKey ?? "",
-                    grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                    grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                    grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                    apiConfig,
                     titleAuthorSearchEnabled: titleAuthorEnabled,
                     title: fileMeta.Title,
                     author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
                     ct: cancellationToken).ConfigureAwait(false);
 
-                _grouping.SetLastEnrichmentTime(info.Path);
+                if (enrichmentResult.ApiMatchFound)
+                    _grouping.SetLastEnrichmentTime(info.Path, enrichmentResult.EnrichedBy);
                 enriched = enrichmentResult.Metadata;
 
                 if (dir?.EnableMetadataWriting == true && !string.IsNullOrWhiteSpace(info.Path) && File.Exists(info.Path))
@@ -148,38 +138,28 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
             if (!string.IsNullOrWhiteSpace(searchInfo.Name))
             {
                 var localMeta = await ExtractFileMetadata(searchInfo.Path, cancellationToken).ConfigureAwait(false);
+                var searchDir = FindMatchingDirectory(config, searchInfo.Path);
                 if (localMeta is not null)
                 {
                     if (localMeta.Isbn is not null)
                     {
-                        if (config.EnrichmentCooldownDays > 0 && !string.IsNullOrWhiteSpace(searchInfo.Path) && _grouping.IsEnrichmentOnCooldown(searchInfo.Path, config.EnrichmentCooldownDays))
+                        var searchCooldownInfo = _grouping.GetEnrichmentCooldownInfo(searchInfo.Path, config.EnrichmentCooldownDays);
+                        if (searchCooldownInfo.OnCooldown)
                         {
-                            _logger.LogDebug("Skipped search enrichment (cooldown) for {Path}", searchInfo.Path);
+                            var by = string.IsNullOrWhiteSpace(searchCooldownInfo.EnrichedBy) ? "unknown API" : searchCooldownInfo.EnrichedBy;
+                            _logger.LogDebug("Skipped search enrichment (cooldown, last by {Api}) for {Path}", by, searchInfo.Path);
                         }
                         else
                         {
+                            var searchApiConfig = config.GetEffectiveApiConfig(searchDir);
                             var enrichmentResult = await _enrichment.EnrichAsync(
                                 localMeta,
-                                config.HardcoverApiKey,
-                                config.GoogleBooksApiKey,
-                                config.HardcoverEnabled,
-                                config.GoogleBooksEnabled,
-                                config.OpenLibraryEnabled,
-                                comicVineEnabled: config.ComicVineEnabled,
-                                comicVineApiKey: config.ComicVineApiKey ?? "",
-                                metronEnabled: config.MetronEnabled,
-                                metronUsername: config.MetronUsername ?? "",
-                                metronPassword: config.MetronPassword ?? "",
-                                versedbEnabled: config.VerseDbEnabled,
-                                versedbApiKey: config.VerseDbApiKey ?? "",
-                                grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                                grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                                grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                                searchApiConfig,
                                 title: searchInfo.Name,
                                 ct: cancellationToken).ConfigureAwait(false);
 
-                            if (!string.IsNullOrWhiteSpace(searchInfo.Path))
-                                _grouping.SetLastEnrichmentTime(searchInfo.Path);
+                            if (!string.IsNullOrWhiteSpace(searchInfo.Path) && enrichmentResult.ApiMatchFound)
+                                _grouping.SetLastEnrichmentTime(searchInfo.Path, enrichmentResult.EnrichedBy);
 
                             if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
                             {
@@ -191,35 +171,24 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
 
                     if (HasComicMetadata(localMeta))
                     {
-                        if (config.EnrichmentCooldownDays > 0 && !string.IsNullOrWhiteSpace(searchInfo.Path) && _grouping.IsEnrichmentOnCooldown(searchInfo.Path, config.EnrichmentCooldownDays))
+                        var comicCooldownInfo = _grouping.GetEnrichmentCooldownInfo(searchInfo.Path, config.EnrichmentCooldownDays);
+                        if (comicCooldownInfo.OnCooldown)
                         {
-                            _logger.LogDebug("Skipped comic search enrichment (cooldown) for {Path}", searchInfo.Path);
+                            var by = string.IsNullOrWhiteSpace(comicCooldownInfo.EnrichedBy) ? "unknown API" : comicCooldownInfo.EnrichedBy;
+                            _logger.LogDebug("Skipped comic search enrichment (cooldown, last by {Api}) for {Path}", by, searchInfo.Path);
                         }
                         else
                         {
+                            var comicApiConfig = config.GetEffectiveApiConfig(searchDir);
                             var enriched = await _enrichment.EnrichAsync(
                                 localMeta,
-                                config.HardcoverApiKey,
-                                config.GoogleBooksApiKey,
-                                config.HardcoverEnabled,
-                                config.GoogleBooksEnabled,
-                                config.OpenLibraryEnabled,
-                                comicVineEnabled: config.ComicVineEnabled,
-                                comicVineApiKey: config.ComicVineApiKey ?? "",
-                                metronEnabled: config.MetronEnabled,
-                                metronUsername: config.MetronUsername ?? "",
-                                metronPassword: config.MetronPassword ?? "",
-                                versedbEnabled: config.VerseDbEnabled,
-                                versedbApiKey: config.VerseDbApiKey ?? "",
-                                grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                                grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                                grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                                comicApiConfig,
                                 titleAuthorSearchEnabled: false,
                                 title: searchInfo.Name,
                                 ct: cancellationToken).ConfigureAwait(false);
 
-                            if (!string.IsNullOrWhiteSpace(searchInfo.Path))
-                                _grouping.SetLastEnrichmentTime(searchInfo.Path);
+                            if (!string.IsNullOrWhiteSpace(searchInfo.Path) && enriched.ApiMatchFound)
+                                _grouping.SetLastEnrichmentTime(searchInfo.Path, enriched.EnrichedBy);
 
                             if (!string.IsNullOrWhiteSpace(enriched.Metadata.Title))
                             {

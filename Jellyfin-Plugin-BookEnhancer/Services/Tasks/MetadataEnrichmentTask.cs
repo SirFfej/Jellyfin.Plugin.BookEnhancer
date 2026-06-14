@@ -159,35 +159,24 @@ public class MetadataEnrichmentTask : IScheduledTask
                         var cooldown = config.EnrichmentCooldownDays;
                         if (cooldown > 0)
                         {
-                            var lastEnriched = _groupingService.GetLastEnrichmentTime(filePath);
-                            if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
+                            var cooldownInfo = _groupingService.GetEnrichmentCooldownInfo(filePath, cooldown);
+                            if (cooldownInfo.OnCooldown)
                             {
                                 skippedCooldown++;
-                                logger.LogInformation($"Skipped (cooldown): {filePath}");
+                                var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
+                                logger.LogInformation($"Skipped (cooldown, last by {by}): {filePath}");
                                 continue;
                             }
                         }
 
+                        var apiConfig = config.GetEffectiveApiConfig(null);
                         var result = await _enrichment.EnrichAsync(
                             metadata,
-                            config.HardcoverApiKey,
-                            config.GoogleBooksApiKey,
-                            config.HardcoverEnabled,
-                            config.GoogleBooksEnabled,
-                            config.OpenLibraryEnabled,
-                            comicVineEnabled: config.ComicVineEnabled,
-                            comicVineApiKey: config.ComicVineApiKey ?? "",
-                            metronEnabled: config.MetronEnabled,
-                            metronUsername: config.MetronUsername ?? "",
-                            metronPassword: config.MetronPassword ?? "",
-                            versedbEnabled: config.VerseDbEnabled,
-                            versedbApiKey: config.VerseDbApiKey ?? "",
-                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                            apiConfig,
                             ct: cancellationToken).ConfigureAwait(false);
 
-                        _groupingService.SetLastEnrichmentTime(filePath);
+                        if (result.ApiMatchFound)
+                            _groupingService.SetLastEnrichmentTime(filePath, result.EnrichedBy);
 
                         var enrichedMeta = result.Metadata;
 

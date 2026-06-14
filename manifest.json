@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.5.0 - New: enrichment cooldown logs now mention which API last enriched the file. New: per-managed-directory API selection via EnabledApiSources; each directory can override global API toggles in the Ingestion tab. Refactored MetadataEnrichmentService to use EnrichmentApiConfig. Database schema updated with EnrichedBy column. Build: 0W/0E.",
+        "checksum": "097ABA62A17CFFCEEBD8CB233B0DA82E",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.5.0/Jellyfin.Plugin.BookEnhancer_0.8.5.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.5.0"
+      },
+      {
         "changelog": "v0.8.4.0 - New: series-first organization. LibraryCleanupService now detects series that span multiple authors (configurable threshold, default 2) and reorganizes them under {Series}/{Author}/{Title} instead of {Author}/{Series}/{Title}. Use case: Wheel of Time books by Robert Jordan and Brandon Sanderson stay under one The Wheel of Time parent folder. Configurable via EnableSeriesFirstOrganization (default true), SeriesFirstAuthorThreshold, and SeriesFirstTemplate. AGENTS.md updated. Build: 0W/0E.",
         "checksum": "23157526223FE60BD4480DEF1E8A969D",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.4.0/Jellyfin.Plugin.BookEnhancer_0.8.4.0.zip",

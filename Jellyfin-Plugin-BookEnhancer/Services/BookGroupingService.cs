@@ -45,7 +45,8 @@ public class BookGroupingService
                 FormatType TEXT NOT NULL,
                 JellyfinItemId TEXT,
                 IsPrimary INTEGER NOT NULL DEFAULT 0,
-                AddedAt TEXT NOT NULL
+                AddedAt TEXT NOT NULL,
+                EnrichedBy TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_formats_group ON book_formats(GroupId);
@@ -56,6 +57,7 @@ public class BookGroupingService
         cmd.ExecuteNonQuery();
 
         MigrateAddEnrichedAt(conn);
+        MigrateAddEnrichedBy(conn);
         MigrateUniqueFilePath(conn);
     }
 
@@ -79,6 +81,30 @@ public class BookGroupingService
         {
             using var migrate = conn.CreateCommand();
             migrate.CommandText = "ALTER TABLE book_formats ADD COLUMN EnrichedAt TEXT";
+            migrate.ExecuteNonQuery();
+        }
+    }
+
+    private static void MigrateAddEnrichedBy(SqliteConnection conn)
+    {
+        var hasColumn = false;
+        using var check = conn.CreateCommand();
+        check.CommandText = "PRAGMA table_info(book_formats)";
+        using var reader = check.ExecuteReader();
+        while (reader.Read())
+        {
+            var name = reader.GetString(1);
+            if (string.Equals(name, "EnrichedBy", StringComparison.OrdinalIgnoreCase))
+            {
+                hasColumn = true;
+                break;
+            }
+        }
+
+        if (!hasColumn)
+        {
+            using var migrate = conn.CreateCommand();
+            migrate.CommandText = "ALTER TABLE book_formats ADD COLUMN EnrichedBy TEXT";
             migrate.ExecuteNonQuery();
         }
     }
@@ -348,22 +374,48 @@ public class BookGroupingService
 
     public bool IsEnrichmentOnCooldown(string filePath, int cooldownDays)
     {
-        if (cooldownDays <= 0)
-            return false;
-
-        var lastEnriched = GetLastEnrichmentTime(filePath);
-        return lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldownDays;
+        return GetEnrichmentCooldownInfo(filePath, cooldownDays).OnCooldown;
     }
 
-    public void SetLastEnrichmentTime(string filePath)
+    public (bool OnCooldown, string? EnrichedBy) GetEnrichmentCooldownInfo(string filePath, int cooldownDays)
+    {
+        if (cooldownDays <= 0)
+            return (false, null);
+
+        using var conn = CreateConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT EnrichedAt, EnrichedBy FROM book_formats WHERE FilePath = @FilePath LIMIT 1";
+        cmd.Parameters.AddWithValue("@FilePath", filePath);
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+            return (false, null);
+
+        var enrichedAtRaw = reader.IsDBNull(0) ? null : reader.GetString(0);
+        var enrichedBy = reader.IsDBNull(1) ? null : reader.GetString(1);
+
+        if (string.IsNullOrWhiteSpace(enrichedAtRaw))
+            return (false, null);
+
+        if (!DateTime.TryParse(enrichedAtRaw, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var lastEnriched))
+            return (false, null);
+
+        var onCooldown = (DateTime.UtcNow - lastEnriched).TotalDays < cooldownDays;
+        return (onCooldown, enrichedBy);
+    }
+
+    public void SetLastEnrichmentTime(string filePath, string? enrichedBy = null)
     {
         using var conn = CreateConnection();
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE book_formats SET EnrichedAt = @Now WHERE FilePath = @FilePath";
+        cmd.CommandText = "UPDATE book_formats SET EnrichedAt = @Now, EnrichedBy = @EnrichedBy WHERE FilePath = @FilePath";
         cmd.Parameters.AddWithValue("@FilePath", filePath);
         cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("@EnrichedBy", enrichedBy ?? (object)DBNull.Value);
         cmd.ExecuteNonQuery();
     }
 

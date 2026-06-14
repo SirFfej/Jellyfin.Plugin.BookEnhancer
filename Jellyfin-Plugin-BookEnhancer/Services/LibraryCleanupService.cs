@@ -154,9 +154,11 @@ public class LibraryCleanupService
                     var cooldown = config.EnrichmentCooldownDays;
                     if (cooldown > 0)
                     {
-                        var lastEnriched = _groupingService.GetLastEnrichmentTime(file);
-                        if (lastEnriched.HasValue && (DateTime.UtcNow - lastEnriched.Value).TotalDays < cooldown)
+                        var cooldownInfo = _groupingService.GetEnrichmentCooldownInfo(file, cooldown);
+                        if (cooldownInfo.OnCooldown)
                         {
+                            var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
+                            await logCallback($"[{libLabel}] Skipped enrichment (cooldown, last by {by}): {file}").ConfigureAwait(false);
                             fileData.Add((file, metadata, dir, template));
                         }
                         else
@@ -254,29 +256,17 @@ public class LibraryCleanupService
 
                     try
                     {
+                        var apiConfig = config.GetEffectiveApiConfig(dir);
                         var enrichmentResult = await _enrichment.EnrichAsync(
                             rawMetadata,
-                            config.HardcoverApiKey,
-                            config.GoogleBooksApiKey,
-                            config.HardcoverEnabled,
-                            config.GoogleBooksEnabled,
-                            config.OpenLibraryEnabled,
-                            comicVineEnabled: config.ComicVineEnabled,
-                            comicVineApiKey: config.ComicVineApiKey ?? "",
-                            metronEnabled: config.MetronEnabled,
-                            metronUsername: config.MetronUsername ?? "",
-                            metronPassword: config.MetronPassword ?? "",
-                            versedbEnabled: config.VerseDbEnabled,
-                            versedbApiKey: config.VerseDbApiKey ?? "",
-                            grandComicsDbEnabled: config.GrandComicsDbEnabled,
-                            grandComicsDbUsername: config.GrandComicsDbUsername ?? "",
-                            grandComicsDbPassword: config.GrandComicsDbPassword ?? "",
+                            apiConfig,
                             titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
                             title: rawMetadata.Title,
                             author: rawMetadata.Authors.Count > 0 ? rawMetadata.Authors[0] : null,
                             ct: ct).ConfigureAwait(false);
 
-                        _groupingService.SetLastEnrichmentTime(file);
+                        if (enrichmentResult.ApiMatchFound)
+                            _groupingService.SetLastEnrichmentTime(file, enrichmentResult.EnrichedBy);
 
                         var enriched = enrichmentResult.Metadata;
 
@@ -319,7 +309,8 @@ public class LibraryCleanupService
                             if (updated == 0)
                             {
                                 _groupingService.RegisterFile(expectedPath, enriched, isPrimary: true, config.GroupingStrategy);
-                                _groupingService.SetLastEnrichmentTime(expectedPath);
+                                if (enrichmentResult.ApiMatchFound)
+                                    _groupingService.SetLastEnrichmentTime(expectedPath, enrichmentResult.EnrichedBy);
                             }
 
                             var targetDir = Path.GetDirectoryName(expectedPath);

@@ -68,6 +68,11 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 - **Test Enrichment Connectivity** button on the Metadata config tab — pings all 6 enrichment APIs (Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB) and reports reachability, status codes, and error details per service
 - **Independent of API key tests** — isolates network-level issues (port blocking, proxy, firewall, DNS) from credential problems
 
+### v0.8.5.0
+- **Cooldown logging with API name** — enrichment-cooldown skip messages now include which API last enriched the file (e.g., `Skipped enrichment (cooldown, last by Hardcover)`)
+- **Per-directory API selection** — each managed source directory can override the global API toggles. Unchecked APIs fall back to global settings; checked APIs act as a directory whitelist
+- **Enrichment API config refactor** — internal `EnrichmentApiConfig` model makes per-directory overrides efficient and consistent across ingestion, cleanup, provider, and scheduled tasks
+
 ### Enrichment Cascade (v0.7.0.2)
 - **Comic filename fallback** — when ComicInfo.xml is missing or unreadable, `SeriesName`, `SeriesNumber`, and `PublishYear` are parsed from common filename patterns (e.g. `All New X-Men 014 (2013)`). Files without ISBN but with filename-derived series/issue can now reach the comic enrichment cascade instead of being skipped.
 - **Comic ISBN requirement removed** — comic files (.cbz/.cbr/.cb7) no longer require an ISBN to proceed to the enrichment cascade; the comic tier (Comic Vine → Metron → VerseDB) can run on filename-parsed series + issue number alone.
@@ -121,9 +126,9 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 
 ### Config Page (Dashboard → Plugins → BookEnhancers)
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation
-- **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons
+- **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons, **per-directory API selection** (expand a directory row to whitelist APIs for that source)
 - **Grouping** — Preview, Process, and Repair Format Paths buttons with results display
-- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, and field mappings
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, field mappings, and cooldown logging
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging

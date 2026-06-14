@@ -132,6 +132,7 @@
                                min="0" max="365" step="1" label="Skip re-enrichment if already enriched within (days)" />
                         <div class="fieldDescription">
                             Prevents re-enriching the same file on every scheduled task run to conserve API usage.
+                            Cooldown skip messages include the API that last enriched the file (e.g., "Skipped enrichment (cooldown, last by Hardcover)").
                             Set to 0 to always enrich. Default: 7 (weekly).
                         </div>
                     </div>
@@ -800,6 +801,21 @@
             </ul>
             <p><code>{BookTitle}</code> is derived from the audio <code>Title</code> tag by removing the author prefix and disc marker. <code>{Disc}</code> is extracted from markers like <code>Disc 08</code>, <code>[Disc 1]</code>, <code>CD 2</code>, or <code>Part 3 of 12</code>.</p>
 
+            <h3>Per-directory API selection</h3>
+            <p>
+                Each managed source directory can override the global API toggles. Expand a directory row in the Ingestion tab
+                and check the APIs you want to allow for that source. If no APIs are checked, the directory falls back to the
+                global toggles on the Metadata tab. This is useful when one library should only use comic APIs and another
+                should only use book APIs, or when you want to disable online enrichment entirely for a specific source.
+            </p>
+
+            <h3>Enrichment cooldown</h3>
+            <p>
+                The <strong>Skip re-enrichment if already enriched within (days)</strong> setting on the Main tab prevents the same file
+                from being hammered on every scheduled task run. When a file is skipped because of cooldown, the log entry includes
+                the API that last enriched it, for example: <code>Skipped enrichment (cooldown, last by Hardcover)</code>.
+            </p>
+
             <h3>How to pre-populate files before ingestion</h3>
             <table>
                 <tr><th>Goal</th><th>Tag to set</th><th>Tool</th></tr>
@@ -1236,6 +1252,16 @@
                     ? _beLibraries.filter(function (l) { return selectedLibIds.indexOf(l.id) >= 0; })
                     : (_beLibraries || []);
 
+                var apiSourceOptions = [
+                    { key: "Hardcover", label: "Hardcover" },
+                    { key: "Google Books", label: "Google Books" },
+                    { key: "OpenLibrary", label: "OpenLibrary" },
+                    { key: "Comic Vine", label: "Comic Vine" },
+                    { key: "Metron", label: "Metron" },
+                    { key: "VerseDB", label: "VerseDB" },
+                    { key: "Grand Comics Database", label: "Grand Comics DB" }
+                ];
+
                 dirs.forEach(function (dir, idx) {
                     var row = document.createElement("div");
                     row.style.cssText = "border:1px solid var(--border-color);border-radius:6px;padding:12px;margin-bottom:8px;background:var(--card-background);";
@@ -1246,6 +1272,15 @@
                         libOpts += '<option value="' + escapeHtml(lib.id) + '"' + sel + '>'
                             + escapeHtml(lib.name) + ' (' + escapeHtml(lib.collectionType) + ')</option>';
                     });
+
+                    var enabledApis = dir.EnabledApiSources || [];
+                    var apiCheckboxes = apiSourceOptions.map(function (api) {
+                        var checked = enabledApis.indexOf(api.key) >= 0 ? ' checked' : '';
+                        return '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;">' +
+                            '<input is="emby-checkbox" class="dir-api-source" type="checkbox" data-idx="' + idx + '" data-api="' + escapeHtml(api.key) + '"' + checked + ' />' +
+                            '<span>' + escapeHtml(api.label) + '</span>' +
+                            '</label>';
+                    }).join('');
 
                     row.innerHTML =
                         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">' +
@@ -1288,7 +1323,11 @@
                                 '<input is="emby-checkbox" class="dir-flat-series" type="checkbox" data-idx="' + idx + '"' + (dir.FlatSeriesStructure ? ' checked' : '') + ' />' +
                                 '<span>Flat Series Folders</span>' +
                             '</label>' +
-                        '</div>';
+                        '</div>' +
+                        '<details style="margin-top:10px;">' +
+                            '<summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);">Per-directory API selection (unchecked = use global)</summary>' +
+                            '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;">' + apiCheckboxes + '</div>' +
+                        '</details>';
 
                     container.appendChild(row);
                 });
@@ -1381,6 +1420,11 @@
                     var titleAuthorInput = container.querySelector('.dir-title-author-search[data-idx="' + idx + '"]');
                     var metadataWriteInput = container.querySelector('.dir-metadata-write[data-idx="' + idx + '"]');
                     var flatSeriesInput = container.querySelector('.dir-flat-series[data-idx="' + idx + '"]');
+                    var apiSourceInputs = container.querySelectorAll('.dir-api-source[data-idx="' + idx + '"]');
+                    var enabledApiSources = [];
+                    apiSourceInputs.forEach(function (cb) {
+                        if (cb.checked) enabledApiSources.push(cb.getAttribute('data-api'));
+                    });
 
                     dirs.push({
                         SourcePath: sourceInput ? sourceInput.value : "",
@@ -1390,7 +1434,8 @@
                         OrganizeTemplate: tmplInput ? tmplInput.value : "",
                         EnableTitleAuthorSearch: titleAuthorInput ? titleAuthorInput.checked : true,
                         EnableMetadataWriting: metadataWriteInput ? metadataWriteInput.checked : false,
-                        FlatSeriesStructure: flatSeriesInput ? flatSeriesInput.checked : false
+                        FlatSeriesStructure: flatSeriesInput ? flatSeriesInput.checked : false,
+                        EnabledApiSources: enabledApiSources
                     });
                 });
 
@@ -1399,7 +1444,7 @@
 
             document.getElementById("btnAddDirectory").addEventListener("click", function () {
                 var dirs = getCurrentDirectories();
-                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false, FlatSeriesStructure: false });
+                dirs.push({ SourcePath: "", LibraryPath: "", Enabled: true, LibraryId: "", EnableTitleAuthorSearch: true, EnableMetadataWriting: false, FlatSeriesStructure: false, EnabledApiSources: [] });
                 renderDirectories(dirs);
             });
 

@@ -1,3 +1,4 @@
+using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.BookEnhancer.Configuration;
@@ -60,6 +61,46 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the custom template for series-first organization.
     /// </summary>
     public string SeriesFirstTemplate { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Resolves the effective API configuration for a managed source directory.
+    /// When the directory has an explicit <see cref="ManagedSourceDirectory.EnabledApiSources"/> list,
+    /// only APIs named in that list are enabled; otherwise the global toggles are used.
+    /// </summary>
+    /// <param name="dir">The managed source directory, or null for global defaults.</param>
+    /// <returns>The resolved API configuration.</returns>
+    public EnrichmentApiConfig GetEffectiveApiConfig(ManagedSourceDirectory? dir)
+    {
+        var overrides = dir?.EnabledApiSources;
+        var hasOverrides = overrides is not null && overrides.Count > 0;
+
+        bool IsEnabled(bool global, string apiName)
+        {
+            if (!hasOverrides)
+                return global;
+
+            return overrides!.Contains(apiName, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return new EnrichmentApiConfig
+        {
+            HardcoverEnabled = IsEnabled(HardcoverEnabled, "Hardcover"),
+            HardcoverApiKey = HardcoverApiKey,
+            GoogleBooksEnabled = IsEnabled(GoogleBooksEnabled, "Google Books"),
+            GoogleBooksApiKey = GoogleBooksApiKey,
+            OpenLibraryEnabled = IsEnabled(OpenLibraryEnabled, "OpenLibrary"),
+            ComicVineEnabled = IsEnabled(ComicVineEnabled, "Comic Vine"),
+            ComicVineApiKey = ComicVineApiKey,
+            MetronEnabled = IsEnabled(MetronEnabled, "Metron"),
+            MetronUsername = MetronUsername,
+            MetronPassword = MetronPassword,
+            VerseDbEnabled = IsEnabled(VerseDbEnabled, "VerseDB"),
+            VerseDbApiKey = VerseDbApiKey,
+            GrandComicsDbEnabled = IsEnabled(GrandComicsDbEnabled, "Grand Comics Database"),
+            GrandComicsDbUsername = GrandComicsDbUsername,
+            GrandComicsDbPassword = GrandComicsDbPassword
+        };
+    }
 }
 
 public class FormatPriorityEntry
@@ -78,4 +119,11 @@ public class ManagedSourceDirectory
     public bool EnableTitleAuthorSearch { get; set; } = true;
     public bool EnableMetadataWriting { get; set; } = false;
     public bool FlatSeriesStructure { get; set; }
+
+    /// <summary>
+    /// Gets or sets the list of API source names enabled for this directory.
+    /// When empty, the global API toggles are used.
+    /// Known values: Hardcover, Google Books, OpenLibrary, Comic Vine, Metron, VerseDB, Grand Comics Database.
+    /// </summary>
+    public List<string> EnabledApiSources { get; set; } = new();
 }

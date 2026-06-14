@@ -185,34 +185,24 @@ public class BookIngestionService
                     metadata = CreateMinimalMetadata(file);
                 }
 
+                EnrichmentResult? enrichmentResult = null;
                 var enrichmentAttempted = false;
                 if (Config?.UnifiedMetadataEnabled == true)
                 {
                     var cooldown = Config.EnrichmentCooldownDays;
-                    if (cooldown > 0 && _groupingService.IsEnrichmentOnCooldown(file, cooldown))
+                    var cooldownInfo = _groupingService.GetEnrichmentCooldownInfo(file, cooldown);
+                    if (cooldownInfo.OnCooldown)
                     {
-                        await LogInfoAsync($"Skipped enrichment (cooldown): {file}", logCallback, _logger).ConfigureAwait(false);
+                        var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
+                        await LogInfoAsync($"Skipped enrichment (cooldown, last by {by}): {file}", logCallback, _logger).ConfigureAwait(false);
                     }
                     else
                     {
                         enrichmentAttempted = true;
-                        var enrichmentResult = await _enrichment.EnrichAsync(
+                        var apiConfig = Config.GetEffectiveApiConfig(dir);
+                        enrichmentResult = await _enrichment.EnrichAsync(
                             metadata,
-                            Config.HardcoverApiKey,
-                            Config.GoogleBooksApiKey,
-                            Config.HardcoverEnabled,
-                            Config.GoogleBooksEnabled,
-                            Config.OpenLibraryEnabled,
-                            comicVineEnabled: Config.ComicVineEnabled,
-                            comicVineApiKey: Config.ComicVineApiKey ?? "",
-                            metronEnabled: Config.MetronEnabled,
-                            metronUsername: Config.MetronUsername ?? "",
-                            metronPassword: Config.MetronPassword ?? "",
-                            versedbEnabled: Config.VerseDbEnabled,
-                            versedbApiKey: Config.VerseDbApiKey ?? "",
-                            grandComicsDbEnabled: Config.GrandComicsDbEnabled,
-                            grandComicsDbUsername: Config.GrandComicsDbUsername ?? "",
-                            grandComicsDbPassword: Config.GrandComicsDbPassword ?? "",
+                            apiConfig,
                             titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
                             title: metadata.Title,
                             author: metadata.Authors.Count > 0 ? metadata.Authors[0] : null,
@@ -239,8 +229,8 @@ public class BookIngestionService
                 if (moveResult.Success)
                 {
                     _groupingService.RegisterFile(targetPath, metadata, isPrimary: true, Config?.GroupingStrategy ?? "IsbnOnly");
-                    if (enrichmentAttempted)
-                        _groupingService.SetLastEnrichmentTime(targetPath);
+                    if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true)
+                        _groupingService.SetLastEnrichmentTime(targetPath, enrichmentResult.EnrichedBy);
                     result.FilesAdded++;
 
                     if (!string.IsNullOrWhiteSpace(targetDir))
@@ -266,8 +256,8 @@ public class BookIngestionService
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
 
                     var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false, Config?.GroupingStrategy ?? "IsbnOnly");
-                    if (enrichmentAttempted)
-                        _groupingService.SetLastEnrichmentTime(targetPath);
+                    if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true)
+                        _groupingService.SetLastEnrichmentTime(targetPath, enrichmentResult.EnrichedBy);
                     result.FilesSkipped++;
 
                     if (!string.IsNullOrWhiteSpace(targetDir))
