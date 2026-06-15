@@ -36,16 +36,13 @@
             background:var(--card-background);
         }
         .be-dir-options {
-            display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+            display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 12px;
         }
         .be-dir-chip {
-            display:inline-flex; align-items:center; gap:6px;
-            padding:4px 10px; border:1px solid var(--border-color);
-            border-radius:4px; cursor:pointer; font-size:12px;
+            display:flex; align-items:center; gap:3px;
+            padding:3px 8px; border:1px solid var(--border-color);
+            border-radius:3px; cursor:pointer; font-size:12px;
             background:var(--card-background);
-            white-space:nowrap;
-            min-width:max-content;
-            line-height:1.4;
         }
         .be-dir-chip input[is="emby-checkbox"] {
             flex-shrink:0;
@@ -1517,7 +1514,7 @@
                             '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {BookTitle} {Disc} {Volume} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>' +
-                        '<div class="be-dir-options" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
+                        '<div class="be-dir-options">' +
                             '<label class="be-dir-chip" title="Enable title/author online search for this directory">' +
                                 '<input is="emby-checkbox" class="dir-title-author-search" type="checkbox" data-idx="' + idx + '"' + (dir.EnableTitleAuthorSearch !== false ? ' checked' : '') + ' />' +
                                 '<span>Title/Author Search</span>' +
