@@ -107,6 +107,10 @@
                         style="font-size:0.75em;padding:3px 10px;white-space:nowrap;flex-shrink:0;">
                     &#x1F4D6; Metadata Guide
                 </button>
+                <button is="emby-button" id="btnOpenDuplicateReviews" type="button" class="raised"
+                        style="font-size:0.75em;padding:3px 10px;white-space:nowrap;flex-shrink:0;">
+                    &#x1F4CB; Duplicate Review
+                </button>
             </div>
 
             <div class="be-tabs" style="display:flex;gap:2px;margin-bottom:15px;border-bottom:2px solid var(--accent-color,#00a4dc);flex-wrap:wrap;">
@@ -197,6 +201,15 @@
                         <div class="fieldDescription">
                             Number of days to keep trashed files before automatic deletion.
                             Set to 0 to disable auto-purge. Default: 7 (weekly).
+                        </div>
+                    </div>
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <input is="emby-input" id="txtDuplicateReviewTtl" type="number"
+                               min="0" max="365" step="1" label="Duplicate-review entry TTL (days)" />
+                        <div class="fieldDescription">
+                            Number of days to keep size-mismatch duplicate records before they are pruned.
+                            Files recorded here are skipped during ingestion until the entry expires or the source file changes.
+                            Set to 0 to disable pruning. Default: 30.
                         </div>
                     </div>
 
@@ -958,6 +971,33 @@
             <p style="margin-top:14px;color:var(--text-secondary);font-size:12px;">
                 Full documentation available in <code>archive/metadata-tags-guide.md</code>
             </p>
+        </div>
+    </div>
+
+    <div class="be-modal-overlay" id="duplicateReviewsModal">
+        <div class="be-modal" style="max-width:900px;">
+            <button class="be-modal-close" id="btnCloseDuplicateReviews">&times;</button>
+            <h2>Duplicate Review</h2>
+            <p>Source files that already exist in the library with a different size are skipped during ingestion. They remain here until the source file changes, the entry ages past the TTL, or you clean them up manually.</p>
+
+            <div id="duplicateReviewsLoading" style="margin:20px 0;color:var(--text-secondary);">Loading...</div>
+            <div id="duplicateReviewsEmpty" style="display:none;margin:20px 0;color:var(--text-secondary);">No duplicate-review entries found.</div>
+            <div id="duplicateReviewsError" style="display:none;margin:20px 0;color:#c44;"></div>
+            <div id="duplicateReviewsContent" style="display:none;max-height:60vh;overflow:auto;">
+                <table class="be-duplicate-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;padding:6px;border-bottom:1px solid var(--divider-color,#444);">Source</th>
+                            <th style="text-align:left;padding:6px;border-bottom:1px solid var(--divider-color,#444);">Target</th>
+                            <th style="text-align:right;padding:6px;border-bottom:1px solid var(--divider-color,#444);">Source Size</th>
+                            <th style="text-align:right;padding:6px;border-bottom:1px solid var(--divider-color,#444);">Target Size</th>
+                            <th style="text-align:left;padding:6px;border-bottom:1px solid var(--divider-color,#444);">First Seen</th>
+                            <th style="text-align:left;padding:6px;border-bottom:1px solid var(--divider-color,#444);">Last Seen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="duplicateReviewsBody"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -1913,6 +1953,7 @@
                     config.IncludedLibraryIds = [];
                     config.TrashDirectory = "";
                     config.TrashCleanupIntervalDays = 7;
+                    config.DuplicateReviewTtlDays = 30;
                     config.EnableNonBookDirectoryCleanup = false;
                     config.BackupDirectory = "";
                     config.BackupCleanupIntervalDays = 30;
@@ -1961,6 +2002,7 @@
                     document.getElementById("txtTrashDirectory").value = config.TrashDirectory || "";
                     setFieldInvalid(document.getElementById("txtTrashDirectory"), !config.TrashDirectory);
                     document.getElementById("txtTrashCleanupInterval").value = config.TrashCleanupIntervalDays || 7;
+                    document.getElementById("txtDuplicateReviewTtl").value = config.DuplicateReviewTtlDays ?? 30;
                     document.getElementById("chkEnableNonBookDirectoryCleanup").checked = config.EnableNonBookDirectoryCleanup || false;
                     document.getElementById("txtBackupDirectory").value = config.BackupDirectory || "";
                     document.getElementById("txtBackupCleanupInterval").value = config.BackupCleanupIntervalDays || 30;
@@ -2128,6 +2170,8 @@
 
                         config.TrashDirectory = document.getElementById("txtTrashDirectory").value.trim();
                         config.TrashCleanupIntervalDays = parseInt(document.getElementById("txtTrashCleanupInterval").value) || 0;
+                        var duplicateReviewTtlValue = parseInt(document.getElementById("txtDuplicateReviewTtl").value);
+                        config.DuplicateReviewTtlDays = isNaN(duplicateReviewTtlValue) ? 30 : duplicateReviewTtlValue;
                         config.EnableNonBookDirectoryCleanup = document.getElementById("chkEnableNonBookDirectoryCleanup").checked;
                         config.BackupDirectory = document.getElementById("txtBackupDirectory").value.trim();
                         config.BackupCleanupIntervalDays = parseInt(document.getElementById("txtBackupCleanupInterval").value) || 0;
@@ -2170,6 +2214,79 @@
                 document.getElementById("guideModal").classList.remove("open");
             });
             document.getElementById("guideModal").addEventListener("click", function (e) {
+                if (e.target === this) this.classList.remove("open");
+            });
+
+            function formatBytes(bytes) {
+                if (bytes === 0 || !bytes) return "0 B";
+                var k = 1024;
+                var sizes = ["B", "KB", "MB", "GB", "TB"];
+                var i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+            }
+
+            function formatDate(isoString) {
+                if (!isoString) return "-";
+                var d = new Date(isoString);
+                if (isNaN(d.getTime())) return isoString;
+                return d.toLocaleString();
+            }
+
+            function renderDuplicateReviews() {
+                var loading = document.getElementById("duplicateReviewsLoading");
+                var empty = document.getElementById("duplicateReviewsEmpty");
+                var error = document.getElementById("duplicateReviewsError");
+                var content = document.getElementById("duplicateReviewsContent");
+                var body = document.getElementById("duplicateReviewsBody");
+
+                loading.style.display = "block";
+                empty.style.display = "none";
+                error.style.display = "none";
+                content.style.display = "none";
+                body.innerHTML = "";
+
+                authFetch("Books/Config/DuplicateReviews")
+                    .then(function (r) {
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.json();
+                    })
+                    .then(function (entries) {
+                        loading.style.display = "none";
+                        if (!entries || entries.length === 0) {
+                            empty.style.display = "block";
+                            return;
+                        }
+
+                        entries.forEach(function (entry) {
+                            var row = document.createElement("tr");
+                            row.innerHTML =
+                                "<td style='padding:6px;vertical-align:top;word-break:break-all;'>" + escapeHtml(entry.sourcePath) + "</td>" +
+                                "<td style='padding:6px;vertical-align:top;word-break:break-all;'>" + escapeHtml(entry.targetPath) + "</td>" +
+                                "<td style='padding:6px;text-align:right;white-space:nowrap;'>" + escapeHtml(formatBytes(entry.sourceSize)) + "</td>" +
+                                "<td style='padding:6px;text-align:right;white-space:nowrap;'>" + escapeHtml(formatBytes(entry.targetSize)) + "</td>" +
+                                "<td style='padding:6px;white-space:nowrap;'>" + escapeHtml(formatDate(entry.firstSeen)) + "</td>" +
+                                "<td style='padding:6px;white-space:nowrap;'>" + escapeHtml(formatDate(entry.lastSeen)) + "</td>";
+                            body.appendChild(row);
+                        });
+
+                        content.style.display = "block";
+                    })
+                    .catch(function (err) {
+                        loading.style.display = "none";
+                        error.style.display = "block";
+                        error.textContent = "Failed to load duplicate-review records: " + (err.message || err);
+                        console.error("[BookEnhancers] Failed to load duplicate reviews:", err);
+                    });
+            }
+
+            document.getElementById("btnOpenDuplicateReviews").addEventListener("click", function () {
+                document.getElementById("duplicateReviewsModal").classList.add("open");
+                renderDuplicateReviews();
+            });
+            document.getElementById("btnCloseDuplicateReviews").addEventListener("click", function () {
+                document.getElementById("duplicateReviewsModal").classList.remove("open");
+            });
+            document.getElementById("duplicateReviewsModal").addEventListener("click", function (e) {
                 if (e.target === this) this.classList.remove("open");
             });
 

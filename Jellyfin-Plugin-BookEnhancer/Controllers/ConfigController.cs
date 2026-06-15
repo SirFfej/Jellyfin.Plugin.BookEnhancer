@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using Jellyfin.Plugin.BookEnhancer.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -308,6 +309,13 @@ public class ConfigController : ControllerBase
             Version = version,
             Name = plugin?.Name ?? "BookEnhancers"
         });
+    }
+
+    [HttpGet("DuplicateReviews")]
+    public async Task<ActionResult<List<DuplicateReviewEntry>>> GetDuplicateReviews()
+    {
+        var entries = await DuplicateReviewLogger.LoadAsync().ConfigureAwait(false);
+        return Ok(entries);
     }
 
     [HttpPost("ConvertCbrToCbz")]

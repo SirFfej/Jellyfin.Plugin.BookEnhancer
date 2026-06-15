@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.8.5 - New: Duplicate Review button on the config page shows all size-mismatch duplicate records in a modal table. New: ingestion scan now skips files listed in duplicate-review; entries whose source file has been modified since the mismatch are removed from the log. New: Duplicate-review entries are pruned after a configurable TTL (default 30 days). Build: 0W/0E.",
+        "checksum": "599D4980AEDC42B26B0DC4403F9DC4FD",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.5/Jellyfin.Plugin.BookEnhancer_0.8.8.5.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-15T00:00:00Z",
+        "version": "0.8.8.5"
+      },
+      {
         "changelog": "v0.8.8.4 - Fix: OperationCanceledException handling is now token-aware so HTTP timeouts are logged as API failures instead of aborting the entire scan. Added CancellationHelper and updated API clients, controllers, and service per-file catches. Removed dead OCE catches from no-token/synchronous helpers. Build: 0W/0E.",
         "checksum": "96C4CBD4D2CBCFD2873FC5B0372581DD",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.4/Jellyfin.Plugin.BookEnhancer_0.8.8.4.zip",

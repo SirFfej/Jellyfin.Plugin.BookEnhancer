@@ -71,6 +71,11 @@ public class PluginConfiguration : BasePluginConfiguration
     public string BackupDirectory { get; set; } = string.Empty;
     public int BackupCleanupIntervalDays { get; set; } = 30;
 
+    /// <summary>
+    /// Gets or sets the number of days after which stale duplicate-review entries are pruned. 0 = never prune.
+    /// </summary>
+    public int DuplicateReviewTtlDays { get; set; } = 30;
+
     public bool EnableNonBookDirectoryCleanup { get; set; }
 
     /// <summary>

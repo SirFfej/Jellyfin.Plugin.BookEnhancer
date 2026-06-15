@@ -19,6 +19,121 @@ public static class DuplicateReviewLogger
     };
 
     /// <summary>
+    /// Loads the current duplicate-review list from disk.
+    /// </summary>
+    /// <returns>The persisted duplicate-review entries.</returns>
+    public static async Task<List<DuplicateReviewEntry>> LoadAsync()
+    {
+        var dataPath = Plugin.DataPath;
+        if (string.IsNullOrWhiteSpace(dataPath))
+            return [];
+
+        var path = Path.Combine(dataPath, "plugins", "BookEnhancer", "duplicate-reviews", "duplicate-reviews.json");
+        return await LoadExistingAsync(path).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Removes a single duplicate-review entry if it exists.
+    /// </summary>
+    /// <param name="sourcePath">The source file path.</param>
+    /// <param name="targetPath">The target file path.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    public static async Task RemoveAsync(string sourcePath, string targetPath)
+    {
+        var dataPath = Plugin.DataPath;
+        if (string.IsNullOrWhiteSpace(dataPath))
+            return;
+
+        var path = GetPath(dataPath);
+
+        await Semaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var existing = await LoadExistingAsync(path).ConfigureAwait(false);
+            var dictionary = existing.ToDictionary(Key, StringComparer.OrdinalIgnoreCase);
+            var key = Key(sourcePath, targetPath);
+            if (!dictionary.Remove(key))
+                return;
+
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(dictionary.Values.ToList(), JsonOptions)).ConfigureAwait(false);
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Removes a range of duplicate-review entries in a single write.
+    /// </summary>
+    /// <param name="entriesToRemove">The entries to remove.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    public static async Task RemoveRangeAsync(IEnumerable<DuplicateReviewEntry> entriesToRemove)
+    {
+        var removals = entriesToRemove.ToList();
+        if (removals.Count == 0)
+            return;
+
+        var dataPath = Plugin.DataPath;
+        if (string.IsNullOrWhiteSpace(dataPath))
+            return;
+
+        var path = GetPath(dataPath);
+
+        await Semaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var existing = await LoadExistingAsync(path).ConfigureAwait(false);
+            var dictionary = existing.ToDictionary(Key, StringComparer.OrdinalIgnoreCase);
+            foreach (var entry in removals)
+                dictionary.Remove(Key(entry));
+
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(dictionary.Values.ToList(), JsonOptions)).ConfigureAwait(false);
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Prunes entries older than the cutoff, entries pointing to missing files, and
+    /// entries whose source file has been modified more recently than the recorded last-seen time.
+    /// </summary>
+    /// <param name="cutoffUtc">Entries with a LastSeen older than this are removed.</param>
+    /// <param name="logger">Logger for debug output.</param>
+    /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
+    public static async Task PruneAsync(DateTime cutoffUtc, ILogger logger)
+    {
+        var dataPath = Plugin.DataPath;
+        if (string.IsNullOrWhiteSpace(dataPath))
+            return;
+
+        var path = GetPath(dataPath);
+
+        await Semaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var existing = await LoadExistingAsync(path).ConfigureAwait(false);
+            var pruned = existing
+                .Where(e => e.LastSeen >= cutoffUtc)
+                .Where(e => File.Exists(e.SourcePath) && File.Exists(e.TargetPath))
+                .Where(e => !IsSourceNewerThanRecorded(e))
+                .ToList();
+
+            if (pruned.Count == existing.Count)
+                return;
+
+            await File.WriteAllTextAsync(path, JsonSerializer.Serialize(pruned, JsonOptions)).ConfigureAwait(false);
+            logger.LogDebug("Pruned duplicate-review log from {Before} to {After} entries", existing.Count, pruned.Count);
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
+    }
+
+    /// <summary>
     /// Merges newly detected mismatches into the persisted duplicate-review list and saves it.
     /// </summary>
     /// <param name="newEntries">New mismatches detected during this operation.</param>
@@ -37,9 +152,8 @@ public static class DuplicateReviewLogger
         if (string.IsNullOrWhiteSpace(dataPath))
             return;
 
-        var dir = Path.Combine(dataPath, "plugins", "BookEnhancer", "duplicate-reviews");
-        Directory.CreateDirectory(dir);
-        var path = Path.Combine(dir, "duplicate-reviews.json");
+        var path = GetPath(dataPath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
 
         await Semaphore.WaitAsync().ConfigureAwait(false);
         try
@@ -81,6 +195,27 @@ public static class DuplicateReviewLogger
         logger.LogDebug("Updated duplicate-review log with {Count} new entries", newEntries.Count);
     }
 
+    private static string GetPath(string dataPath)
+    {
+        return Path.Combine(dataPath, "plugins", "BookEnhancer", "duplicate-reviews", "duplicate-reviews.json");
+    }
+
+    private static bool IsSourceNewerThanRecorded(DuplicateReviewEntry entry)
+    {
+        try
+        {
+            if (!File.Exists(entry.SourcePath))
+                return false;
+
+            var lastWrite = File.GetLastWriteTimeUtc(entry.SourcePath);
+            return lastWrite > entry.LastSeen;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private static async Task<List<DuplicateReviewEntry>> LoadExistingAsync(string path)
     {
         if (!File.Exists(path))
@@ -97,8 +232,13 @@ public static class DuplicateReviewLogger
         }
     }
 
+    private static string Key(string sourcePath, string targetPath)
+    {
+        return sourcePath + "|" + targetPath;
+    }
+
     private static string Key(DuplicateReviewEntry entry)
     {
-        return entry.SourcePath + "|" + entry.TargetPath;
+        return Key(entry.SourcePath, entry.TargetPath);
     }
 }

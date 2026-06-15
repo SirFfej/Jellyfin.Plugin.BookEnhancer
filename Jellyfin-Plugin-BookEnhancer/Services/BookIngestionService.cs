@@ -174,7 +174,9 @@ public class BookIngestionService
 
         var movedByDir = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var skippedByDir = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        var duplicateReviewEntries = new List<DuplicateReviewEntry>();
+        var newDuplicateReviewEntries = new List<DuplicateReviewEntry>();
+        var duplicateReviewLookup = await LoadDuplicateReviewLookupAsync().ConfigureAwait(false);
+        var freshenedDuplicateEntries = new List<DuplicateReviewEntry>();
         var processedSinceCheckpoint = 0;
         var checkpointCleared = false;
 
@@ -195,6 +197,21 @@ public class BookIngestionService
 
             if (ct.IsCancellationRequested)
                 break;
+
+            if (duplicateReviewLookup.TryGetValue(file, out var duplicateEntry))
+            {
+                if (IsDuplicateReviewEntryFreshened(duplicateEntry))
+                {
+                    freshenedDuplicateEntries.Add(duplicateEntry);
+                    duplicateReviewLookup.Remove(file);
+                }
+                else
+                {
+                    await LogInfoAsync($"Skipping duplicate-review entry: {file}", logCallback, _logger).ConfigureAwait(false);
+                    result.FilesSkipped++;
+                    continue;
+                }
+            }
 
             try
             {
@@ -295,7 +312,7 @@ public class BookIngestionService
                             else
                             {
                                 await LogWarningAsync($"Duplicate file size mismatch; leaving source in place: {file} ({sourceInfo.Length}) vs {targetPath} ({targetInfo.Length})", logCallback, _logger).ConfigureAwait(false);
-                                duplicateReviewEntries.Add(new DuplicateReviewEntry
+                                newDuplicateReviewEntries.Add(new DuplicateReviewEntry
                                 {
                                     SourcePath = file,
                                     TargetPath = targetPath,
@@ -387,7 +404,15 @@ public class BookIngestionService
             checkpointCleared = true;
         }
 
-        await DuplicateReviewLogger.MergeAndSaveAsync(duplicateReviewEntries, logCallback, _logger).ConfigureAwait(false);
+        if (freshenedDuplicateEntries.Count > 0)
+            await DuplicateReviewLogger.RemoveRangeAsync(freshenedDuplicateEntries).ConfigureAwait(false);
+
+        await DuplicateReviewLogger.MergeAndSaveAsync(newDuplicateReviewEntries, logCallback, _logger).ConfigureAwait(false);
+
+        var ttlDays = Config?.DuplicateReviewTtlDays ?? 30;
+        if (ttlDays > 0)
+            await DuplicateReviewLogger.PruneAsync(DateTime.UtcNow.AddDays(-ttlDays), _logger).ConfigureAwait(false);
+
         await LogDirectorySummariesAsync(movedByDir, skippedByDir, logCallback).ConfigureAwait(false);
 
         return result;
@@ -396,6 +421,27 @@ public class BookIngestionService
     private static string GetCheckpointKey(string sourcePath)
     {
         return $"IngestionScan:{sourcePath}";
+    }
+
+    private static async Task<Dictionary<string, DuplicateReviewEntry>> LoadDuplicateReviewLookupAsync()
+    {
+        var entries = await DuplicateReviewLogger.LoadAsync().ConfigureAwait(false);
+        return entries.ToDictionary(e => e.SourcePath, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static bool IsDuplicateReviewEntryFreshened(DuplicateReviewEntry entry)
+    {
+        try
+        {
+            if (!File.Exists(entry.SourcePath))
+                return false;
+
+            return File.GetLastWriteTimeUtc(entry.SourcePath) > entry.LastSeen;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private async Task LogDirectorySummariesAsync(
