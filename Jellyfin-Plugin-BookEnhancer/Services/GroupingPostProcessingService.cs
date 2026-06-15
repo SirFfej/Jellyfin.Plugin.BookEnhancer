@@ -125,7 +125,7 @@ public class GroupingPostProcessingService
                     if (group is not null)
                         registered++;
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                 {
                     throw;
                 }
@@ -213,7 +213,7 @@ public class GroupingPostProcessingService
 
                 _groupingService.RemoveFormat(alternate.Id);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
             {
                 throw;
             }
@@ -274,10 +274,6 @@ public class GroupingPostProcessingService
         {
             return _libraryManager.FindByPath(path, false);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to find item by path: {Path}", path);
@@ -300,7 +296,7 @@ public class GroupingPostProcessingService
 
                 return;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
             {
                 throw;
             }

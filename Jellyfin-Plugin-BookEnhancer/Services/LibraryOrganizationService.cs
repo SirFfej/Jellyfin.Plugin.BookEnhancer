@@ -92,10 +92,6 @@ public class LibraryOrganizationService
 
             return MoveResult.CreateSuccess(targetPath);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             if (logCallback is not null)

@@ -77,7 +77,7 @@ public class IngestionScanTask : IScheduledTask
                     $"Enrichment failures: {result.EnrichmentFailures}, Errors: {result.Errors}");
                 ((IProgress<double>)logger).Report(1.0);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
             {
                 if (timeoutCts?.IsCancellationRequested == true)
                     logger.LogWarning($"Ingestion scan timed out after {timeoutMinutes} minutes");

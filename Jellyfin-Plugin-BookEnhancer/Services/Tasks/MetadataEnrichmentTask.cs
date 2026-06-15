@@ -213,7 +213,7 @@ public class MetadataEnrichmentTask : IScheduledTask
 
                         await Task.Delay(250, ct).ConfigureAwait(false);
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                     {
                         throw;
                     }
@@ -259,7 +259,7 @@ public class MetadataEnrichmentTask : IScheduledTask
             logger.LogInformation($"Summary written to: {summaryPath}");
             ((IProgress<double>)logger).Report(1.0);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             if (timeoutCts?.IsCancellationRequested == true)
                 logger.LogWarning($"Metadata enrichment timed out after {timeoutMinutes} minutes");

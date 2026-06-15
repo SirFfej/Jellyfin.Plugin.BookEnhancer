@@ -33,7 +33,7 @@ public class HardcoverApiClient
             var meta = MapBookToMetadata(bookData);
             return meta;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -150,7 +150,7 @@ query($title: String!) {
 
             return meta;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -314,10 +314,6 @@ query($bookId: Int!) {
                     else
                         meta.Tags.Add(tag);
                 }
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
             }
             catch (Exception ex)
             {

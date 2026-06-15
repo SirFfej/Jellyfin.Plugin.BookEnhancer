@@ -95,10 +95,6 @@ public class CbrToCbzService
                 await ConvertSingleFileAsync(file, originalsRunDir, config, logCallback, ct).ConfigureAwait(false);
                 result.Converted++;
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
             catch (Exception ex)
             {
                 result.Errors++;
@@ -295,19 +291,11 @@ public class CbrToCbzService
                     Directory.Delete(dir, recursive: true);
                     await LogAsync(logCallback, $"Purged old backup: {dir} (from {created:yyyy-MM-dd})").ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
                 catch (Exception ex)
                 {
                     await LogAsync(logCallback, $"Failed to purge backup directory {dir}: {ex.Message}").ConfigureAwait(false);
                 }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

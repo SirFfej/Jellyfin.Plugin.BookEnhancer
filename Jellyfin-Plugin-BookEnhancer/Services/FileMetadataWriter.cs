@@ -41,10 +41,6 @@ public class FileMetadataWriter : IFileMetadataWriter
             _logger.LogDebug("No writer available for {Ext}: {Path}", ext, filePath);
             return false;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to write metadata to {Path}", filePath);
@@ -74,10 +70,6 @@ public class FileMetadataWriter : IFileMetadataWriter
             _logger.LogDebug("Wrote audio tags to {Path}", filePath);
             return true;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to write audio tags to {Path}", filePath);
@@ -105,10 +97,6 @@ public class FileMetadataWriter : IFileMetadataWriter
 
             _logger.LogDebug("Wrote ComicInfo.xml to {Path}", filePath);
             return true;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
@@ -181,10 +169,6 @@ public class FileMetadataWriter : IFileMetadataWriter
 
             _logger.LogDebug("Wrote OPF metadata to {Path}", filePath);
             return true;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

@@ -40,7 +40,7 @@ public class GoogleBooksApiClient
 
             return MapVolume(volume.VolumeInfo, string.Empty);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -76,7 +76,7 @@ public class GoogleBooksApiClient
 
             return MapVolume(volume.VolumeInfo, cleanIsbn);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

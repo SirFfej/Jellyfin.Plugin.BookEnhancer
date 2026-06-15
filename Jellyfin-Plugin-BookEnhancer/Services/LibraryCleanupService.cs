@@ -122,7 +122,7 @@ public class LibraryCleanupService
 
                     scannedFiles.Add((file, metadata, dir));
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                 {
                     throw;
                 }
@@ -238,7 +238,7 @@ public class LibraryCleanupService
                         libResult.Errors++;
                     }
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                 {
                     throw;
                 }
@@ -335,7 +335,7 @@ public class LibraryCleanupService
                             libResult.Errors++;
                         }
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                     {
                         throw;
                     }
@@ -551,7 +551,7 @@ public class LibraryCleanupService
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
             {
                 throw;
             }
@@ -623,19 +623,11 @@ public class LibraryCleanupService
                     Directory.Delete(dir, recursive: true);
                     await logCallback($"Purged old trash: {dir} (from {created:yyyy-MM-dd})").ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
                 catch (Exception ex)
                 {
                     await logCallback($"Failed to purge trash directory {dir}: {ex.Message}").ConfigureAwait(false);
                 }
             }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
@@ -682,10 +674,6 @@ public class LibraryCleanupService
                 await logCallback($"  Moved companion image: {imagePath} -> {targetPath}").ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             await logCallback($"Failed to move companion images from {sourceDir}: {ex.Message}").ConfigureAwait(false);
@@ -710,10 +698,6 @@ public class LibraryCleanupService
                 await logCallback($"Removed empty directory: {dir.FullName}").ConfigureAwait(false);
                 dir = dir.Parent;
             }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
@@ -784,7 +768,7 @@ public class LibraryCleanupService
                     count++;
                     await logCallback($"Removed empty directory: {dir}").ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                 {
                     throw;
                 }
@@ -794,7 +778,7 @@ public class LibraryCleanupService
                 }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

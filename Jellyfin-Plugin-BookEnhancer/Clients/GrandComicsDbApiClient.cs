@@ -52,7 +52,7 @@ public class GrandComicsDbApiClient
 
             return await GetIssueDetailAsync(issueId.Value, username, password, ct).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -85,7 +85,7 @@ public class GrandComicsDbApiClient
 
             return MapIssueDetail(response);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

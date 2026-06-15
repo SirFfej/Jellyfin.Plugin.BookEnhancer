@@ -119,7 +119,7 @@ public class ConfigController : ControllerBase
             _logger.LogWarning("GCD API test failed: {StatusCode}", resp.StatusCode);
             return Ok(new TestResult { Success = false, Message = $"GCD API returned {resp.StatusCode}. Check credentials." });
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -151,7 +151,7 @@ public class ConfigController : ControllerBase
             hcResult.Reachable = true;
             hcResult.StatusCode = (int)hcResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -173,7 +173,7 @@ public class ConfigController : ControllerBase
             gbResult.Reachable = true;
             gbResult.StatusCode = (int)gbResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -195,7 +195,7 @@ public class ConfigController : ControllerBase
             olResult.Reachable = true;
             olResult.StatusCode = (int)olResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -217,7 +217,7 @@ public class ConfigController : ControllerBase
             cvResult.Reachable = true;
             cvResult.StatusCode = (int)cvResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -239,7 +239,7 @@ public class ConfigController : ControllerBase
             mtResult.Reachable = true;
             mtResult.StatusCode = (int)mtResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -261,7 +261,7 @@ public class ConfigController : ControllerBase
             vdResult.Reachable = true;
             vdResult.StatusCode = (int)vdResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -283,7 +283,7 @@ public class ConfigController : ControllerBase
             gcdResult.Reachable = true;
             gcdResult.StatusCode = (int)gcdResp.StatusCode;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -351,7 +351,7 @@ public class ConfigController : ControllerBase
 
             return Ok(new DownloadTemplateResult { Success = false, Message = "Downloaded content was not a valid ComicInfo.xml document." });
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -385,10 +385,6 @@ public class ConfigController : ControllerBase
             }
 
             return Ok(new ValidateDirectoryResult { Exists = false, Message = "Directory does not exist." });
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

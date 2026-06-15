@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.8.4 - Fix: OperationCanceledException handling is now token-aware so HTTP timeouts are logged as API failures instead of aborting the entire scan. Added CancellationHelper and updated API clients, controllers, and service per-file catches. Removed dead OCE catches from no-token/synchronous helpers. Build: 0W/0E.",
+        "checksum": "96C4CBD4D2CBCFD2873FC5B0372581DD",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.4/Jellyfin.Plugin.BookEnhancer_0.8.8.4.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.8.4"
+      },
+      {
         "changelog": "v0.8.8.3 - Fix: comic variant/cover-only files with different sizes are now moved into the same series folder as alternate formats instead of being left in place; original filenames (including variant tags) are preserved. New: duplicate-review log at plugins/BookEnhancer/duplicate-reviews/duplicate-reviews.json tracks size-mismatch duplicates for later review. Build: 0W/0E.",
         "checksum": "21B30D5C5A47FD1C9553379D1036BC77",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.3/Jellyfin.Plugin.BookEnhancer_0.8.8.3.zip",

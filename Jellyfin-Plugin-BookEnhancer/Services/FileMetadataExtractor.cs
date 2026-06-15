@@ -39,10 +39,6 @@ public class FileMetadataExtractor
                 {
                     result = await parser.ExtractAsync(filePath, ct).ConfigureAwait(false);
                 }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogWarning(ex, "Parser {Parser} failed for {Path}", parser.GetType().Name, filePath);
@@ -138,10 +134,6 @@ public class FileMetadataExtractor
             if (filled > 0)
                 _logger.LogDebug("Jellyfin DB filled {Count} fields for {Path}", filled, filePath);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Jellyfin DB null-fill failed for {Path}", filePath);
@@ -194,10 +186,6 @@ public class FileMetadataExtractor
             }
 
             return meta;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

@@ -119,7 +119,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
 
             MapPeople(result, enriched);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(cancellationToken))
         {
             throw;
         }
@@ -204,7 +204,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                 }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(cancellationToken))
         {
             throw;
         }

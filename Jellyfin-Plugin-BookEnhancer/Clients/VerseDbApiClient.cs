@@ -43,7 +43,7 @@ public class VerseDbApiClient
                 .Select(MapSearchResult)
                 .ToList();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -74,7 +74,7 @@ public class VerseDbApiClient
             var response = await client.GetFromJsonAsync<VerseDbIssueDetail>(url, ct).ConfigureAwait(false);
             return response is not null ? MapIssueDetail(response) : null;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

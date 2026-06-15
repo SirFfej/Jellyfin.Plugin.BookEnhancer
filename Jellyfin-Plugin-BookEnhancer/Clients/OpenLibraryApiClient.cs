@@ -37,7 +37,7 @@ public class OpenLibraryApiClient
 
             return MapSearchResult(doc);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -107,7 +107,7 @@ public class OpenLibraryApiClient
 
             return MapEntry(entry, cleanIsbn);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

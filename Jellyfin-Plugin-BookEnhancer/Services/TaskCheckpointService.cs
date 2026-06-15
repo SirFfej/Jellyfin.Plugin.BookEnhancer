@@ -46,10 +46,6 @@ public class TaskCheckpointService
             _logger.LogInformation("Loaded checkpoint {Key} from {TimestampUtc:u}; last processed {LastProcessedPath}", key, checkpoint.TimestampUtc, checkpoint.LastProcessedPath);
             return checkpoint;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load checkpoint {Key}", key);
@@ -74,10 +70,6 @@ public class TaskCheckpointService
             File.WriteAllText(tempPath, JsonSerializer.Serialize(checkpoint, JsonOptions));
             File.Move(tempPath, path, overwrite: true);
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to save checkpoint {Key}", key);
@@ -91,10 +83,6 @@ public class TaskCheckpointService
         {
             if (File.Exists(path))
                 File.Delete(path);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

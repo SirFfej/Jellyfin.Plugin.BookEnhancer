@@ -52,7 +52,7 @@ public class MetronApiClient
                 .Select(MapSearchResult)
                 .ToList();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -83,7 +83,7 @@ public class MetronApiClient
             var response = await client.GetFromJsonAsync<MetronIssueDetail>(url, ct).ConfigureAwait(false);
             return response is not null ? MapIssueDetail(response) : null;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

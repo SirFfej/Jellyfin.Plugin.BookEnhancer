@@ -374,10 +374,6 @@ public class BookIngestionService
                     processedSinceCheckpoint = 0;
                 }
             }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
             catch (Exception ex)
             {
                 await LogErrorAsync(ex, $"Error processing file: {file}", logCallback, _logger).ConfigureAwait(false);
@@ -470,10 +466,6 @@ public class BookIngestionService
                 await LogInfoAsync($"  Moved companion image: {imagePath} -> {targetPath}", logCallback, _logger).ConfigureAwait(false);
             }
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             await LogErrorAsync(ex, $"Failed to move companion images from {sourceDir}", logCallback, _logger).ConfigureAwait(false);
@@ -525,10 +517,6 @@ public class BookIngestionService
             await LogInfoAsync($"Moved to trash: {path} -> {dest}", logCallback, _logger).ConfigureAwait(false);
             return true;
         }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
         catch (Exception ex)
         {
             await LogErrorAsync(ex, $"Failed to move to trash: {path}", logCallback, _logger).ConfigureAwait(false);
@@ -553,10 +541,6 @@ public class BookIngestionService
                 await LogInfoAsync($"  Removed empty directory: {dir.FullName}", logCallback, _logger).ConfigureAwait(false);
                 dir = dir.Parent;
             }
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {

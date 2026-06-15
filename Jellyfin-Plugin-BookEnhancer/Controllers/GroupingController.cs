@@ -135,7 +135,7 @@ public class GroupingController : ControllerBase
                                 candidatesFound++;
                         }
                     }
-                    catch (OperationCanceledException)
+                    catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
                     {
                         throw;
                     }
@@ -145,7 +145,7 @@ public class GroupingController : ControllerBase
                     }
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
             {
                 throw;
             }

@@ -43,7 +43,7 @@ public class ComicVineApiClient
                 .Select(MapSearchResult)
                 .ToList();
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }
@@ -74,7 +74,7 @@ public class ComicVineApiClient
             var response = await client.GetFromJsonAsync<CvIssueResponse>(url, ct).ConfigureAwait(false);
             return response?.Results is not null ? MapIssue(response.Results) : null;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
             throw;
         }

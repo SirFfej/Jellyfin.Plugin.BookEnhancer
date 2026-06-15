@@ -94,7 +94,7 @@ public class LibraryCleanupTask : IScheduledTask
                 logger.LogInformation($"Cleanup complete. Summary written to: {logPath}");
                 ((IProgress<double>)logger).Report(1.0);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
             {
                 if (timeoutCts?.IsCancellationRequested == true)
                     logger.LogWarning($"Library cleanup timed out after {timeoutMinutes} minutes");
