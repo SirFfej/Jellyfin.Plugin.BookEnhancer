@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.8.1 - Fix: managed-directory option chips (Title/Author Search, Write Metadata, Comic Library, Flat Series) no longer overlap their checkboxes or truncate text. Chips now wrap and use min-width so full labels remain visible. Build: 0W/0E.",
+        "checksum": "34C8F95A09DD794F20D343323D624D9C",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.1/Jellyfin.Plugin.BookEnhancer_0.8.8.1.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.8.1"
+      },
+      {
         "changelog": "v0.8.8.0 - Fix: ingestion scan now trashes duplicate source files that already exist in the library (size-matched), so empty source folders are removed. Fix: added SafeFileOperations helper with cross-volume move fallback. Fix: all API clients and core services now rethrow OperationCanceledException instead of swallowing it. Fix: ingestion checkpoint resume no longer skips all files when the checkpointed source file has been moved/deleted; checkpoint is preserved on cancellation. Fix: BookGroupingService.RegisterFile is now serialized with a lock to prevent unique-constraint races. Fix: HardcoverApiClient no longer NREs on null author. Build: 0W/0E.",
         "checksum": "3D223E18CDBE3D3C1603E8FA534C65E0",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.0/Jellyfin.Plugin.BookEnhancer_0.8.8.0.zip",
