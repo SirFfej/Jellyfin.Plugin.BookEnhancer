@@ -50,6 +50,10 @@
         .be-dir-chip input[is="emby-checkbox"] {
             flex-shrink:0;
         }
+        .be-invalid {
+            border-color: var(--red,#f44336) !important;
+            box-shadow: 0 0 0 1px var(--red,#f44336) !important;
+        }
         .be-test-result {
             margin-top:3px; padding:3px 8px; border-radius:3px; font-size:12px;
         }
@@ -1056,6 +1060,30 @@
                 el.textContent = message;
             }
 
+            function setButtonLoading(btn, loadingText) {
+                btn.disabled = true;
+                btn.dataset.originalText = btn.textContent;
+                btn.textContent = loadingText;
+            }
+
+            function resetButton(btn) {
+                btn.disabled = false;
+                btn.textContent = btn.dataset.originalText || btn.textContent;
+            }
+
+            function confirmAction(message) {
+                return confirm(message);
+            }
+
+            function setFieldInvalid(field, invalid) {
+                if (!field) return;
+                if (invalid) {
+                    field.classList.add("be-invalid");
+                } else {
+                    field.classList.remove("be-invalid");
+                }
+            }
+
             document.getElementById("btnTestHardcover").addEventListener("click", function () {
                 var key = document.getElementById("txtHardcoverApiKey").value;
                 if (!key) {
@@ -1063,8 +1091,8 @@
                     return;
                 }
                 var btn = this;
-                btn.disabled = true;
-                btn.textContent = "Testing...";
+                showTestResult("testHardcoverResult", true, "Testing...");
+                setButtonLoading(btn, "Testing...");
 
                 authFetch("Books/Config/TestHardcover", {
                     method: "POST",
@@ -1080,16 +1108,15 @@
                         showTestResult("testHardcoverResult", false, "Request failed. Check server connectivity.");
                     })
                     .finally(function () {
-                        btn.disabled = false;
-                        btn.textContent = "Test";
+                        resetButton(btn);
                     });
             });
 
             document.getElementById("btnTestGoogleBooks").addEventListener("click", function () {
                 var key = document.getElementById("txtGoogleBooksApiKey").value;
                 var btn = this;
-                btn.disabled = true;
-                btn.textContent = "Testing...";
+                showTestResult("testGoogleBooksResult", true, "Testing...");
+                setButtonLoading(btn, "Testing...");
 
                 authFetch("Books/Config/TestGoogleBooks", {
                     method: "POST",
@@ -1105,8 +1132,7 @@
                         showTestResult("testGoogleBooksResult", false, "Request failed. Check server connectivity.");
                     })
                     .finally(function () {
-                        btn.disabled = false;
-                        btn.textContent = "Test";
+                        resetButton(btn);
                     });
             });
 
@@ -1118,8 +1144,8 @@
                     return;
                 }
                 var btn = this;
-                btn.disabled = true;
-                btn.textContent = "Testing...";
+                showTestResult("testGrandComicsDbResult", true, "Testing...");
+                setButtonLoading(btn, "Testing...");
 
                 authFetch("Books/Config/TestGrandComicsDb", {
                     method: "POST",
@@ -1135,8 +1161,7 @@
                         showTestResult("testGrandComicsDbResult", false, "Request failed. Check server connectivity.");
                     })
                     .finally(function () {
-                        btn.disabled = false;
-                        btn.textContent = "Test";
+                        resetButton(btn);
                     });
             });
 
@@ -1425,14 +1450,7 @@
                     return;
                 }
 
-                var selectedLibIds = [];
-                document.querySelectorAll(".be-library-checkbox:checked").forEach(function (cb) {
-                    selectedLibIds.push(cb.value);
-                });
-
-                var availableLibs = selectedLibIds.length > 0 && _beLibraries
-                    ? _beLibraries.filter(function (l) { return selectedLibIds.indexOf(l.id) >= 0; })
-                    : (_beLibraries || []);
+                var availableLibs = _beLibraries || [];
 
                 var apiSourceOptions = [
                     { key: "Hardcover", label: "Hardcover" },
@@ -1499,7 +1517,7 @@
                             '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {BookTitle} {Disc} {Volume} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>' +
-                        '<div class="be-dir-options">' +
+                        '<div class="be-dir-options" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">' +
                             '<label class="be-dir-chip" title="Enable title/author online search for this directory">' +
                                 '<input is="emby-checkbox" class="dir-title-author-search" type="checkbox" data-idx="' + idx + '"' + (dir.EnableTitleAuthorSearch !== false ? ' checked' : '') + ' />' +
                                 '<span>Title/Author Search</span>' +
@@ -1527,6 +1545,7 @@
 
                 container.querySelectorAll(".btn-remove-dir").forEach(function (btn) {
                     btn.addEventListener("click", function () {
+                        if (!confirmAction("Remove this managed directory? The source files will not be deleted.")) return;
                         var idx = parseInt(this.getAttribute("data-idx"));
                         var dirs = getCurrentDirectories();
                         dirs.splice(idx, 1);
@@ -1644,6 +1663,7 @@
             });
 
             document.getElementById("btnProcessGroups").addEventListener("click", function () {
+                if (!confirmAction("Run grouping process? This will modify the plugin grouping database.")) return;
                 var btn = this;
                 btn.disabled = true;
                 btn.textContent = "Processing...";
@@ -1670,6 +1690,7 @@
             });
 
             document.getElementById("btnRepairFormatPaths").addEventListener("click", function () {
+                if (!confirmAction("Repair format paths? This will cross-reference the grouping database against the Jellyfin library.")) return;
                 var btn = this;
                 btn.disabled = true;
                 btn.textContent = "Repairing...";
@@ -1745,6 +1766,7 @@
             });
 
             document.getElementById("btnScanAll").addEventListener("click", function () {
+                if (!confirmAction("Start ingestion scan now? This will move/copy files from managed source directories into the library.")) return;
                 var btn = this;
                 btn.disabled = true;
                 btn.textContent = "Scanning...";
@@ -1786,6 +1808,7 @@
             }
 
             document.getElementById("btnConvertComics").addEventListener("click", function () {
+                if (!confirmAction("Convert CBR/CB7 archives to CBZ? Original archives will be moved to the backup/trash directory.")) return;
                 var btn = this;
                 var resultEl = document.getElementById("convertComicsResult");
 
@@ -1905,6 +1928,9 @@
             });
 
             function loadConfig() {
+                if (window._beLoadingConfig) return;
+                window._beLoadingConfig = true;
+
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     document.getElementById("chkUnifiedMetadata").checked = config.UnifiedMetadataEnabled || false;
                     document.getElementById("txtApiRateLimitMaxWaitSeconds").value = config.ApiRateLimitMaxWaitSeconds ?? 5;
@@ -1936,6 +1962,7 @@
                     document.getElementById("txtMetadataEnrichmentTimeout").value = config.MetadataEnrichmentTimeoutMinutes ?? 120;
 
                     document.getElementById("txtTrashDirectory").value = config.TrashDirectory || "";
+                    setFieldInvalid(document.getElementById("txtTrashDirectory"), !config.TrashDirectory);
                     document.getElementById("txtTrashCleanupInterval").value = config.TrashCleanupIntervalDays || 7;
                     document.getElementById("chkEnableNonBookDirectoryCleanup").checked = config.EnableNonBookDirectoryCleanup || false;
                     document.getElementById("txtBackupDirectory").value = config.BackupDirectory || "";
@@ -1965,21 +1992,23 @@
                     } else {
                         document.getElementById("radioMoveMode").checked = true;
                     }
+                }).then(function () {
+                    return authFetch("Books/Config/Info")
+                        .then(function (r) { return r.json(); })
+                        .then(function (info) {
+                            document.getElementById("bePluginInfo").innerHTML =
+                                '<p><strong>Name:</strong> ' + escapeHtml(info.name) + '</p>' +
+                                '<p><strong>Version:</strong> ' + escapeHtml(info.version) + '</p>';
+                        })
+                        .catch(function (err) {
+                            console.error("[BookEnhancers] Failed to load plugin info:", err);
+                            document.getElementById("bePluginInfo").innerHTML = '<p>Could not load plugin info.</p>';
+                        });
                 }).catch(function (err) {
                     console.error("[BookEnhancers] Failed to load plugin configuration:", err);
+                }).finally(function () {
+                    window._beLoadingConfig = false;
                 });
-
-                authFetch("Books/Config/Info")
-                    .then(function (r) { return r.json(); })
-                    .then(function (info) {
-                        document.getElementById("bePluginInfo").innerHTML =
-                            '<p><strong>Name:</strong> ' + escapeHtml(info.name) + '</p>' +
-                            '<p><strong>Version:</strong> ' + escapeHtml(info.version) + '</p>';
-                    })
-                    .catch(function (err) {
-                        console.error("[BookEnhancers] Failed to load plugin info:", err);
-                        document.getElementById("bePluginInfo").innerHTML = '<p>Could not load plugin info.</p>';
-                    });
             }
 
             var _beLibraries = [];
@@ -2019,22 +2048,14 @@
                             entries.push({ idx: idx, path: d.SourcePath });
                     });
 
-                    function checkNext() {
-                        if (entries.length === 0) {
-                            if (hasMissing) {
-                                Dashboard.alert({
-                                    title: "Missing Source Directories",
-                                    message: "Some source paths don't exist. Use each row's Create button to create them."
-                                });
-                                return;
-                            }
-                            doSave();
-                            return;
-                        }
+                    if (entries.length === 0) {
+                        doSave();
+                        return;
+                    }
 
-                        var entry = entries.shift();
+                    Promise.all(entries.map(function (entry) {
                         var statusEl = container.querySelector('.dir-status[data-idx="' + entry.idx + '"]');
-                        authFetch("Books/Config/ValidateDirectory", {
+                        return authFetch("Books/Config/ValidateDirectory", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ path: entry.path, createIfMissing: false })
@@ -2051,16 +2072,28 @@
                                 statusEl.textContent = "OK";
                                 statusEl.style.color = "var(--green,#4caf50)";
                             }
-                            checkNext();
                         })
-                        .catch(function () { checkNext(); });
-                    }
-
-                    checkNext();
+                        .catch(function () {
+                            if (statusEl) {
+                                statusEl.textContent = "Check failed";
+                                statusEl.style.color = "var(--text-secondary,#888)";
+                            }
+                        });
+                    })).then(function () {
+                        if (hasMissing) {
+                            Dashboard.alert({
+                                title: "Missing Source Directories",
+                                message: "Some source paths don't exist. Use each row's Create button to create them."
+                            });
+                            return;
+                        }
+                        doSave();
+                    });
                 }
 
                 function doSave() {
                     var trashDir = document.getElementById("txtTrashDirectory").value.trim();
+                    setFieldInvalid(document.getElementById("txtTrashDirectory"), !trashDir);
                     if (!trashDir) {
                         Dashboard.alert({
                             title: "Trash Directory Required",
@@ -2141,6 +2174,10 @@
             });
             document.getElementById("guideModal").addEventListener("click", function (e) {
                 if (e.target === this) this.classList.remove("open");
+            });
+
+            document.getElementById("txtTrashDirectory").addEventListener("input", function () {
+                setFieldInvalid(this, !this.value.trim());
             });
 
             if (!window._beListenersBound) {

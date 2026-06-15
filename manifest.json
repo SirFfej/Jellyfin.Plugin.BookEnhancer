@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.8.2 - UI/UX improvements: config page now loads once with a guard instead of three times; managed-directory path validation runs in parallel; action buttons show consistent loading/disabled states; destructive actions (Process, Repair, Scan, Convert, Remove directory, Reset) now require confirmation; missing Trash Directory is highlighted with a red border; API test buttons clear prior results and show 'Testing...' feedback. Fix: Target Library dropdown no longer clears on save when the selected library is unchecked in the Main tab; all libraries are now available in the dropdown. Build: 0W/0E.",
+        "checksum": "B9719AE5AB56E3669ECAA5A039CD0283",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.2/Jellyfin.Plugin.BookEnhancer_0.8.8.2.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.8.2"
+      },
+      {
         "changelog": "v0.8.8.1 - Fix: managed-directory option chips (Title/Author Search, Write Metadata, Comic Library, Flat Series) no longer overlap their checkboxes or truncate text. Chips now wrap and use min-width so full labels remain visible. Build: 0W/0E.",
         "checksum": "34C8F95A09DD794F20D343323D624D9C",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.1/Jellyfin.Plugin.BookEnhancer_0.8.8.1.zip",
