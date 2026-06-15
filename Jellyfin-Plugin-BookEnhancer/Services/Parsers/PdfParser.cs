@@ -60,6 +60,10 @@ public class PdfParser : IFileParser
 
             return meta;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "PdfPig failed to parse {FilePath}; falling back to filename metadata", filePath);

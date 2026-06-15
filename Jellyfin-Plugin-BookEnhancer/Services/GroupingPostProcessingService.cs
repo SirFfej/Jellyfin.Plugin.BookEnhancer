@@ -125,6 +125,10 @@ public class GroupingPostProcessingService
                     if (group is not null)
                         registered++;
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     await LogWarningAsync($"Failed to scan {file}: {ex.Message}", logCallback, _logger).ConfigureAwait(false);
@@ -189,10 +193,6 @@ public class GroupingPostProcessingService
             try
             {
                 var altItem = FindItemByPath(alternate.FilePath);
-                if (altItem is not null)
-                {
-                    await DeleteItemWithRetryAsync(altItem, logCallback, ct).ConfigureAwait(false);
-                }
 
                 if (formatsDir is not null && File.Exists(alternate.FilePath))
                 {
@@ -202,11 +202,20 @@ public class GroupingPostProcessingService
 
                     if (!File.Exists(destPath))
                     {
-                        File.Move(alternate.FilePath, destPath);
+                        await SafeFileOperations.MoveFileAsync(alternate.FilePath, destPath, ct).ConfigureAwait(false);
                     }
                 }
 
+                if (altItem is not null)
+                {
+                    await DeleteItemWithRetryAsync(altItem, logCallback, ct).ConfigureAwait(false);
+                }
+
                 _groupingService.RemoveFormat(alternate.Id);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -265,6 +274,10 @@ public class GroupingPostProcessingService
         {
             return _libraryManager.FindByPath(path, false);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to find item by path: {Path}", path);
@@ -286,6 +299,10 @@ public class GroupingPostProcessingService
                     false);
 
                 return;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex) when (attempt <= MaxDeleteRetries)
             {

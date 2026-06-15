@@ -10,6 +10,7 @@ public class BookGroupingService
 {
     private readonly string _dbPath;
     private readonly ILogger<BookGroupingService> _logger;
+    private readonly object _registerLock = new();
 
     public BookGroupingService(string dbDirectory, ILogger<BookGroupingService> logger)
     {
@@ -540,38 +541,41 @@ public class BookGroupingService
 
     public BookGroup? RegisterFile(string path, FileMetadata metadata, bool isPrimary, string strategy = "IsbnOnly")
     {
-        using var conn = CreateConnection();
-        conn.Open();
-
-        using var transaction = conn.BeginTransaction();
-        try
+        lock (_registerLock)
         {
-            var existingGroupId = FindExistingGroupId(conn, metadata, strategy);
+            using var conn = CreateConnection();
+            conn.Open();
 
-            string? groupId;
-            if (existingGroupId is null && isPrimary)
+            using var transaction = conn.BeginTransaction();
+            try
             {
-                groupId = CreateGroup(conn, metadata, strategy).Id;
-            }
-            else
-            {
-                groupId = existingGroupId;
-            }
+                var existingGroupId = FindExistingGroupId(conn, metadata, strategy);
 
-            if (groupId is not null)
-            {
-                AddFormatToGroup(conn, groupId, path, metadata.FileFormat, isPrimary);
-                transaction.Commit();
-                return LoadGroupWithFormats(conn, groupId);
-            }
+                string? groupId;
+                if (existingGroupId is null && isPrimary)
+                {
+                    groupId = CreateGroup(conn, metadata, strategy).Id;
+                }
+                else
+                {
+                    groupId = existingGroupId;
+                }
 
-            transaction.Rollback();
-            return null;
-        }
-        catch
-        {
-            transaction.Rollback();
-            throw;
+                if (groupId is not null)
+                {
+                    AddFormatToGroup(conn, groupId, path, metadata.FileFormat, isPrimary);
+                    transaction.Commit();
+                    return LoadGroupWithFormats(conn, groupId);
+                }
+
+                transaction.Rollback();
+                return null;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
     }
 

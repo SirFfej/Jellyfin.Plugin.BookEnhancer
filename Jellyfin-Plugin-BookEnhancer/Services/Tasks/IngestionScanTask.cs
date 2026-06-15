@@ -73,7 +73,8 @@ public class IngestionScanTask : IScheduledTask
                 var result = await _ingestionService.ScanAllAsync(logCallback, ct).ConfigureAwait(false);
                 logger.LogInformation(
                     $"Scan complete — Found: {result.FilesFound}, Added: {result.FilesAdded}, " +
-                    $"Skipped: {result.FilesSkipped}, Enrichment failures: {result.EnrichmentFailures}, Errors: {result.Errors}");
+                    $"Trashed: {result.FilesTrashed}, Skipped: {result.FilesSkipped}, " +
+                    $"Enrichment failures: {result.EnrichmentFailures}, Errors: {result.Errors}");
                 ((IProgress<double>)logger).Report(1.0);
             }
             catch (OperationCanceledException)

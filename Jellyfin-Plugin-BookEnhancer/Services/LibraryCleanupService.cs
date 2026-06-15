@@ -122,6 +122,10 @@ public class LibraryCleanupService
 
                     scannedFiles.Add((file, metadata, dir));
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     await logCallback($"[{libLabel}] Error reading {file}: {ex.Message}").ConfigureAwait(false);
@@ -234,6 +238,10 @@ public class LibraryCleanupService
                         libResult.Errors++;
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     await logCallback($"[{libLabel}] Error processing {file}: {ex.Message}").ConfigureAwait(false);
@@ -326,6 +334,10 @@ public class LibraryCleanupService
                             await logCallback($"[{libLabel}] Failed to move (enriched) {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
                             libResult.Errors++;
                         }
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
                     }
                     catch (Exception ex)
                     {
@@ -571,9 +583,9 @@ public class LibraryCleanupService
         }
 
         if (isDirectory)
-            Directory.Move(path, dest);
+            await SafeFileOperations.MoveDirectoryAsync(path, dest).ConfigureAwait(false);
         else
-            File.Move(path, dest);
+            await SafeFileOperations.MoveFileAsync(path, dest).ConfigureAwait(false);
 
         await logCallback($"  Moved to trash: {path} -> {dest}").ConfigureAwait(false);
     }
@@ -611,11 +623,19 @@ public class LibraryCleanupService
                     Directory.Delete(dir, recursive: true);
                     await logCallback($"Purged old trash: {dir} (from {created:yyyy-MM-dd})").ConfigureAwait(false);
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     await logCallback($"Failed to purge trash directory {dir}: {ex.Message}").ConfigureAwait(false);
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -658,9 +678,13 @@ public class LibraryCleanupService
                 }
 
                 Directory.CreateDirectory(targetDir);
-                File.Move(imagePath, targetPath);
+                await SafeFileOperations.MoveFileAsync(imagePath, targetPath).ConfigureAwait(false);
                 await logCallback($"  Moved companion image: {imagePath} -> {targetPath}").ConfigureAwait(false);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -686,6 +710,10 @@ public class LibraryCleanupService
                 await logCallback($"Removed empty directory: {dir.FullName}").ConfigureAwait(false);
                 dir = dir.Parent;
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -756,11 +784,19 @@ public class LibraryCleanupService
                     count++;
                     await logCallback($"Removed empty directory: {dir}").ConfigureAwait(false);
                 }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
                 catch (Exception ex)
                 {
                     await logCallback($"Failed to remove empty directory {dir}: {ex.Message}").ConfigureAwait(false);
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

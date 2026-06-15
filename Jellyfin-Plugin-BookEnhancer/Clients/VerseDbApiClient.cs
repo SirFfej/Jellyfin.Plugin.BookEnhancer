@@ -43,6 +43,10 @@ public class VerseDbApiClient
                 .Select(MapSearchResult)
                 .ToList();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("VerseDB", $"search failed for query \"{query}\"", ex);
@@ -69,6 +73,10 @@ public class VerseDbApiClient
 
             var response = await client.GetFromJsonAsync<VerseDbIssueDetail>(url, ct).ConfigureAwait(false);
             return response is not null ? MapIssueDetail(response) : null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -213,6 +213,10 @@ public class MetadataEnrichmentTask : IScheduledTask
 
                         await Task.Delay(250, ct).ConfigureAwait(false);
                     }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         logger.LogError($"Error processing {filePath}: {ex.Message}");

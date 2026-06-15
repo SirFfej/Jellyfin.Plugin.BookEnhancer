@@ -119,6 +119,10 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
 
             MapPeople(result, enriched);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Unified metadata enrichment failed for {Path}", info.Path);
@@ -199,6 +203,10 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                     }
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -75,7 +75,7 @@ public class LibraryOrganizationService
 
             if (copy)
             {
-                File.Copy(sourcePath, targetPath);
+                await SafeFileOperations.CopyFileAsync(sourcePath, targetPath).ConfigureAwait(false);
                 if (logCallback is not null)
                     await logCallback($"Copied file: {sourcePath} -> {targetPath}").ConfigureAwait(false);
                 else
@@ -83,7 +83,7 @@ public class LibraryOrganizationService
             }
             else
             {
-                File.Move(sourcePath, targetPath);
+                await SafeFileOperations.MoveFileAsync(sourcePath, targetPath).ConfigureAwait(false);
                 if (logCallback is not null)
                     await logCallback($"Moved file: {sourcePath} -> {targetPath}").ConfigureAwait(false);
                 else
@@ -91,6 +91,10 @@ public class LibraryOrganizationService
             }
 
             return MoveResult.CreateSuccess(targetPath);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

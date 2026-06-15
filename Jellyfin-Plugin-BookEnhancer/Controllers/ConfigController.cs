@@ -119,6 +119,10 @@ public class ConfigController : ControllerBase
             _logger.LogWarning("GCD API test failed: {StatusCode}", resp.StatusCode);
             return Ok(new TestResult { Success = false, Message = $"GCD API returned {resp.StatusCode}. Check credentials." });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "GCD API test connection failed");
@@ -147,6 +151,10 @@ public class ConfigController : ControllerBase
             hcResult.Reachable = true;
             hcResult.StatusCode = (int)hcResp.StatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             hcResult.Reachable = false;
@@ -164,6 +172,10 @@ public class ConfigController : ControllerBase
             var gbResp = await gbClient.GetAsync("https://www.googleapis.com/books/v1/volumes?q=test&maxResults=1", ct).ConfigureAwait(false);
             gbResult.Reachable = true;
             gbResult.StatusCode = (int)gbResp.StatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -183,6 +195,10 @@ public class ConfigController : ControllerBase
             olResult.Reachable = true;
             olResult.StatusCode = (int)olResp.StatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             olResult.Reachable = false;
@@ -200,6 +216,10 @@ public class ConfigController : ControllerBase
             var cvResp = await cvClient.GetAsync("https://comicvine.gamespot.com/api", ct).ConfigureAwait(false);
             cvResult.Reachable = true;
             cvResult.StatusCode = (int)cvResp.StatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -219,6 +239,10 @@ public class ConfigController : ControllerBase
             mtResult.Reachable = true;
             mtResult.StatusCode = (int)mtResp.StatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             mtResult.Reachable = false;
@@ -237,6 +261,10 @@ public class ConfigController : ControllerBase
             vdResult.Reachable = true;
             vdResult.StatusCode = (int)vdResp.StatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             vdResult.Reachable = false;
@@ -254,6 +282,10 @@ public class ConfigController : ControllerBase
             var gcdResp = await gcdClient.GetAsync("https://www.comics.org/api/issue/1033778/", ct).ConfigureAwait(false);
             gcdResult.Reachable = true;
             gcdResult.StatusCode = (int)gcdResp.StatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -319,6 +351,10 @@ public class ConfigController : ControllerBase
 
             return Ok(new DownloadTemplateResult { Success = false, Message = "Downloaded content was not a valid ComicInfo.xml document." });
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to download ComicInfo template from {Url}", request.Url);
@@ -349,6 +385,10 @@ public class ConfigController : ControllerBase
             }
 
             return Ok(new ValidateDirectoryResult { Exists = false, Message = "Directory does not exist." });
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

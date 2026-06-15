@@ -40,6 +40,10 @@ public class GoogleBooksApiClient
 
             return MapVolume(volume.VolumeInfo, string.Empty);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("Google Books", $"title/author search failed for \"{title}\" by \"{author}\"", ex);
@@ -71,6 +75,10 @@ public class GoogleBooksApiClient
             if (volume?.VolumeInfo is null) return null;
 
             return MapVolume(volume.VolumeInfo, cleanIsbn);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

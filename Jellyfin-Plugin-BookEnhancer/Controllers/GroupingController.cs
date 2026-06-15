@@ -135,11 +135,19 @@ public class GroupingController : ControllerBase
                                 candidatesFound++;
                         }
                     }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         _logger.LogDebug(ex, "Skipping file (metadata extraction failed): {File}", file);
                     }
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

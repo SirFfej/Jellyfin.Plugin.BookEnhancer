@@ -43,6 +43,10 @@ public class ComicVineApiClient
                 .Select(MapSearchResult)
                 .ToList();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("Comic Vine", $"search failed for query \"{query}\"", ex);
@@ -69,6 +73,10 @@ public class ComicVineApiClient
 
             var response = await client.GetFromJsonAsync<CvIssueResponse>(url, ct).ConfigureAwait(false);
             return response?.Results is not null ? MapIssue(response.Results) : null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

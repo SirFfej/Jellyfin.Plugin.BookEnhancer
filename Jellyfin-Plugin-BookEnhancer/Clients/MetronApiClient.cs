@@ -52,6 +52,10 @@ public class MetronApiClient
                 .Select(MapSearchResult)
                 .ToList();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("Metron", $"search failed for \"{seriesName}\" #{issueNumber}", ex);
@@ -78,6 +82,10 @@ public class MetronApiClient
 
             var response = await client.GetFromJsonAsync<MetronIssueDetail>(url, ct).ConfigureAwait(false);
             return response is not null ? MapIssueDetail(response) : null;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

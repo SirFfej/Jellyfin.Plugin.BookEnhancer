@@ -95,6 +95,7 @@ public class BookIngestionService
             result.FilesFound += dirResult.FilesFound;
             result.FilesAdded += dirResult.FilesAdded;
             result.FilesSkipped += dirResult.FilesSkipped;
+            result.FilesTrashed += dirResult.FilesTrashed;
             result.Errors += dirResult.Errors;
         }
 
@@ -145,13 +146,30 @@ public class BookIngestionService
         result.FilesFound = files.Count;
         await LogInfoAsync($"Found {files.Count} files in {dir.SourcePath}", logCallback, _logger).ConfigureAwait(false);
 
+        var trashRunDir = string.Empty;
+        if (!string.IsNullOrWhiteSpace(Config?.TrashDirectory))
+        {
+            trashRunDir = Path.Combine(Config.TrashDirectory, DateTime.Now.ToString("yyyyMMdd-HHmmss"));
+            Directory.CreateDirectory(trashRunDir);
+        }
+
         var checkpointKey = GetCheckpointKey(dir.SourcePath);
         var checkpoint = _checkpointService.LoadCheckpoint(checkpointKey, CheckpointMaxAge);
         var resumeFrom = checkpoint?.LastProcessedPath;
         var resuming = !string.IsNullOrWhiteSpace(resumeFrom);
         if (resuming)
         {
-            await LogInfoAsync($"Resuming from checkpoint: {resumeFrom}", logCallback, _logger).ConfigureAwait(false);
+            if (!File.Exists(resumeFrom))
+            {
+                await LogInfoAsync($"Checkpoint file no longer exists ({resumeFrom}); treating checkpoint as stale and starting from beginning", logCallback, _logger).ConfigureAwait(false);
+                _checkpointService.ClearCheckpoint(checkpointKey);
+                resuming = false;
+                resumeFrom = null;
+            }
+            else
+            {
+                await LogInfoAsync($"Resuming from checkpoint: {resumeFrom}", logCallback, _logger).ConfigureAwait(false);
+            }
         }
 
         var movedByDir = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
@@ -252,13 +270,43 @@ public class BookIngestionService
                 }
                 else if (moveResult.Skipped)
                 {
-                    if (dir.EnableMetadataWriting)
+                    var sameFile = string.Equals(file, targetPath, StringComparison.OrdinalIgnoreCase);
+                    if (!sameFile && !string.IsNullOrWhiteSpace(trashRunDir))
+                    {
+                        var sourceInfo = new FileInfo(file);
+                        var targetInfo = new FileInfo(targetPath);
+                        if (sourceInfo.Exists && targetInfo.Exists && sourceInfo.Length == targetInfo.Length)
+                        {
+                            if (await MoveToTrashAsync(file, trashRunDir, isDirectory: false, logCallback).ConfigureAwait(false))
+                            {
+                                result.FilesTrashed++;
+                            }
+                            else
+                            {
+                                result.FilesSkipped++;
+                            }
+                        }
+                        else
+                        {
+                            if (sourceInfo.Exists && targetInfo.Exists && sourceInfo.Length != targetInfo.Length)
+                            {
+                                await LogWarningAsync($"Duplicate file size mismatch; leaving source in place: {file} ({sourceInfo.Length}) vs {targetPath} ({targetInfo.Length})", logCallback, _logger).ConfigureAwait(false);
+                            }
+
+                            result.FilesSkipped++;
+                        }
+                    }
+                    else
+                    {
+                        result.FilesSkipped++;
+                    }
+
+                    if (dir.EnableMetadataWriting && File.Exists(targetPath))
                         await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
 
                     var group = _groupingService.RegisterFile(targetPath, metadata, isPrimary: false, Config?.GroupingStrategy ?? "IsbnOnly");
                     if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true)
                         _groupingService.SetLastEnrichmentTime(targetPath, enrichmentResult.EnrichedBy);
-                    result.FilesSkipped++;
 
                     if (!string.IsNullOrWhiteSpace(targetDir))
                         skippedByDir[targetDir] = skippedByDir.GetValueOrDefault(targetDir) + 1;
@@ -279,6 +327,10 @@ public class BookIngestionService
                     processedSinceCheckpoint = 0;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 await LogErrorAsync(ex, $"Error processing file: {file}", logCallback, _logger).ConfigureAwait(false);
@@ -286,7 +338,7 @@ public class BookIngestionService
             }
         }
 
-        if (!checkpointCleared)
+        if (!checkpointCleared && !ct.IsCancellationRequested)
         {
             _checkpointService.ClearCheckpoint(checkpointKey);
             checkpointCleared = true;
@@ -366,13 +418,54 @@ public class BookIngestionService
                 }
 
                 Directory.CreateDirectory(targetDir);
-                File.Move(imagePath, targetPath);
+                await SafeFileOperations.MoveFileAsync(imagePath, targetPath).ConfigureAwait(false);
                 await LogInfoAsync($"  Moved companion image: {imagePath} -> {targetPath}", logCallback, _logger).ConfigureAwait(false);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             await LogErrorAsync(ex, $"Failed to move companion images from {sourceDir}", logCallback, _logger).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<bool> MoveToTrashAsync(string path, string trashRunDir, bool isDirectory, Func<string, Task>? logCallback)
+    {
+        try
+        {
+            var baseName = isDirectory ? new DirectoryInfo(path).Name : Path.GetFileName(path);
+            var ext = isDirectory ? string.Empty : Path.GetExtension(path);
+            var dest = Path.Combine(trashRunDir, baseName);
+            var counter = 1;
+            while (isDirectory ? Directory.Exists(dest) : File.Exists(dest))
+            {
+                dest = Path.Combine(trashRunDir, $"{baseName}_{counter}{ext}");
+                counter++;
+            }
+
+            var destDir = Path.GetDirectoryName(dest);
+            if (!string.IsNullOrWhiteSpace(destDir))
+                Directory.CreateDirectory(destDir);
+
+            if (isDirectory)
+                await SafeFileOperations.MoveDirectoryAsync(path, dest).ConfigureAwait(false);
+            else
+                await SafeFileOperations.MoveFileAsync(path, dest).ConfigureAwait(false);
+
+            await LogInfoAsync($"Moved to trash: {path} -> {dest}", logCallback, _logger).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await LogErrorAsync(ex, $"Failed to move to trash: {path}", logCallback, _logger).ConfigureAwait(false);
+            return false;
         }
     }
 
@@ -394,6 +487,10 @@ public class BookIngestionService
                 dir = dir.Parent;
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             await LogErrorAsync(ex, $"Failed to remove empty directory {startPath}", logCallback, _logger).ConfigureAwait(false);
@@ -406,6 +503,7 @@ public class IngestionResult
     public int FilesFound { get; set; }
     public int FilesAdded { get; set; }
     public int FilesSkipped { get; set; }
+    public int FilesTrashed { get; set; }
     public int Errors { get; set; }
     public int EnrichmentFailures { get; set; }
 }

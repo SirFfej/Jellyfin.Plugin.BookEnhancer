@@ -52,6 +52,10 @@ public class GrandComicsDbApiClient
 
             return await GetIssueDetailAsync(issueId.Value, username, password, ct).ConfigureAwait(false);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("Grand Comics Database", $"search failed for \"{seriesName}\" #{issueNumber}", ex);
@@ -80,6 +84,10 @@ public class GrandComicsDbApiClient
             if (response is null) return null;
 
             return MapIssueDetail(response);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -37,6 +37,10 @@ public class OpenLibraryApiClient
 
             return MapSearchResult(doc);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("OpenLibrary", $"title/author search failed for \"{title}\" by \"{author}\"", ex);
@@ -102,6 +106,10 @@ public class OpenLibraryApiClient
                 return null;
 
             return MapEntry(entry, cleanIsbn);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

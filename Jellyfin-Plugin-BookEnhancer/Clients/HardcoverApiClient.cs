@@ -33,6 +33,10 @@ public class HardcoverApiClient
             var meta = MapBookToMetadata(bookData);
             return meta;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             ApiResponseLogger.Log("Hardcover", $"title/author search failed for \"{title}\" by \"{author}\"", ex);
@@ -43,6 +47,9 @@ public class HardcoverApiClient
 
     private async Task<BookResult?> QueryBookByTitleAuthor(string title, string author, string apiKey, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(author))
+            return null;
+
         var query = @"
 query($title: String!) {
   books(where: {title: {_iregex: $title}}, limit: 10) {
@@ -142,6 +149,10 @@ query($title: String!) {
             }
 
             return meta;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -303,6 +314,10 @@ query($bookId: Int!) {
                     else
                         meta.Tags.Add(tag);
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
