@@ -21,10 +21,16 @@ public class ComicVineApiClient
 
     public async Task<List<ComicVineSearchResult>> SearchIssuesAsync(string query, string apiKey, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return [];
+
+        ConfigureRateLimiter();
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return [];
+
         try
         {
             var url = $"{BaseUrl}/search/?api_key={apiKey}&format=json&resources=issue&query={Uri.EscapeDataString(query)}&field_list=id,name,issue_number,image,volume,cover_date,description,publisher";
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -47,10 +53,16 @@ public class ComicVineApiClient
 
     public async Task<FileMetadata?> GetIssueDetailAsync(int issueId, string apiKey, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return null;
+
+        ConfigureRateLimiter();
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
             var url = $"{BaseUrl}/issue/4000-{issueId}/?api_key={apiKey}&format=json&field_list=id,name,issue_number,volume,cover_date,description,publisher,person_credits,character_credits,image";
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -171,6 +183,29 @@ public class ComicVineApiClient
     {
         if (string.IsNullOrWhiteSpace(html)) return null;
         return System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", string.Empty).Trim();
+    }
+
+    private static void ConfigureRateLimiter()
+    {
+        var config = Plugin.Instance?.Configuration;
+        if (config is null)
+            return;
+
+        var limit = config.ComicVineRateLimitPerHour > 0 ? config.ComicVineRateLimitPerHour : 180;
+        _rateLimiter.Configure(limit, TimeSpan.FromHours(1));
+    }
+
+    private static async Task<bool> WaitForRateLimitSlotAsync(CancellationToken ct)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var maxWaitSeconds = config?.ApiRateLimitMaxWaitSeconds ?? 5;
+        if (maxWaitSeconds <= 0)
+        {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+
+        return await _rateLimiter.TryWaitAsync(TimeSpan.FromSeconds(maxWaitSeconds), ct).ConfigureAwait(false);
     }
 
     private class CvSearchResponse

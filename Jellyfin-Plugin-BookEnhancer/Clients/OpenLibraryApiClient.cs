@@ -21,11 +21,12 @@ public class OpenLibraryApiClient
 
     public async Task<FileMetadata?> SearchByTitleAuthorAsync(string title, string author, CancellationToken ct = default)
     {
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
             var query = $"{BaseUrl}/search.json?q={Uri.EscapeDataString(title)}+{Uri.EscapeDataString(author)}&limit=5";
-
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -83,11 +84,12 @@ public class OpenLibraryApiClient
         var cleanIsbn = CleanIsbn(isbn);
         if (cleanIsbn is null) return null;
 
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
             var url = $"{BaseUrl}api/books?bibkeys=ISBN:{cleanIsbn}&jscmd=data&format=json";
-
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -163,6 +165,19 @@ public class OpenLibraryApiClient
     {
         var cleaned = new string(isbn.Where(c => char.IsDigit(c) || c is 'X' or 'x').ToArray());
         return string.IsNullOrWhiteSpace(cleaned) ? null : cleaned;
+    }
+
+    private static async Task<bool> WaitForRateLimitSlotAsync(CancellationToken ct)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var maxWaitSeconds = config?.ApiRateLimitMaxWaitSeconds ?? 5;
+        if (maxWaitSeconds <= 0)
+        {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+
+        return await _rateLimiter.TryWaitAsync(TimeSpan.FromSeconds(maxWaitSeconds), ct).ConfigureAwait(false);
     }
 
     private class OlSearchResponse

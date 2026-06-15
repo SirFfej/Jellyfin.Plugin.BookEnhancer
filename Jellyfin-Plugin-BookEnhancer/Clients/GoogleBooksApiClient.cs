@@ -21,6 +21,9 @@ public class GoogleBooksApiClient
 
     public async Task<FileMetadata?> SearchByTitleAuthorAsync(string title, string author, string? apiKey, CancellationToken ct = default)
     {
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
             var url = $"{BaseUrl}volumes?q=intitle:{Uri.EscapeDataString(title)}+inauthor:{Uri.EscapeDataString(author)}&maxResults=1";
@@ -50,13 +53,15 @@ public class GoogleBooksApiClient
         var cleanIsbn = CleanIsbn(isbn);
         if (cleanIsbn is null) return null;
 
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
             var url = $"{BaseUrl}volumes?q=isbn:{cleanIsbn}&maxResults=1";
             if (!string.IsNullOrWhiteSpace(apiKey))
                 url += $"&key={apiKey}";
 
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(10);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -143,6 +148,19 @@ public class GoogleBooksApiClient
     {
         var cleaned = new string(isbn.Where(c => char.IsDigit(c) || c is 'X' or 'x').ToArray());
         return string.IsNullOrWhiteSpace(cleaned) ? null : cleaned;
+    }
+
+    private static async Task<bool> WaitForRateLimitSlotAsync(CancellationToken ct)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var maxWaitSeconds = config?.ApiRateLimitMaxWaitSeconds ?? 5;
+        if (maxWaitSeconds <= 0)
+        {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+
+        return await _rateLimiter.TryWaitAsync(TimeSpan.FromSeconds(maxWaitSeconds), ct).ConfigureAwait(false);
     }
 
     private class VolumeResponse

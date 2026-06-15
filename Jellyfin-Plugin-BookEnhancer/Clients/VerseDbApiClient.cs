@@ -21,10 +21,15 @@ public class VerseDbApiClient
 
     public async Task<List<VerseDbSearchResult>> SearchIssuesAsync(string query, string apiKey, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return [];
+
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return [];
+
         try
         {
             var url = $"{BaseUrl}/issues?search={Uri.EscapeDataString(query)}";
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -48,10 +53,15 @@ public class VerseDbApiClient
 
     public async Task<FileMetadata?> GetIssueDetailAsync(int issueId, string apiKey, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return null;
+
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
             var url = $"{BaseUrl}/issues/{issueId}";
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
             client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -173,6 +183,19 @@ public class VerseDbApiClient
     {
         if (string.IsNullOrWhiteSpace(html)) return null;
         return System.Text.RegularExpressions.Regex.Replace(html, "<[^>]+>", string.Empty).Trim();
+    }
+
+    private static async Task<bool> WaitForRateLimitSlotAsync(CancellationToken ct)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var maxWaitSeconds = config?.ApiRateLimitMaxWaitSeconds ?? 5;
+        if (maxWaitSeconds <= 0)
+        {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+
+        return await _rateLimiter.TryWaitAsync(TimeSpan.FromSeconds(maxWaitSeconds), ct).ConfigureAwait(false);
     }
 
     private class VerseDbListResponse

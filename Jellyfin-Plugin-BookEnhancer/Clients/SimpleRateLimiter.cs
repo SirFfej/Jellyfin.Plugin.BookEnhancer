@@ -2,10 +2,10 @@ namespace Jellyfin.Plugin.BookEnhancer.Clients;
 
 public class SimpleRateLimiter
 {
-    private readonly int _maxRequests;
-    private readonly TimeSpan _window;
     private readonly Queue<DateTime> _timestamps = new();
     private readonly object _lock = new();
+    private int _maxRequests;
+    private TimeSpan _window;
 
     public SimpleRateLimiter(int maxRequests, TimeSpan window)
     {
@@ -13,7 +13,26 @@ public class SimpleRateLimiter
         _window = window;
     }
 
-    public async Task WaitAsync(CancellationToken ct = default)
+    public void Configure(int maxRequests, TimeSpan window)
+    {
+        lock (_lock)
+        {
+            _maxRequests = maxRequests;
+            _window = window;
+        }
+    }
+
+    public Task WaitAsync(CancellationToken ct = default)
+    {
+        return WaitCoreAsync(null, ct);
+    }
+
+    public Task<bool> TryWaitAsync(TimeSpan maxWait, CancellationToken ct = default)
+    {
+        return WaitCoreAsync(maxWait, ct);
+    }
+
+    private async Task<bool> WaitCoreAsync(TimeSpan? maxWait, CancellationToken ct)
     {
         while (true)
         {
@@ -28,14 +47,21 @@ public class SimpleRateLimiter
                 if (_timestamps.Count < _maxRequests)
                 {
                     _timestamps.Enqueue(now);
-                    return;
+                    return true;
                 }
 
                 waitTime = _window - (now - _timestamps.Peek());
+                if (waitTime.Value <= TimeSpan.Zero)
+                {
+                    _timestamps.Enqueue(now);
+                    return true;
+                }
             }
 
-            if (waitTime.Value > TimeSpan.Zero)
-                await Task.Delay(waitTime.Value, ct).ConfigureAwait(false);
+            if (maxWait.HasValue && waitTime.Value > maxWait.Value)
+                return false;
+
+            await Task.Delay(waitTime.Value, ct).ConfigureAwait(false);
         }
     }
 }

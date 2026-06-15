@@ -13,6 +13,17 @@ public class PluginConfiguration : BasePluginConfiguration
     public bool OpenLibraryEnabled { get; set; } = true;
     public bool ComicVineEnabled { get; set; } = false;
     public string ComicVineApiKey { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the ComicVine rate limit in requests per hour. 0 = use default (180).
+    /// </summary>
+    public int ComicVineRateLimitPerHour { get; set; } = 180;
+
+    /// <summary>
+    /// Gets or sets the maximum time an API call will wait for a rate limit slot before falling back to the next API.
+    /// 0 = wait indefinitely (legacy behavior).
+    /// </summary>
+    public int ApiRateLimitMaxWaitSeconds { get; set; } = 5;
     public bool MetronEnabled { get; set; } = false;
     public string MetronUsername { get; set; } = string.Empty;
     public string MetronPassword { get; set; } = string.Empty;

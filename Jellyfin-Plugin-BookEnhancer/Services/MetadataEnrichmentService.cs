@@ -13,6 +13,7 @@ public class MetadataEnrichmentService
     private readonly MetronApiClient _metron;
     private readonly VerseDbApiClient _verseDb;
     private readonly GrandComicsDbApiClient _grandComicsDb;
+    private readonly ComicApiCache _comicCache;
     private readonly ILogger<MetadataEnrichmentService> _logger;
 
     public MetadataEnrichmentService(
@@ -23,6 +24,7 @@ public class MetadataEnrichmentService
         MetronApiClient metron,
         VerseDbApiClient verseDb,
         GrandComicsDbApiClient grandComicsDb,
+        ComicApiCache comicCache,
         ILogger<MetadataEnrichmentService> logger)
     {
         _hardcover = hardcover;
@@ -32,6 +34,7 @@ public class MetadataEnrichmentService
         _metron = metron;
         _verseDb = verseDb;
         _grandComicsDb = grandComicsDb;
+        _comicCache = comicCache;
         _logger = logger;
     }
 
@@ -201,60 +204,108 @@ public class MetadataEnrichmentService
 
         if (apiConfig.ComicVineEnabled && !string.IsNullOrWhiteSpace(apiConfig.ComicVineApiKey))
         {
-            var query = issue is not null ? $"{series} {issue}" : series;
-            var cvResults = await _comicVine.SearchIssuesAsync(query, apiConfig.ComicVineApiKey, ct).ConfigureAwait(false);
-            if (cvResults.Count > 0)
-            {
-                var detail = await _comicVine.GetIssueDetailAsync(cvResults[0].Id, apiConfig.ComicVineApiKey, ct).ConfigureAwait(false);
-                if (detail is not null)
+            var cvMeta = await _comicCache.GetOrAddAsync(
+                "ComicVine",
+                series,
+                issue,
+                async () =>
                 {
-                    MergeNulls(source, detail);
-                    if (!string.IsNullOrWhiteSpace(cvResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
-                        source.Publisher = cvResults[0].PublisherName;
-                    _logger.LogDebug("Comic Vine enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                    return (true, "Comic Vine");
-                }
+                    var query = issue is not null ? $"{series} {issue}" : series;
+                    var cvResults = await _comicVine.SearchIssuesAsync(query, apiConfig.ComicVineApiKey, ct).ConfigureAwait(false);
+                    if (cvResults.Count == 0)
+                        return null;
+
+                    var detail = await _comicVine.GetIssueDetailAsync(cvResults[0].Id, apiConfig.ComicVineApiKey, ct).ConfigureAwait(false);
+                    if (detail is null)
+                        return null;
+
+                    if (string.IsNullOrWhiteSpace(detail.Publisher) && !string.IsNullOrWhiteSpace(cvResults[0].PublisherName))
+                        detail.Publisher = cvResults[0].PublisherName;
+
+                    return detail;
+                },
+                ct).ConfigureAwait(false);
+
+            if (cvMeta is not null)
+            {
+                MergeNulls(source, cvMeta);
+                _logger.LogDebug("Comic Vine enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                return (true, "Comic Vine");
             }
         }
 
         if (apiConfig.MetronEnabled && !string.IsNullOrWhiteSpace(apiConfig.MetronUsername) && !string.IsNullOrWhiteSpace(apiConfig.MetronPassword) && !string.IsNullOrWhiteSpace(issue))
         {
-            var mtResults = await _metron.SearchIssuesAsync(series, issue, apiConfig.MetronUsername, apiConfig.MetronPassword, ct).ConfigureAwait(false);
-            if (mtResults.Count > 0)
-            {
-                var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, apiConfig.MetronUsername, apiConfig.MetronPassword, ct).ConfigureAwait(false);
-                if (detail is not null)
+            var mtMeta = await _comicCache.GetOrAddAsync(
+                "Metron",
+                series,
+                issue,
+                async () =>
                 {
-                    MergeNulls(source, detail);
-                    if (!string.IsNullOrWhiteSpace(mtResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
-                        source.Publisher = mtResults[0].PublisherName;
-                    _logger.LogDebug("Metron enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                    return (true, "Metron");
-                }
+                    var mtResults = await _metron.SearchIssuesAsync(series, issue, apiConfig.MetronUsername, apiConfig.MetronPassword, ct).ConfigureAwait(false);
+                    if (mtResults.Count == 0)
+                        return null;
+
+                    var detail = await _metron.GetIssueDetailAsync(mtResults[0].Id, apiConfig.MetronUsername, apiConfig.MetronPassword, ct).ConfigureAwait(false);
+                    if (detail is null)
+                        return null;
+
+                    if (string.IsNullOrWhiteSpace(detail.Publisher) && !string.IsNullOrWhiteSpace(mtResults[0].PublisherName))
+                        detail.Publisher = mtResults[0].PublisherName;
+
+                    return detail;
+                },
+                ct).ConfigureAwait(false);
+
+            if (mtMeta is not null)
+            {
+                MergeNulls(source, mtMeta);
+                _logger.LogDebug("Metron enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                return (true, "Metron");
             }
         }
 
         if (apiConfig.VerseDbEnabled && !string.IsNullOrWhiteSpace(apiConfig.VerseDbApiKey))
         {
-            var query = issue is not null ? $"{series} {issue}" : series;
-            var vdResults = await _verseDb.SearchIssuesAsync(query, apiConfig.VerseDbApiKey, ct).ConfigureAwait(false);
-            if (vdResults.Count > 0)
-            {
-                var detail = await _verseDb.GetIssueDetailAsync(vdResults[0].Id, apiConfig.VerseDbApiKey, ct).ConfigureAwait(false);
-                if (detail is not null)
+            var vdMeta = await _comicCache.GetOrAddAsync(
+                "VerseDB",
+                series,
+                issue,
+                async () =>
                 {
-                    MergeNulls(source, detail);
-                    if (!string.IsNullOrWhiteSpace(vdResults[0].PublisherName) && string.IsNullOrWhiteSpace(source.Publisher))
-                        source.Publisher = vdResults[0].PublisherName;
-                    _logger.LogDebug("VerseDB enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
-                    return (true, "VerseDB");
-                }
+                    var query = issue is not null ? $"{series} {issue}" : series;
+                    var vdResults = await _verseDb.SearchIssuesAsync(query, apiConfig.VerseDbApiKey, ct).ConfigureAwait(false);
+                    if (vdResults.Count == 0)
+                        return null;
+
+                    var detail = await _verseDb.GetIssueDetailAsync(vdResults[0].Id, apiConfig.VerseDbApiKey, ct).ConfigureAwait(false);
+                    if (detail is null)
+                        return null;
+
+                    if (string.IsNullOrWhiteSpace(detail.Publisher) && !string.IsNullOrWhiteSpace(vdResults[0].PublisherName))
+                        detail.Publisher = vdResults[0].PublisherName;
+
+                    return detail;
+                },
+                ct).ConfigureAwait(false);
+
+            if (vdMeta is not null)
+            {
+                MergeNulls(source, vdMeta);
+                _logger.LogDebug("VerseDB enriched {Title} (series: {Series}, issue: {Issue})", source.Title, source.SeriesName, source.SeriesNumber);
+                return (true, "VerseDB");
             }
         }
 
         if (apiConfig.GrandComicsDbEnabled && !string.IsNullOrWhiteSpace(apiConfig.GrandComicsDbUsername) && !string.IsNullOrWhiteSpace(apiConfig.GrandComicsDbPassword) && !string.IsNullOrWhiteSpace(issue))
         {
-            var gcdMeta = await _grandComicsDb.SearchBySeriesAndIssueAsync(series, issue, apiConfig.GrandComicsDbUsername, apiConfig.GrandComicsDbPassword, ct).ConfigureAwait(false);
+            var gcdMeta = await _comicCache.GetOrAddAsync(
+                "GrandComicsDB",
+                series,
+                issue,
+                async () => await _grandComicsDb.SearchBySeriesAndIssueAsync(series, issue, apiConfig.GrandComicsDbUsername, apiConfig.GrandComicsDbPassword, ct).ConfigureAwait(false),
+                ct).ConfigureAwait(false);
+
             if (gcdMeta is not null)
             {
                 MergeNulls(source, gcdMeta);

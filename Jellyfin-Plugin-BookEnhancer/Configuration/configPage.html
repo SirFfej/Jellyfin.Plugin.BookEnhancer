@@ -260,6 +260,15 @@
                         </label>
                     </div>
 
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <input is="emby-input" id="txtApiRateLimitMaxWaitSeconds" type="number" min="0" max="300" step="1"
+                               label="API rate-limit max wait (seconds)" />
+                        <div class="fieldDescription">
+                            If an API is rate-limited, the plugin will wait up to this many seconds for a slot before
+                            falling back to the next source. Set to 0 to wait indefinitely (legacy behavior).
+                        </div>
+                    </div>
+
                     <hr style="margin:15px 0;" />
 
                     <h4 style="font-size:1em;margin:10px 0 3px;">Hardcover</h4>
@@ -380,6 +389,14 @@
                             <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noopener" style="color:var(--link-color,#00a4dc);">
                                 Get one at Comic Vine
                             </a>
+                        </div>
+                    </div>
+
+                    <div class="inputContainer" style="margin-top:8px;">
+                        <input is="emby-input" id="txtComicVineRateLimitPerHour" type="number" min="1" max="10000" step="1"
+                               label="Comic Vine rate limit (requests/hour)" />
+                        <div class="fieldDescription">
+                            Default 180/hour. Increase this if your Comic Vine account shows no current rate limits.
                         </div>
                     </div>
 
@@ -1837,6 +1854,7 @@
 
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     config.UnifiedMetadataEnabled = true;
+                    config.ApiRateLimitMaxWaitSeconds = 5;
                     config.HardcoverEnabled = true;
                     config.HardcoverApiKey = "";
                     config.GoogleBooksEnabled = true;
@@ -1844,6 +1862,7 @@
                     config.OpenLibraryEnabled = true;
                     config.ComicVineEnabled = false;
                     config.ComicVineApiKey = "";
+                    config.ComicVineRateLimitPerHour = 180;
                     config.MetronEnabled = false;
                     config.MetronUsername = "";
                     config.MetronPassword = "";
@@ -1880,6 +1899,7 @@
             function loadConfig() {
                 ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                     document.getElementById("chkUnifiedMetadata").checked = config.UnifiedMetadataEnabled || false;
+                    document.getElementById("txtApiRateLimitMaxWaitSeconds").value = config.ApiRateLimitMaxWaitSeconds ?? 5;
                     document.getElementById("chkHardcoverEnabled").checked = config.HardcoverEnabled || false;
                     document.getElementById("txtHardcoverApiKey").value = config.HardcoverApiKey || "";
                     document.getElementById("chkGoogleBooksEnabled").checked = config.GoogleBooksEnabled || false;
@@ -1887,6 +1907,7 @@
                     document.getElementById("chkOpenLibraryEnabled").checked = config.OpenLibraryEnabled || false;
                     document.getElementById("chkComicVineEnabled").checked = config.ComicVineEnabled || false;
                     document.getElementById("txtComicVineApiKey").value = config.ComicVineApiKey || "";
+                    document.getElementById("txtComicVineRateLimitPerHour").value = config.ComicVineRateLimitPerHour ?? 180;
                     document.getElementById("chkMetronEnabled").checked = config.MetronEnabled || false;
                     document.getElementById("txtMetronUsername").value = config.MetronUsername || "";
                     document.getElementById("txtMetronPassword").value = config.MetronPassword || "";
@@ -2042,6 +2063,7 @@
 
                     ApiClient.getPluginConfiguration(pluginId).then(function (config) {
                         config.UnifiedMetadataEnabled = document.getElementById("chkUnifiedMetadata").checked;
+                        config.ApiRateLimitMaxWaitSeconds = parseInt(document.getElementById("txtApiRateLimitMaxWaitSeconds").value, 10) || 5;
                         config.HardcoverEnabled = document.getElementById("chkHardcoverEnabled").checked;
                         config.HardcoverApiKey = document.getElementById("txtHardcoverApiKey").value;
                         config.GoogleBooksEnabled = document.getElementById("chkGoogleBooksEnabled").checked;
@@ -2049,6 +2071,7 @@
                         config.OpenLibraryEnabled = document.getElementById("chkOpenLibraryEnabled").checked;
                         config.ComicVineEnabled = document.getElementById("chkComicVineEnabled").checked;
                         config.ComicVineApiKey = document.getElementById("txtComicVineApiKey").value;
+                        config.ComicVineRateLimitPerHour = parseInt(document.getElementById("txtComicVineRateLimitPerHour").value, 10) || 180;
                         config.MetronEnabled = document.getElementById("chkMetronEnabled").checked;
                         config.MetronUsername = document.getElementById("txtMetronUsername").value;
                         config.MetronPassword = document.getElementById("txtMetronPassword").value;

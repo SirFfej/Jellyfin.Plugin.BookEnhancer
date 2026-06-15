@@ -208,7 +208,12 @@ query($bookId: Int!) {
 
     private async Task<GraphQlResponse<T>?> SendGraphQlAsync<T>(object body, string apiKey, CancellationToken ct)
     {
-        await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(apiKey))
+            return null;
+
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         using var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(15);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
@@ -217,6 +222,19 @@ query($bookId: Int!) {
         var httpResponse = await client.PostAsJsonAsync(BaseUrl, body, ct).ConfigureAwait(false);
         httpResponse.EnsureSuccessStatusCode();
         return await httpResponse.Content.ReadFromJsonAsync<GraphQlResponse<T>>(ct).ConfigureAwait(false);
+    }
+
+    private static async Task<bool> WaitForRateLimitSlotAsync(CancellationToken ct)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var maxWaitSeconds = config?.ApiRateLimitMaxWaitSeconds ?? 5;
+        if (maxWaitSeconds <= 0)
+        {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+
+        return await _rateLimiter.TryWaitAsync(TimeSpan.FromSeconds(maxWaitSeconds), ct).ConfigureAwait(false);
     }
 
     private static FileMetadata MapEdition(EditionResult ed)

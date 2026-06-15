@@ -30,6 +30,9 @@ public class GrandComicsDbApiClient
     public async Task<FileMetadata?> SearchBySeriesAndIssueAsync(
         string seriesName, string issueNumber, string username, string password, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            return null;
+
         try
         {
             // Step 1: Direct issue search by series name + issue number
@@ -59,9 +62,14 @@ public class GrandComicsDbApiClient
 
     public async Task<FileMetadata?> GetIssueDetailAsync(int issueId, string username, string password, CancellationToken ct = default)
     {
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+            return null;
+
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         try
         {
-            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
             var url = $"{BaseUrl}/issue/{issueId}/";
             using var client = _httpClientFactory.CreateClient();
             client.Timeout = TimeSpan.FromSeconds(15);
@@ -88,7 +96,9 @@ public class GrandComicsDbApiClient
     private async Task<string?> FindIssueBySeriesAndNumberAsync(
         string seriesName, string issueNumber, string username, string password, CancellationToken ct)
     {
-        await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+        if (!await WaitForRateLimitSlotAsync(ct).ConfigureAwait(false))
+            return null;
+
         using var client = _httpClientFactory.CreateClient();
         client.Timeout = TimeSpan.FromSeconds(15);
         client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
@@ -269,6 +279,19 @@ public class GrandComicsDbApiClient
             if (!string.IsNullOrWhiteSpace(clean))
                 people.Add(new ComicPersonInfo { Name = clean, Role = role });
         }
+    }
+
+    private static async Task<bool> WaitForRateLimitSlotAsync(CancellationToken ct)
+    {
+        var config = Plugin.Instance?.Configuration;
+        var maxWaitSeconds = config?.ApiRateLimitMaxWaitSeconds ?? 5;
+        if (maxWaitSeconds <= 0)
+        {
+            await _rateLimiter.WaitAsync(ct).ConfigureAwait(false);
+            return true;
+        }
+
+        return await _rateLimiter.TryWaitAsync(TimeSpan.FromSeconds(maxWaitSeconds), ct).ConfigureAwait(false);
     }
 
     private class GcdIssueSearchResponse

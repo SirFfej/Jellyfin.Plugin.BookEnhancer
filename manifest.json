@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.7.0 - New: configurable ComicVine rate limit (requests/hour) and global API rate-limit max-wait fallback. All API clients now skip an API if the required wait exceeds the configured timeout, allowing the cascade to continue. API clients now guard against empty keys/credentials. New: in-memory ComicApiCache reduces repeated comic series/issue lookups across a batch. Build: 0W/0E.",
+        "checksum": "F4F602C6AC67B812D9DDF3BC652E5826",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.7.0/Jellyfin.Plugin.BookEnhancer_0.8.7.0.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.7.0"
+      },
+      {
         "changelog": "v0.8.6.2 - Fix: scheduled tasks now guard against duplicate concurrent starts. Fix: ingestion scan log now clarifies that files are still moved/organized when online enrichment finds no match. UI: managed directory option chips returned to a horizontal row with correct checkbox/label alignment. README and Metadata Guide updated. Build: 0W/0E.",
         "checksum": "B5013555CAF86CDB920AFF12178DB6B5",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.6.2/Jellyfin.Plugin.BookEnhancer_0.8.6.2.zip",
