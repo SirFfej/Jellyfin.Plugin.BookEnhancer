@@ -1,3 +1,4 @@
+using System.Threading;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Tasks;
 
@@ -8,6 +9,7 @@ public class FullMaintenanceTask : IScheduledTask
     private readonly LibraryCleanupService _cleanupService;
     private readonly GroupingPostProcessingService _groupingService;
     private readonly IApplicationPaths _appPaths;
+    private int _isRunning;
 
     public FullMaintenanceTask(
         LibraryCleanupService cleanupService,
@@ -48,21 +50,29 @@ public class FullMaintenanceTask : IScheduledTask
         var logDir = _appPaths.LogDirectoryPath;
         using var logger = new TaskLogger(logDir, "FullMaintenance");
 
-        var config = Plugin.Instance?.Configuration;
-        if (config is null || string.IsNullOrWhiteSpace(config.TrashDirectory))
+        if (Interlocked.CompareExchange(ref _isRunning, 1, 0) != 0)
         {
-            logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
+            logger.LogWarning("Full maintenance is already running; skipping duplicate start");
             return;
         }
 
-        Func<string, Task> logCallback = msg =>
-        {
-            logger.LogInformation(msg);
-            return Task.CompletedTask;
-        };
-
         try
         {
+            var config = Plugin.Instance?.Configuration;
+            if (config is null || string.IsNullOrWhiteSpace(config.TrashDirectory))
+            {
+                logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
+                return;
+            }
+
+            Func<string, Task> logCallback = msg =>
+            {
+                logger.LogInformation(msg);
+                return Task.CompletedTask;
+            };
+
+            try
+            {
             logger.LogInformation("Starting full maintenance — library cleanup...");
             ((IProgress<double>)logger).Report(0.0);
 
@@ -86,10 +96,15 @@ public class FullMaintenanceTask : IScheduledTask
             logger.LogWarning("Full maintenance was cancelled");
             throw;
         }
-        catch (Exception ex)
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Full maintenance failed");
+                throw;
+            }
+        }
+        finally
         {
-            logger.LogError(ex, "Full maintenance failed");
-            throw;
+            Interlocked.Exchange(ref _isRunning, 0);
         }
     }
 }

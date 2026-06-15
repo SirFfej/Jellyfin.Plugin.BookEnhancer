@@ -213,7 +213,7 @@ public class BookIngestionService
                         if (!string.IsNullOrWhiteSpace(metadata.Isbn) && !enrichmentResult.ApiMatchFound)
                         {
                             result.EnrichmentFailures++;
-                            await LogWarningAsync($"ENRICHMENT FAILURE: {file} (ISBN: {metadata.Isbn}) — no online match found", logCallback, _logger).ConfigureAwait(false);
+                            await LogInfoAsync($"ENRICHMENT MISSED: {file} (ISBN: {metadata.Isbn}) — no online match found. File will still be moved/organized.", logCallback, _logger).ConfigureAwait(false);
                         }
                     }
                 }

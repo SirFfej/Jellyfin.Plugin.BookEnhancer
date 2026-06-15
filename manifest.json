@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.6.2 - Fix: scheduled tasks now guard against duplicate concurrent starts. Fix: ingestion scan log now clarifies that files are still moved/organized when online enrichment finds no match. UI: managed directory option chips returned to a horizontal row with correct checkbox/label alignment. README and Metadata Guide updated. Build: 0W/0E.",
+        "checksum": "B5013555CAF86CDB920AFF12178DB6B5",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.6.2/Jellyfin.Plugin.BookEnhancer_0.8.6.2.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-14T00:00:00Z",
+        "version": "0.8.6.2"
+      },
+      {
         "changelog": "v0.8.6.1 - New: ComicIssue grouping strategy groups alternate formats of the same comic by parsed Series + Issue. New: per-managed-directory IsComicLibrary toggle; PDFs inside flagged directories are treated as comics (filename issue parsing, ComicIssue grouping, comic enrichment). Fix: standalone audiobooks no longer flagged as enrichment issues when only {Series} is missing. Fix: ComicInfo.xml with empty Series/Number now falls back to filename parsing. UI: library option checkboxes shrunk to match File Type Filters chip style. AGENTS.md updated. Build: 0W/0E.",
         "checksum": "6BD0997CD9E678999C8931C46AABDBC2",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.6.1/Jellyfin.Plugin.BookEnhancer_0.8.6.1.zip",

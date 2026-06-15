@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading;
 using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using MediaBrowser.Common.Configuration;
@@ -12,6 +13,7 @@ public class MetadataEnrichmentTask : IScheduledTask
     private readonly MetadataEnrichmentService _enrichment;
     private readonly BookGroupingService _groupingService;
     private readonly IApplicationPaths _appPaths;
+    private int _isRunning;
 
     public MetadataEnrichmentTask(
         FileMetadataExtractor fileExtractor,
@@ -43,30 +45,38 @@ public class MetadataEnrichmentTask : IScheduledTask
         var logDir = _appPaths.LogDirectoryPath;
         using var logger = new TaskLogger(logDir, "MetadataEnrichment");
 
-        var config = Plugin.Instance?.Configuration;
-        if (config is null)
+        if (Interlocked.CompareExchange(ref _isRunning, 1, 0) != 0)
         {
-            logger.LogError("Plugin configuration not available");
+            logger.LogWarning("Metadata enrichment is already running; skipping duplicate start");
             return;
         }
-
-        if (string.IsNullOrWhiteSpace(config.TrashDirectory))
-        {
-            logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
-            return;
-        }
-
-        var summaryBuffer = new StringBuilder();
-
-        var timeoutMinutes = config.MetadataEnrichmentTimeoutMinutes;
-        using var timeoutCts = timeoutMinutes > 0 ? new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes)) : null;
-        using var linkedCts = timeoutCts is not null
-            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
-            : null;
-        var ct = linkedCts?.Token ?? cancellationToken;
 
         try
         {
+            var config = Plugin.Instance?.Configuration;
+            if (config is null)
+            {
+                logger.LogError("Plugin configuration not available");
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(config.TrashDirectory))
+            {
+                logger.LogWarning("Trash directory not configured. All tasks are disabled until a trash directory is set in plugin settings.");
+                return;
+            }
+
+            var summaryBuffer = new StringBuilder();
+
+            var timeoutMinutes = config.MetadataEnrichmentTimeoutMinutes;
+            using var timeoutCts = timeoutMinutes > 0 ? new CancellationTokenSource(TimeSpan.FromMinutes(timeoutMinutes)) : null;
+            using var linkedCts = timeoutCts is not null
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token)
+                : null;
+            var ct = linkedCts?.Token ?? cancellationToken;
+
+            try
+            {
             if (timeoutCts is not null)
                 logger.LogInformation($"Metadata enrichment timeout set to {timeoutMinutes} minutes");
 
@@ -257,6 +267,11 @@ public class MetadataEnrichmentTask : IScheduledTask
         {
             logger.LogError(ex, "Enrichment failed");
             throw;
+        }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _isRunning, 0);
         }
     }
 

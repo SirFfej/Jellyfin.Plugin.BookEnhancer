@@ -35,14 +35,12 @@
             border-radius:3px; cursor:pointer; font-size:12px;
             background:var(--card-background);
         }
-        .be-dir-options {
-            display:flex; flex-wrap:wrap; gap:4px; margin:6px 0 8px;
-        }
-        .be-dir-options label {
-            display:flex; align-items:center; gap:3px;
+        .be-dir-chip {
+            display:flex; align-items:center; gap:4px;
             padding:3px 8px; border:1px solid var(--border-color);
             border-radius:3px; cursor:pointer; font-size:12px;
             background:var(--card-background);
+            white-space:nowrap;
         }
         .be-test-result {
             margin-top:3px; padding:3px 8px; border-radius:3px; font-size:12px;
@@ -1476,20 +1474,20 @@
                             '<label class="inputLabel inputLabelUnfocused">Organize Template <span style="font-weight:normal;color:var(--text-secondary);font-size:11px;">{Author} {Series} {Title} {BookTitle} {Disc} {Volume} {Publisher}</span></label>' +
                             '<input is="emby-input" class="dir-template" type="text" data-idx="' + idx + '" value="' + escapeHtml(dir.OrganizeTemplate || '') + '" placeholder="e.g. {Author}/{Series}/{Title}" />' +
                         '</div>' +
-                        '<div class="be-dir-options">' +
-                            '<label title="Enable title/author online search for this directory">' +
+                        '<div class="be-dir-options" style="display:flex;gap:12px;align-items:center;">' +
+                            '<label class="be-dir-chip" title="Enable title/author online search for this directory">' +
                                 '<input is="emby-checkbox" class="dir-title-author-search" type="checkbox" data-idx="' + idx + '"' + (dir.EnableTitleAuthorSearch !== false ? ' checked' : '') + ' />' +
                                 '<span>Title/Author Search</span>' +
                             '</label>' +
-                            '<label title="Write enriched metadata back into files">' +
+                            '<label class="be-dir-chip" title="Write enriched metadata back into files">' +
                                 '<input is="emby-checkbox" class="dir-metadata-write" type="checkbox" data-idx="' + idx + '"' + (dir.EnableMetadataWriting ? ' checked' : '') + ' />' +
                                 '<span>Write Metadata</span>' +
                             '</label>' +
-                            '<label title="Treat PDF and archive files in this directory as comics (parse issue numbers, apply ComicIssue grouping)">' +
+                            '<label class="be-dir-chip" title="Treat PDF and archive files in this directory as comics (parse issue numbers, apply ComicIssue grouping)">' +
                                 '<input is="emby-checkbox" class="dir-comic-library" type="checkbox" data-idx="' + idx + '"' + (dir.IsComicLibrary ? ' checked' : '') + ' />' +
                                 '<span>Comic Library</span>' +
                             '</label>' +
-                            '<label title="Only removes the per-title folder from the default template. Series books go into {Publisher}/{Series}/file.cbz; standalone books keep {Publisher}/{Title}/file.cbz. Does not affect {Volume} or any other custom template tokens.">' +
+                            '<label class="be-dir-chip" title="Only removes the per-title folder from the default template. Series books go into {Publisher}/{Series}/file.cbz; standalone books keep {Publisher}/{Title}/file.cbz. Does not affect {Volume} or any other custom template tokens.">' +
                                 '<input is="emby-checkbox" class="dir-flat-series" type="checkbox" data-idx="' + idx + '"' + (dir.FlatSeriesStructure ? ' checked' : '') + ' />' +
                                 '<span>Flat Series</span>' +
                             '</label>' +
