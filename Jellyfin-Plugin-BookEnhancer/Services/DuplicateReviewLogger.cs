@@ -26,10 +26,22 @@ public static class DuplicateReviewLogger
     {
         var dataPath = Plugin.DataPath;
         if (string.IsNullOrWhiteSpace(dataPath))
+        {
             return [];
+        }
 
-        var path = Path.Combine(dataPath, "plugins", "BookEnhancer", "duplicate-reviews", "duplicate-reviews.json");
-        return await LoadExistingAsync(path).ConfigureAwait(false);
+        var path = GetPath(dataPath);
+
+        await Semaphore.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var entries = await LoadExistingAsync(path).ConfigureAwait(false);
+            return entries;
+        }
+        finally
+        {
+            Semaphore.Release();
+        }
     }
 
     /// <summary>
@@ -146,11 +158,16 @@ public static class DuplicateReviewLogger
         ILogger logger)
     {
         if (newEntries.Count == 0)
+        {
             return;
+        }
 
         var dataPath = Plugin.DataPath;
         if (string.IsNullOrWhiteSpace(dataPath))
+        {
+            logger.LogWarning("Cannot persist duplicate-review entries because the plugin data path is not available");
             return;
+        }
 
         var path = GetPath(dataPath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
@@ -183,6 +200,7 @@ public static class DuplicateReviewLogger
                 .ToList();
 
             await File.WriteAllTextAsync(path, JsonSerializer.Serialize(filtered, JsonOptions)).ConfigureAwait(false);
+            logger.LogInformation("Persisted {Count} duplicate-review entries to {Path}", filtered.Count, path);
         }
         finally
         {

@@ -53,6 +53,13 @@ public class BookGroupingService
             CREATE INDEX IF NOT EXISTS idx_formats_group ON book_formats(GroupId);
             CREATE INDEX IF NOT EXISTS idx_groups_isbn ON book_groups(Isbn);
             CREATE INDEX IF NOT EXISTS idx_formats_path ON book_formats(FilePath);
+
+            CREATE TABLE IF NOT EXISTS enrichment_cooldown (
+                FilePath TEXT PRIMARY KEY,
+                EnrichedAt TEXT NOT NULL,
+                EnrichedBy TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_enrichment_cooldown_path ON enrichment_cooldown(FilePath);
             """;
 
         cmd.ExecuteNonQuery();
@@ -60,6 +67,7 @@ public class BookGroupingService
         MigrateAddEnrichedAt(conn);
         MigrateAddEnrichedBy(conn);
         MigrateUniqueFilePath(conn);
+        MigrateEnrichmentCooldown(conn);
     }
 
     private static void MigrateAddEnrichedAt(SqliteConnection conn)
@@ -134,6 +142,24 @@ public class BookGroupingService
         using var createIndex = conn.CreateCommand();
         createIndex.CommandText = "CREATE UNIQUE INDEX idx_formats_path_unique ON book_formats(FilePath)";
         createIndex.ExecuteNonQuery();
+    }
+
+    private static void MigrateEnrichmentCooldown(SqliteConnection conn)
+    {
+        using var count = conn.CreateCommand();
+        count.CommandText = "SELECT COUNT(*) FROM enrichment_cooldown";
+        var existing = Convert.ToInt32(count.ExecuteScalar());
+        if (existing > 0)
+            return;
+
+        using var migrate = conn.CreateCommand();
+        migrate.CommandText = """
+            INSERT OR IGNORE INTO enrichment_cooldown (FilePath, EnrichedAt, EnrichedBy)
+            SELECT FilePath, EnrichedAt, EnrichedBy
+            FROM book_formats
+            WHERE EnrichedAt IS NOT NULL
+            """;
+        migrate.ExecuteNonQuery();
     }
 
     private static string? NormalizeIssueNumber(FileMetadata metadata)
@@ -374,6 +400,19 @@ public class BookGroupingService
         cmd.Parameters.AddWithValue("@NewPath", newPath);
         var count = cmd.ExecuteNonQuery();
 
+        using var cooldownCmd = conn.CreateCommand();
+        cooldownCmd.CommandText = """
+            INSERT INTO enrichment_cooldown (FilePath, EnrichedAt, EnrichedBy)
+            SELECT @NewPath, EnrichedAt, EnrichedBy FROM enrichment_cooldown WHERE FilePath = @OldPath
+            ON CONFLICT(FilePath) DO UPDATE SET
+                EnrichedAt = excluded.EnrichedAt,
+                EnrichedBy = excluded.EnrichedBy;
+            DELETE FROM enrichment_cooldown WHERE FilePath = @OldPath;
+            """;
+        cooldownCmd.Parameters.AddWithValue("@OldPath", oldPath);
+        cooldownCmd.Parameters.AddWithValue("@NewPath", newPath);
+        cooldownCmd.ExecuteNonQuery();
+
         if (count > 0)
             _logger.LogDebug("Updated format path in DB: {Old} -> {New}", oldPath, newPath);
 
@@ -413,7 +452,7 @@ public class BookGroupingService
         conn.Open();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT EnrichedAt, EnrichedBy FROM book_formats WHERE FilePath = @FilePath LIMIT 1";
+        cmd.CommandText = "SELECT EnrichedAt, EnrichedBy FROM enrichment_cooldown WHERE FilePath = @FilePath LIMIT 1";
         cmd.Parameters.AddWithValue("@FilePath", filePath);
 
         using var reader = cmd.ExecuteReader();
@@ -438,12 +477,28 @@ public class BookGroupingService
         using var conn = CreateConnection();
         conn.Open();
 
+        var now = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "UPDATE book_formats SET EnrichedAt = @Now, EnrichedBy = @EnrichedBy WHERE FilePath = @FilePath";
+        cmd.CommandText = """
+            INSERT INTO enrichment_cooldown (FilePath, EnrichedAt, EnrichedBy)
+            VALUES (@FilePath, @Now, @EnrichedBy)
+            ON CONFLICT(FilePath) DO UPDATE SET
+                EnrichedAt = excluded.EnrichedAt,
+                EnrichedBy = excluded.EnrichedBy
+            """;
         cmd.Parameters.AddWithValue("@FilePath", filePath);
-        cmd.Parameters.AddWithValue("@Now", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+        cmd.Parameters.AddWithValue("@Now", now);
         cmd.Parameters.AddWithValue("@EnrichedBy", enrichedBy ?? (object)DBNull.Value);
         cmd.ExecuteNonQuery();
+
+        // Keep the legacy column in sync for any existing format rows.
+        using var legacyCmd = conn.CreateCommand();
+        legacyCmd.CommandText = "UPDATE book_formats SET EnrichedAt = @Now, EnrichedBy = @EnrichedBy WHERE FilePath = @FilePath";
+        legacyCmd.Parameters.AddWithValue("@FilePath", filePath);
+        legacyCmd.Parameters.AddWithValue("@Now", now);
+        legacyCmd.Parameters.AddWithValue("@EnrichedBy", enrichedBy ?? (object)DBNull.Value);
+        legacyCmd.ExecuteNonQuery();
     }
 
     public void SetPrimaryFormat(string groupId, string formatId)

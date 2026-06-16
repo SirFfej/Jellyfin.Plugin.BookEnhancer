@@ -3,6 +3,8 @@ using System.Threading;
 using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Tasks;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services.Tasks;
@@ -12,6 +14,7 @@ public class MetadataEnrichmentTask : IScheduledTask
     private readonly FileMetadataExtractor _fileExtractor;
     private readonly MetadataEnrichmentService _enrichment;
     private readonly BookGroupingService _groupingService;
+    private readonly ILibraryManager _libraryManager;
     private readonly IApplicationPaths _appPaths;
     private int _isRunning;
 
@@ -19,11 +22,13 @@ public class MetadataEnrichmentTask : IScheduledTask
         FileMetadataExtractor fileExtractor,
         MetadataEnrichmentService enrichment,
         BookGroupingService groupingService,
+        ILibraryManager libraryManager,
         IApplicationPaths appPaths)
     {
         _fileExtractor = fileExtractor;
         _enrichment = enrichment;
         _groupingService = groupingService;
+        _libraryManager = libraryManager;
         _appPaths = appPaths;
     }
 
@@ -31,7 +36,7 @@ public class MetadataEnrichmentTask : IScheduledTask
 
     public string Key => "BookEnhancerMetadataEnrichment";
 
-    public string Description => "Attempts online enrichment for all library files and reports items that could not be matched.";
+    public string Description => "Attempts online enrichment for all unlocked library files, ignoring cooldown and current completeness.";
 
     public string Category => "BookEnhancers";
 
@@ -112,10 +117,9 @@ public class MetadataEnrichmentTask : IScheduledTask
             }
 
             var enriched = 0;
-            var noIsbn = 0;
             var noMatch = 0;
             var errors = 0;
-            var skippedCooldown = 0;
+            var skippedLocked = 0;
             var unenriched = new List<string>();
 
             logger.LogInformation($"Found {total} files across {dirs.Count} directories");
@@ -165,27 +169,12 @@ public class MetadataEnrichmentTask : IScheduledTask
                             continue;
                         }
 
-                        if (string.IsNullOrWhiteSpace(metadata.Isbn))
+                        var item = _libraryManager.FindByPath(filePath, false);
+                        if (item?.IsLocked == true)
                         {
-                            if (!metadata.IsComic)
-                            {
-                                noIsbn++;
-                                unenriched.Add($"NO ISBN: {filePath}");
-                                continue;
-                            }
-                        }
-
-                        var cooldown = config.EnrichmentCooldownDays;
-                        if (cooldown > 0)
-                        {
-                            var cooldownInfo = _groupingService.GetEnrichmentCooldownInfo(filePath, cooldown);
-                            if (cooldownInfo.OnCooldown)
-                            {
-                                skippedCooldown++;
-                                var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
-                                logger.LogInformation($"Skipped (cooldown, last by {by}): {filePath}");
-                                continue;
-                            }
+                            skippedLocked++;
+                            logger.LogInformation($"Skipped (locked): {filePath}");
+                            continue;
                         }
 
                         var apiConfig = config.GetEffectiveApiConfig(null);
@@ -194,7 +183,7 @@ public class MetadataEnrichmentTask : IScheduledTask
                             apiConfig,
                             ct: ct).ConfigureAwait(false);
 
-                        if (result.ApiMatchFound)
+                        if (result.ApiMatchFound && MetadataEnrichmentService.HasCompleteMetadata(result.Metadata))
                             _groupingService.SetLastEnrichmentTime(filePath, result.EnrichedBy);
 
                         var enrichedMeta = result.Metadata;
@@ -230,10 +219,9 @@ public class MetadataEnrichmentTask : IScheduledTask
             }
 
             summaryBuffer.AppendLine($"Enriched:       {enriched}");
-            summaryBuffer.AppendLine($"No ISBN:        {noIsbn}");
             summaryBuffer.AppendLine($"No match:       {noMatch}");
             summaryBuffer.AppendLine($"Errors:         {errors}");
-            summaryBuffer.AppendLine($"Skipped (cooldown): {skippedCooldown}");
+            summaryBuffer.AppendLine($"Skipped (locked): {skippedLocked}");
             summaryBuffer.AppendLine();
 
             if (unenriched.Count > 0)
@@ -255,7 +243,7 @@ public class MetadataEnrichmentTask : IScheduledTask
             var summaryPath = Path.Combine(logDir, $"MetadataEnrichment-{DateTime.Now:yyyyMMdd-HHmmss}-summary.log");
             await File.WriteAllTextAsync(summaryPath, summaryBuffer.ToString(), ct).ConfigureAwait(false);
 
-            logger.LogInformation($"Enrichment complete — Enriched: {enriched}, No ISBN: {noIsbn}, No match: {noMatch}, Errors: {errors}, Skipped (cooldown): {skippedCooldown}");
+            logger.LogInformation($"Enrichment complete — Enriched: {enriched}, No match: {noMatch}, Errors: {errors}, Skipped (locked): {skippedLocked}");
             logger.LogInformation($"Summary written to: {summaryPath}");
             ((IProgress<double>)logger).Report(1.0);
         }

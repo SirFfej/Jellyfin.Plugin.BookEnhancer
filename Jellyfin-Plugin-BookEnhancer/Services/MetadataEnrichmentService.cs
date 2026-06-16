@@ -404,7 +404,12 @@ public class MetadataEnrichmentService
         }
     }
 
-    private static bool HasCompleteMetadata(FileMetadata meta)
+    /// <summary>
+    /// Determines whether the metadata is complete enough to make enrichment worthwhile on future runs.
+    /// </summary>
+    /// <param name="meta">The metadata to evaluate.</param>
+    /// <returns><c>true</c> if the metadata has enough populated fields to be considered a successful enrichment.</returns>
+    public static bool HasCompleteMetadata(FileMetadata meta)
     {
         return !string.IsNullOrWhiteSpace(meta.Title)
             && !string.IsNullOrWhiteSpace(meta.Description)

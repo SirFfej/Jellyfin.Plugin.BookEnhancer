@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text.Json.Serialization;
 using Jellyfin.Plugin.BookEnhancer.Configuration;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
 using SharpCompress.Archives;
 using SharpCompress.Common;
@@ -15,6 +16,7 @@ public class CbrToCbzService
     private readonly LibraryOrganizationService _organization;
     private readonly BookGroupingService _grouping;
     private readonly IFileMetadataWriter _writer;
+    private readonly IApplicationPaths _appPaths;
     private readonly ILogger<CbrToCbzService> _logger;
 
     private static readonly HashSet<string> _comicExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -28,6 +30,7 @@ public class CbrToCbzService
         LibraryOrganizationService organization,
         BookGroupingService grouping,
         IFileMetadataWriter writer,
+        IApplicationPaths appPaths,
         ILogger<CbrToCbzService> logger)
     {
         _fileExtractor = fileExtractor;
@@ -35,6 +38,7 @@ public class CbrToCbzService
         _organization = organization;
         _grouping = grouping;
         _writer = writer;
+        _appPaths = appPaths;
         _logger = logger;
     }
 
@@ -82,6 +86,9 @@ public class CbrToCbzService
 
         await LogAsync(logCallback, $"Found {files.Count} comic archives to convert in {scanPath}").ConfigureAwait(false);
 
+        var failureLogPath = Path.Combine(_appPaths.LogDirectoryPath, $"BookEnhancer-ConvertFailures-{DateTime.Now:yyyyMMdd-HHmmss}.log");
+        var failureLines = new List<string>();
+
         for (var i = 0; i < files.Count; i++)
         {
             if (ct.IsCancellationRequested)
@@ -98,8 +105,26 @@ public class CbrToCbzService
             catch (Exception ex)
             {
                 result.Errors++;
-                result.ErrorDetails.Add($"{file}: {ex.Message}");
+                var detail = $"{file}: {ex.Message}";
+                result.ErrorDetails.Add(detail);
+                failureLines.Add($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} — {detail}");
+                _logger.LogError(ex, "Convert & Tag failed for {File}: {Message}", file, ex.Message);
                 await LogAsync(logCallback, $"  ERROR: {file} — {ex.Message}").ConfigureAwait(false);
+            }
+        }
+
+        if (failureLines.Count > 0)
+        {
+            try
+            {
+                await File.WriteAllLinesAsync(failureLogPath, failureLines, ct).ConfigureAwait(false);
+                result.FailureLogPath = failureLogPath;
+                _logger.LogInformation("Convert & Tag failure log written to {Path}", failureLogPath);
+                await LogAsync(logCallback, $"Failures written to: {failureLogPath}").ConfigureAwait(false);
+            }
+            catch (Exception logEx)
+            {
+                _logger.LogError(logEx, "Failed to write Convert & Tag failure log");
             }
         }
 
@@ -190,7 +215,7 @@ public class CbrToCbzService
                             ct: ct).ConfigureAwait(false);
 
                         metadata = enrichmentResult.Metadata;
-                        if (enrichmentResult.ApiMatchFound)
+                        if (enrichmentResult.ApiMatchFound && MetadataEnrichmentService.HasCompleteMetadata(metadata))
                             _grouping.SetLastEnrichmentTime(cbzPath, enrichmentResult.EnrichedBy);
                     }
                 }
@@ -371,4 +396,7 @@ public class CbrToCbzResult
 
     [JsonPropertyName("errorDetails")]
     public List<string> ErrorDetails { get; set; } = new();
+
+    [JsonPropertyName("failureLogPath")]
+    public string? FailureLogPath { get; set; }
 }

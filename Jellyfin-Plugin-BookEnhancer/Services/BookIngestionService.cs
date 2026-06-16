@@ -266,7 +266,13 @@ public class BookIngestionService
                 {
                     _groupingService.RegisterFile(targetPath, metadata, isPrimary: true, Config?.GroupingStrategy ?? "IsbnOnly");
                     if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true)
-                        _groupingService.SetLastEnrichmentTime(targetPath, enrichmentResult.EnrichedBy);
+                    {
+                        if (MetadataEnrichmentService.HasCompleteMetadata(enrichmentResult.Metadata))
+                            _groupingService.SetLastEnrichmentTime(targetPath, enrichmentResult.EnrichedBy);
+                        else
+                            await LogInfoAsync($"Enrichment match for {targetPath} did not meet completeness threshold; not recording cooldown", logCallback, _logger).ConfigureAwait(false);
+                    }
+
                     result.FilesAdded++;
 
                     if (!string.IsNullOrWhiteSpace(targetDir))
@@ -331,7 +337,7 @@ public class BookIngestionService
                                     {
                                         await LogInfoAsync($"Moved comic variant to alternate path: {variantTargetPath}", logCallback, _logger).ConfigureAwait(false);
                                         _groupingService.RegisterFile(variantTargetPath, metadata, isPrimary: false, Config?.GroupingStrategy ?? "IsbnOnly");
-                                        if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true)
+                                        if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true && MetadataEnrichmentService.HasCompleteMetadata(enrichmentResult.Metadata))
                                             _groupingService.SetLastEnrichmentTime(variantTargetPath, enrichmentResult.EnrichedBy);
                                         if (dir.EnableMetadataWriting)
                                             await _writer.WriteMetadataAsync(variantTargetPath, metadata, ct).ConfigureAwait(false);
@@ -368,7 +374,7 @@ public class BookIngestionService
                             await _writer.WriteMetadataAsync(targetPath, metadata, ct).ConfigureAwait(false);
 
                         _groupingService.RegisterFile(targetPath, metadata, isPrimary: false, Config?.GroupingStrategy ?? "IsbnOnly");
-                        if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true)
+                        if (enrichmentAttempted && enrichmentResult?.ApiMatchFound == true && MetadataEnrichmentService.HasCompleteMetadata(enrichmentResult.Metadata))
                             _groupingService.SetLastEnrichmentTime(targetPath, enrichmentResult.EnrichedBy);
 
                         if (!string.IsNullOrWhiteSpace(targetDir))

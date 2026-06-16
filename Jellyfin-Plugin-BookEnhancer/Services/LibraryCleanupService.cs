@@ -7,7 +7,6 @@ namespace Jellyfin.Plugin.BookEnhancer.Services;
 public class LibraryCleanupService
 {
     private readonly FileMetadataExtractor _fileExtractor;
-    private readonly MetadataEnrichmentService _enrichment;
     private readonly LibraryOrganizationService _organization;
     private readonly BookGroupingService _groupingService;
     private readonly IApplicationPaths _appPaths;
@@ -32,13 +31,11 @@ public class LibraryCleanupService
 
     public LibraryCleanupService(
         FileMetadataExtractor fileExtractor,
-        MetadataEnrichmentService enrichment,
         LibraryOrganizationService organization,
         BookGroupingService groupingService,
         IApplicationPaths appPaths)
     {
         _fileExtractor = fileExtractor;
-        _enrichment = enrichment;
         _organization = organization;
         _groupingService = groupingService;
         _appPaths = appPaths;
@@ -147,39 +144,23 @@ public class LibraryCleanupService
             var multiAuthorSeries = BuildMultiAuthorSeriesSet(scannedFiles);
 
             var fileData = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
-            var enrichmentQueue = new List<(string Path, FileMetadata Metadata, ManagedSourceDirectory Dir, string Template)>();
+            var unresolved = new List<string>();
 
             foreach (var (file, metadata, dir) in scannedFiles)
             {
                 var template = ResolveTemplate(metadata, dir, multiAuthorSeries);
 
-                if (config.UnifiedMetadataEnabled && NeedsEnrichment(metadata, template))
+                if (NeedsEnrichment(metadata, template))
                 {
-                    var cooldown = config.EnrichmentCooldownDays;
-                    if (cooldown > 0)
-                    {
-                        var cooldownInfo = _groupingService.GetEnrichmentCooldownInfo(file, cooldown);
-                        if (cooldownInfo.OnCooldown)
-                        {
-                            var by = string.IsNullOrWhiteSpace(cooldownInfo.EnrichedBy) ? "unknown API" : cooldownInfo.EnrichedBy;
-                            await logCallback($"[{libLabel}] Skipped enrichment (cooldown, last by {by}): {file}").ConfigureAwait(false);
-                            fileData.Add((file, metadata, dir, template));
-                        }
-                        else
-                        {
-                            enrichmentQueue.Add((file, metadata, dir, template));
-                        }
-                    }
-                    else
-                    {
-                        enrichmentQueue.Add((file, metadata, dir, template));
-                    }
+                    unresolved.Add(file);
+                    await logCallback($"[{libLabel}] Skipped move (missing metadata): {file}").ConfigureAwait(false);
+                    continue;
                 }
-                else
-                {
-                    fileData.Add((file, metadata, dir, template));
-                }
+
+                fileData.Add((file, metadata, dir, template));
             }
+
+            grandProcessed += unresolved.Count;
 
             var duplicateIndex = BuildDuplicateIndex(fileData);
 
@@ -253,113 +234,13 @@ public class LibraryCleanupService
                     progress.Report((double)grandProcessed / grandTotal);
             }
 
-            if (enrichmentQueue.Count > 0)
+            if (unresolved.Count > 0 && _appPaths is not null)
             {
-                await logCallback($"[{libLabel}] Enriching {enrichmentQueue.Count} files...").ConfigureAwait(false);
-                var enrichmentIssues = new List<string>();
-
-                foreach (var (file, rawMetadata, dir, template) in enrichmentQueue)
-                {
-                    ct.ThrowIfCancellationRequested();
-
-                    try
-                    {
-                        var apiConfig = config.GetEffectiveApiConfig(dir);
-                        var enrichmentResult = await _enrichment.EnrichAsync(
-                            rawMetadata,
-                            apiConfig,
-                            titleAuthorSearchEnabled: dir.EnableTitleAuthorSearch,
-                            title: rawMetadata.Title,
-                            author: rawMetadata.Authors.Count > 0 ? rawMetadata.Authors[0] : null,
-                            ct: ct).ConfigureAwait(false);
-
-                        if (enrichmentResult.ApiMatchFound)
-                            _groupingService.SetLastEnrichmentTime(file, enrichmentResult.EnrichedBy);
-
-                        var enriched = enrichmentResult.Metadata;
-
-                        var expectedPath = _organization.BuildTargetPath(libraryRoot, enriched, template);
-
-                        if (string.Equals(file, expectedPath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            if (NeedsEnrichment(enriched, template))
-                            {
-                                enrichmentIssues.Add(file);
-                                libResult.FilesSkipped++;
-                                await logCallback($"[{libLabel}] Enrichment could not resolve all fields, but file is at expected path: {file}").ConfigureAwait(false);
-                            }
-
-                            continue;
-                        }
-
-                        var dup = FindDuplicate(file, enriched, duplicateIndex);
-                        if (dup is not null)
-                        {
-                            await MoveToTrash(file, isDirectory: false, logCallback).ConfigureAwait(false);
-                            libResult.DuplicatesFound++;
-                            await logCallback($"[{libLabel}] Duplicate (enriched) of {dup}, removed: {file}").ConfigureAwait(false);
-
-                            var dupDir = Path.GetDirectoryName(file);
-                            await MoveCompanionImagesAsync(dupDir, Path.GetDirectoryName(expectedPath), logCallback).ConfigureAwait(false);
-                            await CleanupEmptyDirectories(dupDir, libResult, logCallback).ConfigureAwait(false);
-                            continue;
-                        }
-
-                        var dirToClean = Path.GetDirectoryName(file);
-                        var moveResult = await _organization.MoveFile(file, expectedPath, copy: false, logCallback).ConfigureAwait(false);
-
-                        if (moveResult.Success)
-                        {
-                            libResult.FilesMoved++;
-                            var enrichedNote = NeedsEnrichment(enriched, template) ? " (partial)" : string.Empty;
-                            await logCallback($"[{libLabel}] Moved{enrichedNote}: {file} -> {expectedPath}").ConfigureAwait(false);
-                            var updated = _groupingService.UpdateFormatPath(file, expectedPath);
-                            if (updated == 0)
-                            {
-                                _groupingService.RegisterFile(expectedPath, enriched, isPrimary: true, config.GroupingStrategy);
-                                if (enrichmentResult.ApiMatchFound)
-                                    _groupingService.SetLastEnrichmentTime(expectedPath, enrichmentResult.EnrichedBy);
-                            }
-
-                            var targetDir = Path.GetDirectoryName(expectedPath);
-                            await MoveCompanionImagesAsync(dirToClean, targetDir, logCallback).ConfigureAwait(false);
-                            await CleanupEmptyDirectories(dirToClean, libResult, logCallback).ConfigureAwait(false);
-                        }
-                        else if (moveResult.Skipped)
-                        {
-                            libResult.FilesSkipped++;
-                        }
-                        else
-                        {
-                            await logCallback($"[{libLabel}] Failed to move (enriched) {file}: {moveResult.ErrorMessage}").ConfigureAwait(false);
-                            libResult.Errors++;
-                        }
-                    }
-                    catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        await logCallback($"[{libLabel}] Error enriching {file}: {ex.Message}").ConfigureAwait(false);
-                        libResult.Errors++;
-                    }
-
-                    grandProcessed++;
-                    if (grandTotal > 0)
-                        progress.Report((double)grandProcessed / grandTotal);
-                }
-
-                if (enrichmentIssues.Count > 0 && _appPaths is not null)
-                {
-                    var summaryPath = Path.Combine(
-                        _appPaths.LogDirectoryPath,
-                        $"log_LibraryCleanup-{DateTime.Now:yyyyMMdd}-enrichment-issues.log");
-                    await File.WriteAllLinesAsync(summaryPath, enrichmentIssues, ct).ConfigureAwait(false);
-                    await logCallback($"[{libLabel}] Wrote enrichment issues log ({enrichmentIssues.Count} files): {summaryPath}").ConfigureAwait(false);
-                }
-
-                await logCallback($"[{libLabel}] Enrichment pass complete — {enrichmentQueue.Count} processed, {enrichmentIssues.Count} unresolved.").ConfigureAwait(false);
+                var summaryPath = Path.Combine(
+                    _appPaths.LogDirectoryPath,
+                    $"log_LibraryCleanup-{DateTime.Now:yyyyMMdd}-unresolved.log");
+                await File.WriteAllLinesAsync(summaryPath, unresolved, ct).ConfigureAwait(false);
+                await logCallback($"[{libLabel}] Wrote unresolved metadata log ({unresolved.Count} files): {summaryPath}").ConfigureAwait(false);
             }
 
             if (config.EnableNonBookDirectoryCleanup)

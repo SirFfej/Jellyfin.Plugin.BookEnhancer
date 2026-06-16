@@ -76,7 +76,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                     author: fileMeta.Authors.Count > 0 ? fileMeta.Authors[0] : null,
                     ct: cancellationToken).ConfigureAwait(false);
 
-                if (enrichmentResult.ApiMatchFound)
+                if (enrichmentResult.ApiMatchFound && MetadataEnrichmentService.HasCompleteMetadata(enrichmentResult.Metadata))
                     _grouping.SetLastEnrichmentTime(info.Path, enrichmentResult.EnrichedBy);
                 enriched = enrichmentResult.Metadata;
 
@@ -162,7 +162,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                                 title: searchInfo.Name,
                                 ct: cancellationToken).ConfigureAwait(false);
 
-                            if (!string.IsNullOrWhiteSpace(searchInfo.Path) && enrichmentResult.ApiMatchFound)
+                            if (!string.IsNullOrWhiteSpace(searchInfo.Path) && enrichmentResult.ApiMatchFound && MetadataEnrichmentService.HasCompleteMetadata(enrichmentResult.Metadata))
                                 _grouping.SetLastEnrichmentTime(searchInfo.Path, enrichmentResult.EnrichedBy);
 
                             if (!string.IsNullOrWhiteSpace(enrichmentResult.Metadata.Title))
@@ -191,7 +191,7 @@ public class UnifiedMetadataProvider : IRemoteMetadataProvider<Book, BookInfo>, 
                                 title: searchInfo.Name,
                                 ct: cancellationToken).ConfigureAwait(false);
 
-                            if (!string.IsNullOrWhiteSpace(searchInfo.Path) && enriched.ApiMatchFound)
+                            if (!string.IsNullOrWhiteSpace(searchInfo.Path) && enriched.ApiMatchFound && MetadataEnrichmentService.HasCompleteMetadata(enriched.Metadata))
                                 _grouping.SetLastEnrichmentTime(searchInfo.Path, enriched.EnrichedBy);
 
                             if (!string.IsNullOrWhiteSpace(enriched.Metadata.Title))
