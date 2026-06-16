@@ -616,32 +616,15 @@
                         Original files are sent to the Trash directory. Enrichment runs automatically if enabled.
                     </p>
 
-                    <div class="inputContainer" style="margin-bottom:4px;">
-                        <label class="inputLabel inputLabelUnfocused">Comic Library (auto-detect)</label>
-                        <select is="emby-select" id="selComicLibrary">
-                            <option value="">-- Auto-detect comic libraries --</option>
-                        </select>
-                        <div class="fieldDescription">
-                            Select a comic library, or leave on "Auto-detect" to find libraries containing "Comic".
-                        </div>
-                    </div>
-
-                    <div class="inputContainer">
-                        <input is="emby-input" id="txtComicScanPath" type="text"
-                               label="Or enter a custom scan path" />
-                        <div class="fieldDescription">
-                            Overrides library selection. Enter a full path to scan for CBR/CB7 files.
-                        </div>
-                    </div>
-
                     <div style="margin-top:12px;">
                         <button is="emby-button" id="btnConvertComics" type="button" class="raised button-submit"
                                 style="font-size:0.85em;">
-                            Convert &amp; Tag
+                            Start Convert &amp; Tag Task
                         </button>
                         <div id="convertComicsResult" class="be-test-result" style="display:none;"></div>
                         <div class="fieldDescription" style="margin-top:4px;">
-                            Scans the selected path, converts all CBR/CB7 &rarr; CBZ, enriches metadata, and writes ComicInfo.xml.
+                            Scans all enabled managed directories for CBR/CB7 archives, converts them to CBZ, enriches metadata, and writes ComicInfo.xml.
+                            Runs as a scheduled task; progress is available in Jellyfin's Scheduled Tasks page.
                         </div>
                     </div>
                 </div>
@@ -819,10 +802,24 @@
 
             <h3>ComicInfo.xml template fallback</h3>
             <p>
-                On the Metadata tab you can configure a <strong>ComicInfo template</strong> file (local path or downloadable URL).
-                When a comic archive has empty or missing fields, the template supplies defaults (for example, setting Publisher
+                The plugin ships a built-in <strong>ComicInfo template</strong> at <code>plugins/BookEnhancer/ComicInfoTemplate.xml</code>.
+                When a CBZ archive has empty or missing fields, the template supplies defaults (for example, setting Publisher
                 to <code>Marvel</code> for an entire publisher dump). Template values never overwrite fields that already exist
                 in the archive's ComicInfo.xml.
+            </p>
+            <p>
+                You can also place a sidecar <code>&lt;comicname&gt;.xml</code> file next to a CBZ. When metadata write-back runs,
+                the sidecar XML is merged into the CBZ before the final ComicInfo.xml is written. CBR/CB7 archives must be
+                converted to CBZ first.
+            </p>
+
+            <h3>Comic Conversion (CBR/CB7 &rarr; CBZ)</h3>
+            <p>
+                The <strong>Convert CBR/CB7 to CBZ</strong> button on the Metadata tab starts a scheduled task instead of running
+                synchronously in the browser. The task scans all enabled managed directories, converts any CBR/CB7 archives to CBZ,
+                enriches metadata if enabled, writes ComicInfo.xml, and moves the original archives to the backup/trash directory.
+                Because it runs as a task, it is not subject to browser request timeouts and cannot be interrupted by closing the
+                config page.
             </p>
 
             <h3>Grouping strategies</h3>
@@ -836,11 +833,23 @@
                 <li><strong>ComicIssue</strong> — groups by parsed <code>SeriesName</code> + issue number. Use this for comic libraries to keep sub-series separate (e.g., <code>Star Wars</code> vs <code>Star Wars - Darth Vader</code>) while still grouping CBZ + CBR of the same issue.</li>
             </ul>
 
-            <h3>Task runtime limits</h3>
+            <h3>Scheduled tasks</h3>
             <p>
-                The Main tab has <strong>Task Runtime Limits</strong> for Ingestion Scan, Library Cleanup, and Metadata Enrichment.
-                When a task exceeds its limit it is cancelled gracefully. Ingestion Scan resumes from its last checkpoint on the
-                next run; cleanup and enrichment simply stop and continue from where they left off on the next scheduled run.
+                The plugin registers several scheduled tasks that appear in Jellyfin's Scheduled Tasks page:
+            </p>
+            <ul>
+                <li><strong>Ingestion Scan</strong> — scans source directories, extracts metadata, enriches, organizes, and groups files</li>
+                <li><strong>Library Cleanup &amp; Reorganize</strong> — moves library files to match the current organize template using existing file/system metadata; skips files with missing required fields and logs them</li>
+                <li><strong>Grouping Process</strong> — scans library directories and groups alternate formats</li>
+                <li><strong>Full Maintenance</strong> — runs Library Cleanup followed by Grouping Process</li>
+                <li><strong>Book Metadata Enrichment</strong> — scans all library files and attempts online enrichment, skipping only Jellyfin-locked items</li>
+                <li><strong>Book Post-Organization Enrichment</strong> — enriches files whose metadata is incomplete or that were modified after their last enrichment</li>
+                <li><strong>Convert CBR/CB7 to CBZ</strong> — converts comic archives across all enabled managed directories</li>
+            </ul>
+            <p>
+                The Main tab has <strong>Task Runtime Limits</strong> for the long-running tasks. When a task exceeds its limit it is
+                cancelled gracefully. Ingestion Scan resumes from its last checkpoint on the next run; cleanup and enrichment simply
+                stop and continue from where they left off on the next scheduled run.
             </p>
 
             <h3>Per-directory API selection</h3>
@@ -856,6 +865,12 @@
                 The <strong>Skip re-enrichment if already enriched within (days)</strong> setting on the Main tab prevents the same file
                 from being hammered on every scheduled task run. When a file is skipped because of cooldown, the log entry includes
                 the API that last enriched it, for example: <code>Skipped enrichment (cooldown, last by Hardcover)</code>.
+            </p>
+            <p>
+                The cooldown is respected by ingestion scans, library provider lookups, and the Convert CBR/CB7 to CBZ task.
+                The <strong>Book Metadata Enrichment</strong> task ignores cooldown so you can force a fresh pass; it skips only
+                items that are locked in Jellyfin. The <strong>Book Post-Organization Enrichment</strong> task also ignores cooldown
+                so it can retry files that were modified after their last enrichment attempt.
             </p>
 
             <h3>How to pre-populate files before ingestion</h3>

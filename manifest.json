@@ -9,13 +9,22 @@
     "owner": "SirFfej",
     "versions": [
       {
-        "changelog": "v0.8.8.7 - New: Book Post-Organization Enrichment scheduled task enriches files that are incomplete or were modified after their last enrichment, skipping Jellyfin-locked items and ignoring cooldown. Change: Book Metadata Enrichment now skips only locked items and ignores cooldown/completeness. Change: Library Cleanup & Reorganize no longer calls online APIs; it uses existing file/system metadata and logs unresolved files. New: Convert & Tag per-file failures are logged to the server log and written to a dedicated failure log. Build: 0W/0E.",
-        "checksum": "17E72FC117BE59DA3826C4FA548203BE",
-        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.7/Jellyfin.Plugin.BookEnhancer_0.8.8.7.zip",
+        "changelog": "v0.9.0.0 - New: Convert CBR/CB7 to CBZ is now a scheduled task started from the config page instead of a synchronous request, avoiding browser timeouts. New: Book Post-Organization Enrichment scheduled task enriches incomplete files or files modified since last enrichment. Change: Book Metadata Enrichment now skips only Jellyfin-locked items and ignores cooldown/completeness. Change: Library Cleanup & Reorganize no longer calls online APIs; it uses existing file/system metadata and logs unresolved files. New: Convert & Tag failures are logged to a dedicated failure log. Docs: README, AGENTS, and in-app Metadata Guide updated. Build: 0W/0E.",
+        "checksum": "ECE082AB389E31469EE3B2DEDF6BF572",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.9.0.0/Jellyfin.Plugin.BookEnhancer_0.9.0.0.zip",
         "targetAbi": "10.11.8.0",
         "timestamp": "2026-06-16T00:00:00Z",
-        "version": "0.8.8.7"
+        "version": "0.9.0.0"
       },
+      {
+        "changelog": "v0.8.8.6 - New: config page split into HTML/CSS/JS following the intro-skipper pattern. New: built-in ComicInfo.xml template with Download and Generate buttons; the plugin ships a default template at plugins/BookEnhancer/ComicInfoTemplate.xml. New: sidecar XML support — a <comicname>.xml file placed next to a CBZ is merged into that CBZ when metadata write-back runs. Fix: template download no longer exposes the auth token in the URL. Build: 0W/0E.",
+        "checksum": "7472E6FB19A4DD7189658339CF4831F8",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.6/Jellyfin.Plugin.BookEnhancer_0.8.8.6.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-15T00:00:00Z",
+        "version": "0.8.8.6"
+      },
+
       {
         "changelog": "v0.8.8.6 - New: config page split into HTML/CSS/JS following the intro-skipper pattern. New: built-in ComicInfo.xml template with Download and Generate buttons; the plugin ships a default template at plugins/BookEnhancer/ComicInfoTemplate.xml. New: sidecar XML support — a <comicname>.xml file placed next to a CBZ is merged into that CBZ when metadata write-back runs. Fix: template download no longer exposes the auth token in the URL. Build: 0W/0E.",
         "checksum": "7472E6FB19A4DD7189658339CF4831F8",

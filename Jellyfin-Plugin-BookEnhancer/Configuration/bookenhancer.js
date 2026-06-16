@@ -65,7 +65,8 @@
                 options.headers['Accept'] = 'application/json';
                 var url = window.ApiClient ? window.ApiClient.getUrl(path) : path;
                 console.debug("[BookEnhancers] Fetching:", url, "token present:", !!token);
-                var timeoutMs = 15000;
+                var timeoutMs = options.timeoutMs || 15000;
+                delete options.timeoutMs;
                 var controller = new AbortController();
                 options.signal = controller.signal;
                 var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
@@ -491,8 +492,6 @@
                         });
                         container.innerHTML = html;
 
-                        populateComicLibraryDropdown();
-
                         if (typeof getCurrentDirectories === 'function') {
                             var dirs = getCurrentDirectories();
                             if (dirs.length > 0) renderDirectories(dirs);
@@ -863,91 +862,37 @@
                     });
             });
 
-            function populateComicLibraryDropdown() {
-                var sel = document.getElementById("selComicLibrary");
-                if (!sel) return;
-                sel.innerHTML = '<option value="">-- Auto-detect comic libraries --</option>';
-                if (!_beLibraries) return;
-                _beLibraries.forEach(function (lib) {
-                    var name = (lib.name || "").toLowerCase();
-                    var type = (lib.collectionType || "").toLowerCase();
-                    var isComic = name.indexOf("comic") >= 0 || type === "comics";
-                    var selAttr = isComic ? ' selected' : '';
-                    sel.innerHTML += '<option value="' + escapeHtml(lib.id) + '"' + selAttr + '>' +
-                        escapeHtml(lib.name) + ' (' + escapeHtml(lib.collectionType) + ')</option>';
-                });
-            }
-
             document.getElementById("btnConvertComics").addEventListener("click", function () {
-                if (!confirmAction("Convert CBR/CB7 archives to CBZ? Original archives will be moved to the backup/trash directory.")) return;
+                if (!confirmAction("Start the Convert CBR/CB7 to CBZ task? Original archives will be moved to the backup/trash directory.")) return;
                 var btn = this;
                 var resultEl = document.getElementById("convertComicsResult");
 
-                var scanPath = document.getElementById("txtComicScanPath").value.trim();
-                if (!scanPath) {
-                    var libId = document.getElementById("selComicLibrary").value;
-                    if (!libId && _beLibraries) {
-                        var comicLib = _beLibraries.filter(function (l) {
-                            var name = (l.name || "").toLowerCase();
-                            var type = (l.collectionType || "").toLowerCase();
-                            return name.indexOf("comic") >= 0 || type === "comics";
-                        });
-                        if (comicLib.length > 0) {
-                            libId = comicLib[0].id;
-                        }
-                    }
-                    if (libId && _beLibraries) {
-                        var found = _beLibraries.filter(function (l) { return l.id === libId; });
-                        if (found.length > 0 && found[0].locations && found[0].locations.length > 0) {
-                            scanPath = found[0].locations[0];
-                        }
-                    }
-                }
-
-                if (!scanPath) {
-                    Dashboard.alert({
-                        title: "No Path Selected",
-                        message: "Select a comic library, enter a custom scan path, or ensure a library with 'Comic' in its name exists."
-                    });
-                    return;
-                }
-
                 btn.disabled = true;
-                btn.textContent = "Converting...";
+                btn.textContent = "Starting...";
                 resultEl.style.display = "block";
-                resultEl.innerHTML = '<div class="loading-spinner"></div> Converting comic archives...';
+                resultEl.innerHTML = '<div class="loading-spinner"></div> Starting Convert &amp; Tag task...';
                 resultEl.style.background = "transparent";
                 resultEl.style.border = "1px solid var(--border-color)";
 
-                authFetch("Books/Config/ConvertCbrToCbz", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ scanPath: scanPath })
-                })
+                authFetch("Books/Config/StartConvertTask", { method: "POST" })
                     .then(function (r) { return r.json(); })
                     .then(function (result) {
-                        var success = result.errors === 0;
-                        var msg = "Found: " + result.filesFound +
-                            "\nConverted: " + result.converted +
-                            "\nErrors: " + result.errors;
-                        if (result.errorDetails && result.errorDetails.length > 0) {
-                            msg += "\n\nErrors:\n" + result.errorDetails.join("\n");
-                        }
-                        resultEl.style.background = success
+                        resultEl.style.background = result.success
                             ? "var(--green-background,rgba(0,200,83,0.15))"
                             : "var(--red-background,rgba(244,67,54,0.15))";
-                        resultEl.style.border = "1px solid " + (success ? "var(--green,#4caf50)" : "var(--red,#f44336)");
-                        resultEl.innerHTML = msg.replace(/\n/g, "<br>");
+                        resultEl.style.border = "1px solid " + (result.success ? "var(--green,#4caf50)" : "var(--red,#f44336)");
+                        resultEl.innerHTML = escapeHtml(result.message).replace(/\n/g, "<br>") +
+                            (result.success ? "<br><br>Progress is available in Jellyfin's Scheduled Tasks page." : "");
                     })
                     .catch(function (err) {
-                        console.error("[BookEnhancers] Comic conversion failed:", err);
+                        console.error("[BookEnhancers] Failed to start Convert & Tag task:", err);
                         resultEl.style.background = "var(--red-background,rgba(244,67,54,0.15))";
                         resultEl.style.border = "1px solid var(--red,#f44336)";
                         resultEl.innerHTML = "Request failed: " + escapeHtml(err.message);
                     })
                     .finally(function () {
                         btn.disabled = false;
-                        btn.textContent = "Convert & Tag";
+                        btn.textContent = "Start Convert &amp; Tag Task";
                     });
             });
 

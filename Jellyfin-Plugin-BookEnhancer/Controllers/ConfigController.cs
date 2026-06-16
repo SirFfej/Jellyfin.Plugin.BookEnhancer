@@ -21,11 +21,16 @@ public class ConfigController : ControllerBase
 {
     private static readonly Uri _hardcoverGraphQlEndpoint = new("https://api.hardcover.app/v1/graphql");
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly MediaBrowser.Model.Tasks.ITaskManager _taskManager;
     private readonly ILogger<ConfigController> _logger;
 
-    public ConfigController(IHttpClientFactory httpClientFactory, ILogger<ConfigController> logger)
+    public ConfigController(
+        IHttpClientFactory httpClientFactory,
+        MediaBrowser.Model.Tasks.ITaskManager taskManager,
+        ILogger<ConfigController> logger)
     {
         _httpClientFactory = httpClientFactory;
+        _taskManager = taskManager;
         _logger = logger;
     }
 
@@ -330,9 +335,30 @@ public class ConfigController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.ScanPath))
             return Ok(new CbrToCbzResult { Errors = 1, ErrorDetails = ["No scan path provided."] });
 
+        _logger.LogInformation("Convert & Tag started for {ScanPath}", request.ScanPath);
         var service = HttpContext.RequestServices.GetRequiredService<CbrToCbzService>();
         var result = await service.ConvertAsync(request.ScanPath, ct: ct).ConfigureAwait(false);
+        _logger.LogInformation(
+            "Convert & Tag complete for {ScanPath}: {Converted} converted, {Errors} errors",
+            request.ScanPath,
+            result.Converted,
+            result.Errors);
         return Ok(result);
+    }
+
+    [HttpPost("StartConvertTask")]
+    public ActionResult<StartConvertTaskResult> StartConvertTask()
+    {
+        var worker = _taskManager.ScheduledTasks.FirstOrDefault(t => t.ScheduledTask.Key == "BookEnhancerConvertCbrToCbz");
+        if (worker is null)
+        {
+            _logger.LogError("Convert CBR/CB7 to CBZ scheduled task not found");
+            return StatusCode(500, new StartConvertTaskResult { Success = false, Message = "Convert task is not registered." });
+        }
+
+        _taskManager.Execute(worker, new MediaBrowser.Model.Tasks.TaskOptions());
+        _logger.LogInformation("Convert CBR/CB7 to CBZ task started via config page");
+        return Ok(new StartConvertTaskResult { Success = true, Message = "Convert & Tag task started. Check Scheduled Tasks for progress." });
     }
 
     [HttpGet("ComicInfoTemplate")]
@@ -511,4 +537,13 @@ public class GenerateTemplateResult
 
     [JsonPropertyName("path")]
     public string Path { get; set; } = string.Empty;
+}
+
+public class StartConvertTaskResult
+{
+    [JsonPropertyName("success")]
+    public bool Success { get; set; }
+
+    [JsonPropertyName("message")]
+    public string Message { get; set; } = string.Empty;
 }

@@ -59,5 +59,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<IScheduledTask, LibraryCleanupTask>();
         serviceCollection.AddSingleton<IScheduledTask, MetadataEnrichmentTask>();
         serviceCollection.AddSingleton<IScheduledTask, PostOrganizationEnrichmentTask>();
+        serviceCollection.AddSingleton<IScheduledTask, ConvertCbrToCbzTask>();
     }
 }
