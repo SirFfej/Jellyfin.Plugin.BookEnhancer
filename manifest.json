@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.9.0.1 - Fix: release ZIP now includes all required dependency DLLs (SharpCompress, PdfPig, TagLibSharp, etc.), resolving 'Could not load file or assembly' errors for Convert CBR/CB7 to CBZ and other features. Build: 0W/0E.",
+        "checksum": "6BEC2A4F03C5F2F00C44695326C976C0",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.9.0.1/Jellyfin.Plugin.BookEnhancer_0.9.0.1.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-16T00:00:00Z",
+        "version": "0.9.0.1"
+      },
+      {
         "changelog": "v0.9.0.0 - New: Convert CBR/CB7 to CBZ is now a scheduled task started from the config page instead of a synchronous request, avoiding browser timeouts. New: Book Post-Organization Enrichment scheduled task enriches incomplete files or files modified since last enrichment. Change: Book Metadata Enrichment now skips only Jellyfin-locked items and ignores cooldown/completeness. Change: Library Cleanup & Reorganize no longer calls online APIs; it uses existing file/system metadata and logs unresolved files. New: Convert & Tag failures are logged to a dedicated failure log. Docs: README, AGENTS, and in-app Metadata Guide updated. Build: 0W/0E.",
         "checksum": "ECE082AB389E31469EE3B2DEDF6BF572",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.9.0.0/Jellyfin.Plugin.BookEnhancer_0.9.0.0.zip",
