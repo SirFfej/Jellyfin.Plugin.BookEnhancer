@@ -9,6 +9,14 @@
     "owner": "SirFfej",
     "versions": [
       {
+        "changelog": "v0.8.8.6 - New: config page split into HTML/CSS/JS following the intro-skipper pattern. New: built-in ComicInfo.xml template with Download and Generate buttons; the plugin ships a default template at plugins/BookEnhancer/ComicInfoTemplate.xml. New: sidecar XML support — a <comicname>.xml file placed next to a CBZ is merged into that CBZ when metadata write-back runs. Fix: template download no longer exposes the auth token in the URL. Build: 0W/0E.",
+        "checksum": "7472E6FB19A4DD7189658339CF4831F8",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.6/Jellyfin.Plugin.BookEnhancer_0.8.8.6.zip",
+        "targetAbi": "10.11.8.0",
+        "timestamp": "2026-06-15T00:00:00Z",
+        "version": "0.8.8.6"
+      },
+      {
         "changelog": "v0.8.8.5 - New: Duplicate Review button on the config page shows all size-mismatch duplicate records in a modal table. New: ingestion scan now skips files listed in duplicate-review; entries whose source file has been modified since the mismatch are removed from the log. New: Duplicate-review entries are pruned after a configurable TTL (default 30 days). Build: 0W/0E.",
         "checksum": "599D4980AEDC42B26B0DC4403F9DC4FD",
         "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.8.8.5/Jellyfin.Plugin.BookEnhancer_0.8.8.5.zip",

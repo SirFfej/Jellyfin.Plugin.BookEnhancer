@@ -1,68 +1,93 @@
+using System.Reflection;
 using System.Xml.Linq;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services;
 
 /// <summary>
-/// Loads a ComicInfo.xml template from disk or URL and applies it as fallback metadata.
+/// Loads a ComicInfo.xml template and applies it as fallback metadata.
+/// The plugin ships a default template that is written to the plugin data folder
+/// so users can edit it without configuring a path.
 /// </summary>
 public static class ComicInfoTemplateLoader
 {
+    private const string EmbeddedResourceName = "Jellyfin.Plugin.BookEnhancer.Configuration.ComicInfoTemplate.xml";
+    private const string TemplateFileName = "ComicInfoTemplate.xml";
+
     /// <summary>
-    /// Loads the configured ComicInfo.xml template and converts it to <see cref="FileMetadata"/>.
+    /// Gets the full path to the user-editable default template file.
     /// </summary>
-    /// <returns>The template metadata, or <c>null</c> if no template is configured or the template cannot be loaded.</returns>
-    public static FileMetadata? LoadTemplate()
+    /// <returns>The default template path, or <c>null</c> when the plugin data path is unavailable.</returns>
+    public static string? GetDefaultTemplatePath()
     {
-        var config = Plugin.Instance?.Configuration;
-        var path = config?.ComicInfoTemplatePath;
-
-        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            return null;
-
-        try
-        {
-            using var stream = File.OpenRead(path);
-            var doc = XDocument.Load(stream);
-            return MapTemplateToMetadata(doc);
-        }
-        catch
+        var dataPath = Plugin.DataPath;
+        if (string.IsNullOrWhiteSpace(dataPath))
         {
             return null;
         }
+
+        return Path.Combine(dataPath, "plugins", "BookEnhancer", TemplateFileName);
     }
 
     /// <summary>
-    /// Downloads the template from the configured URL and saves it to <paramref name="destinationPath"/>.
+    /// Writes the built-in template to the default template path if it does not already exist.
     /// </summary>
-    /// <param name="url">The URL to download from.</param>
-    /// <param name="destinationPath">The local path to save the template to.</param>
-    /// <param name="httpClient">An <see cref="HttpClient"/> instance to use for the download.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns><c>true</c> if the download succeeded; otherwise <c>false</c>.</returns>
-    public static async Task<bool> DownloadTemplateAsync(string url, string destinationPath, HttpClient httpClient, CancellationToken ct = default)
+    /// <returns>The full path to the template file, or <c>null</c> if it could not be created.</returns>
+    public static async Task<string?> EnsureDefaultTemplateExistsAsync(CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(url))
-            return false;
-
-        try
+        var path = GetDefaultTemplatePath();
+        if (string.IsNullOrWhiteSpace(path))
         {
-            var content = await httpClient.GetStringAsync(new Uri(url), ct).ConfigureAwait(false);
-            var doc = XDocument.Parse(content);
-            if (doc.Root?.Name.LocalName != "ComicInfo")
-                return false;
-
-            var directory = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrWhiteSpace(directory))
-                Directory.CreateDirectory(directory);
-
-            await File.WriteAllTextAsync(destinationPath, content, ct).ConfigureAwait(false);
-            return true;
+            return null;
         }
-        catch
+
+        if (File.Exists(path))
         {
-            return false;
+            return path;
         }
+
+        var content = await ReadEmbeddedTemplateAsync(ct).ConfigureAwait(false);
+        if (content is null)
+        {
+            return null;
+        }
+
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        await File.WriteAllTextAsync(path, content, ct).ConfigureAwait(false);
+        return path;
+    }
+
+    /// <summary>
+    /// Loads the ComicInfo.xml template and converts it to <see cref="FileMetadata"/>.
+    /// The user-editable file at <see cref="GetDefaultTemplatePath"/> takes priority;
+    /// if it does not exist, the embedded default template is used.
+    /// </summary>
+    /// <returns>The template metadata, or <c>null</c> if no template can be loaded.</returns>
+    public static FileMetadata? LoadTemplate()
+    {
+        var path = GetDefaultTemplatePath();
+        if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+        {
+            try
+            {
+                using var stream = File.OpenRead(path);
+                var doc = XDocument.Load(stream);
+                return MapTemplateToMetadata(doc);
+            }
+            catch
+            {
+                // Fall back to the embedded template if the user file is unreadable.
+            }
+        }
+
+        var embedded = LoadEmbeddedTemplate();
+        return embedded;
     }
 
     /// <summary>
@@ -73,33 +98,87 @@ public static class ComicInfoTemplateLoader
     public static void MergeTemplate(FileMetadata target, FileMetadata? template)
     {
         if (template is null)
+        {
             return;
+        }
 
         if (string.IsNullOrWhiteSpace(target.Publisher) && !string.IsNullOrWhiteSpace(template.Publisher))
+        {
             target.Publisher = template.Publisher;
+        }
 
         if (string.IsNullOrWhiteSpace(target.AgeRating) && !string.IsNullOrWhiteSpace(template.AgeRating))
+        {
             target.AgeRating = template.AgeRating;
+        }
 
         if (string.IsNullOrWhiteSpace(target.Manga) && !string.IsNullOrWhiteSpace(template.Manga))
+        {
             target.Manga = template.Manga;
+        }
 
         if (string.IsNullOrWhiteSpace(target.Format) && !string.IsNullOrWhiteSpace(template.Format))
             target.Format = template.Format;
 
         if (string.IsNullOrWhiteSpace(target.Language) && !string.IsNullOrWhiteSpace(template.Language))
+        {
             target.Language = template.Language;
+        }
 
         foreach (var genre in template.Genres)
         {
             if (!target.Genres.Contains(genre, StringComparer.OrdinalIgnoreCase))
+            {
                 target.Genres.Add(genre);
+            }
         }
 
         foreach (var tag in template.Tags)
         {
             if (!target.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            {
                 target.Tags.Add(tag);
+            }
+        }
+    }
+
+    private static FileMetadata? LoadEmbeddedTemplate()
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            using var stream = assembly.GetManifestResourceStream(EmbeddedResourceName);
+            if (stream is null)
+            {
+                return null;
+            }
+
+            var doc = XDocument.Load(stream);
+            return MapTemplateToMetadata(doc);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static async Task<string?> ReadEmbeddedTemplateAsync(CancellationToken ct)
+    {
+        try
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            using var stream = assembly.GetManifestResourceStream(EmbeddedResourceName);
+            if (stream is null)
+            {
+                return null;
+            }
+
+            using var reader = new StreamReader(stream);
+            return await reader.ReadToEndAsync(ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            return null;
         }
     }
 
@@ -107,7 +186,9 @@ public static class ComicInfoTemplateLoader
     {
         var root = doc.Root;
         if (root is null || !string.Equals(root.Name.LocalName, "ComicInfo", StringComparison.OrdinalIgnoreCase))
+        {
             return new FileMetadata();
+        }
 
         var meta = new FileMetadata
         {
@@ -124,7 +205,9 @@ public static class ComicInfoTemplateLoader
             foreach (var genre in genres.Split([',', '/', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 if (!string.IsNullOrWhiteSpace(genre))
+                {
                     meta.Genres.Add(genre);
+                }
             }
         }
 
@@ -134,7 +217,9 @@ public static class ComicInfoTemplateLoader
             foreach (var tag in tags.Split([',', '/', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             {
                 if (!string.IsNullOrWhiteSpace(tag))
+                {
                     meta.Tags.Add(tag);
+                }
             }
         }
 

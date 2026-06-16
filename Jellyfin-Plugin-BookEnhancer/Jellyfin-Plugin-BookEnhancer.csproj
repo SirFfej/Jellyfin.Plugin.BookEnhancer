@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <Version>0.8.8.5</Version>
-    <AssemblyVersion>0.8.8.5</AssemblyVersion>
-    <FileVersion>0.8.8.5</FileVersion>
+    <Version>0.8.8.6</Version>
+    <AssemblyVersion>0.8.8.6</AssemblyVersion>
+    <FileVersion>0.8.8.6</FileVersion>
     <RootNamespace>Jellyfin.Plugin.BookEnhancer</RootNamespace>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -52,7 +52,13 @@
 
   <ItemGroup>
     <None Remove="Configuration\configPage.html" />
+    <None Remove="Configuration\bookenhancer.css" />
+    <None Remove="Configuration\bookenhancer.js" />
+    <None Remove="Configuration\ComicInfoTemplate.xml" />
     <EmbeddedResource Include="Configuration\configPage.html" />
+    <EmbeddedResource Include="Configuration\bookenhancer.css" />
+    <EmbeddedResource Include="Configuration\bookenhancer.js" />
+    <EmbeddedResource Include="Configuration\ComicInfoTemplate.xml" />
   </ItemGroup>
 
   <!-- Remove Microsoft.Extensions.* assemblies that the Jellyfin server already provides in its default load context.

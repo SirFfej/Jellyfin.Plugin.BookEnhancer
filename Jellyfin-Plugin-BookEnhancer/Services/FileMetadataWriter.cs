@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Xml.Linq;
 using Jellyfin.Plugin.BookEnhancer.Models.Shared;
+using Jellyfin.Plugin.BookEnhancer.Services.Parsers;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services;
@@ -81,6 +82,8 @@ public class FileMetadataWriter : IFileMetadataWriter
     {
         try
         {
+            ComicInfoParser.ApplySidecarMetadata(metadata, filePath);
+
             using (var archive = ZipFile.Open(filePath, ZipArchiveMode.Update))
             {
                 var existing = archive.GetEntry("ComicInfo.xml");

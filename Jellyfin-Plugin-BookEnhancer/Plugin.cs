@@ -48,13 +48,24 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()
     {
+        var resourcePrefix = string.Format(CultureInfo.InvariantCulture, "{0}.Configuration", GetType().Namespace);
         return
         [
             new PluginPageInfo
             {
                 Name = "BookEnhancers",
                 DisplayName = "BookEnhancers",
-                EmbeddedResourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.Configuration.configPage.html", GetType().Namespace)
+                EmbeddedResourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.configPage.html", resourcePrefix)
+            },
+            new PluginPageInfo
+            {
+                Name = "bookenhancer.css",
+                EmbeddedResourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.bookenhancer.css", resourcePrefix)
+            },
+            new PluginPageInfo
+            {
+                Name = "bookenhancer.js",
+                EmbeddedResourcePath = string.Format(CultureInfo.InvariantCulture, "{0}.bookenhancer.js", resourcePrefix)
             }
         ];
     }

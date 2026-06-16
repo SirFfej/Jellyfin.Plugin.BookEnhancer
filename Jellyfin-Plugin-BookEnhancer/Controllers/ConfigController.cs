@@ -303,11 +303,14 @@ public class ConfigController : ControllerBase
     {
         var plugin = Plugin.Instance;
         var version = plugin?.GetType().Assembly.GetName().Version?.ToString() ?? "unknown";
+        var templatePath = ComicInfoTemplateLoader.GetDefaultTemplatePath();
 
         return Ok(new PluginInfoResult
         {
             Version = version,
-            Name = plugin?.Name ?? "BookEnhancers"
+            Name = plugin?.Name ?? "BookEnhancers",
+            ComicInfoTemplatePath = templatePath,
+            ComicInfoTemplateExists = !string.IsNullOrWhiteSpace(templatePath) && System.IO.File.Exists(templatePath)
         });
     }
 
@@ -332,32 +335,38 @@ public class ConfigController : ControllerBase
         return Ok(result);
     }
 
-    [HttpPost("DownloadComicInfoTemplate")]
-    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA3003:Review code for file path injection vulnerabilities", Justification = "Authorized endpoint used for user-configured template paths only.")]
-    public async Task<ActionResult<DownloadTemplateResult>> DownloadComicInfoTemplate(
-        [FromBody] DownloadTemplateRequest request,
-        CancellationToken ct)
+    [HttpGet("ComicInfoTemplate")]
+    public async Task<IActionResult> DownloadComicInfoTemplate(CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(request.Url))
-            return Ok(new DownloadTemplateResult { Success = false, Message = "No URL provided." });
+        var path = await ComicInfoTemplateLoader.EnsureDefaultTemplateExistsAsync(ct).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
+        {
+            return StatusCode(500, "Template could not be created.");
+        }
 
-        if (string.IsNullOrWhiteSpace(request.DestinationPath))
-            return Ok(new DownloadTemplateResult { Success = false, Message = "No destination path provided." });
+        var stream = System.IO.File.OpenRead(path);
+        return File(stream, "application/xml", "ComicInfoTemplate.xml");
+    }
 
+    [HttpPost("GenerateComicInfoTemplate")]
+    public async Task<ActionResult<GenerateTemplateResult>> GenerateComicInfoTemplate(CancellationToken ct)
+    {
         try
         {
-            using var client = _httpClientFactory.CreateClient();
-            client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("Jellyfin-BookEnhancer/1.0");
-
-            var success = await ComicInfoTemplateLoader.DownloadTemplateAsync(request.Url, request.DestinationPath, client, ct).ConfigureAwait(false);
-            if (success)
+            var path = await ComicInfoTemplateLoader.EnsureDefaultTemplateExistsAsync(ct).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(path))
             {
-                _logger.LogInformation("Downloaded ComicInfo template from {Url} to {Path}", request.Url, request.DestinationPath);
-                return Ok(new DownloadTemplateResult { Success = true, Message = "Template downloaded successfully." });
+                return Ok(new GenerateTemplateResult { Success = false, Message = "Plugin data path is not available." });
             }
 
-            return Ok(new DownloadTemplateResult { Success = false, Message = "Downloaded content was not a valid ComicInfo.xml document." });
+            var existed = System.IO.File.Exists(path);
+            _logger.LogInformation("Ensured ComicInfo template at {Path}", path);
+            return Ok(new GenerateTemplateResult
+            {
+                Success = true,
+                Path = path,
+                Message = existed ? "Template already exists at the default path." : "Default ComicInfo template created."
+            });
         }
         catch (OperationCanceledException oce) when (oce.IsCallerCancellation(ct))
         {
@@ -365,8 +374,8 @@ public class ConfigController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to download ComicInfo template from {Url}", request.Url);
-            return Ok(new DownloadTemplateResult { Success = false, Message = $"Download failed: {ex.Message}" });
+            _logger.LogWarning(ex, "Failed to generate default ComicInfo template");
+            return Ok(new GenerateTemplateResult { Success = false, Message = $"Failed to create template: {ex.Message}" });
         }
     }
 
@@ -433,6 +442,12 @@ public class PluginInfoResult
 
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("comicInfoTemplatePath")]
+    public string? ComicInfoTemplatePath { get; set; }
+
+    [JsonPropertyName("comicInfoTemplateExists")]
+    public bool ComicInfoTemplateExists { get; set; }
 }
 
 public class ValidateDirectoryRequest
@@ -486,20 +501,14 @@ public class ServiceConnectivity
     public string? Error { get; set; }
 }
 
-public class DownloadTemplateRequest
-{
-    [JsonPropertyName("url")]
-    public string Url { get; set; } = string.Empty;
-
-    [JsonPropertyName("destinationPath")]
-    public string DestinationPath { get; set; } = string.Empty;
-}
-
-public class DownloadTemplateResult
+public class GenerateTemplateResult
 {
     [JsonPropertyName("success")]
     public bool Success { get; set; }
 
     [JsonPropertyName("message")]
     public string Message { get; set; } = string.Empty;
+
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = string.Empty;
 }

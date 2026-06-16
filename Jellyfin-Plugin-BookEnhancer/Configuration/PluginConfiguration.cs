@@ -94,16 +94,6 @@ public class PluginConfiguration : BasePluginConfiguration
     public string SeriesFirstTemplate { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the local file path to a ComicInfo.xml template used as fallback metadata for comics.
-    /// </summary>
-    public string ComicInfoTemplatePath { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Gets or sets an optional URL from which to download the ComicInfo.xml template.
-    /// </summary>
-    public string ComicInfoTemplateUrl { get; set; } = string.Empty;
-
-    /// <summary>
     /// Resolves the effective API configuration for a managed source directory.
     /// When the directory has an explicit <see cref="ManagedSourceDirectory.EnabledApiSources"/> list,
     /// only APIs named in that list are enabled; otherwise the global toggles are used.

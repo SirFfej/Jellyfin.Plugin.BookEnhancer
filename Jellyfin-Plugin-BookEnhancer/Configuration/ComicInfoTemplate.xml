@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ComicInfo>
+  <!-- BookEnhancers default fallback template. -->
+  <!-- Fill in any values you want applied to comics that are missing them. -->
+  <!-- Leave a field empty to skip it. Changes take effect on the next library scan. -->
+  <Publisher></Publisher>
+  <Genre></Genre>
+  <Tags></Tags>
+  <AgeRating></AgeRating>
+  <Manga></Manga>
+  <Format></Format>
+  <Language></Language>
+</ComicInfo>

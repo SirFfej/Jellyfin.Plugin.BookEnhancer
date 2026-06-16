@@ -42,7 +42,7 @@ After restart, the plugin appears in Dashboard → Plugins. If it shows **NotSup
 
 ### File Parsing
 - **EPUB** — title, authors, ISBN (3 extraction strategies), publisher, date, language, tags, series, cover image
-- **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count. **Filename fallback** — when ComicInfo.xml is missing, unreadable (e.g. RAR5 CBRs), or has empty `<Series>`/`<Number>` elements, series name, issue number, and year are parsed from common filename patterns like `Series Name 014 (2013)` to enable enrichment via the comic cascade. **ComicInfo template** — configure a template XML file to fill in missing defaults (e.g., Publisher) without overwriting existing values.
+- **CBZ/CBR/CB7** — full ComicInfo.xml with 8 creative roles (writer, penciller, inker, colorist, letterer, cover artist, editor, translator), age rating, manga flag, page count. **Filename fallback** — when ComicInfo.xml is missing, unreadable (e.g. RAR5 CBRs), or has empty `<Series>`/`<Number>` elements, series name, issue number, and year are parsed from common filename patterns like `Series Name 014 (2013)` to enable enrichment via the comic cascade. **Built-in ComicInfo template** — the plugin ships a default template that fills in missing shared CBZ values (e.g., Publisher, Manga, AgeRating). **Sidecar XML** — a `<comicname>.xml` file placed next to a CBZ is merged into that CBZ when metadata write-back runs; CBR/CB7 must be converted to CBZ first.
 - **PDF** — title, author, subject, keywords, page count. When the containing directory is flagged as a **Comic Library**, PDFs are also parsed with comic filename rules so they can be organized and grouped by series/issue.
 - **Audio** (MP3, M4B, FLAC, OGG, OPUS, M4A, WMA, AIFF) — title, artist, album/series, genres, narrators, duration, cover art. **Multi-disc audiobook extraction** — `BookTitle` and `DiscNumber` are derived from title/album tags for template-based organization of multi-disc books.
 
@@ -138,7 +138,7 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 - **Main** — managed directories table with inline status, library selection, organize templates, create directory buttons, per-row source path validation; **Task Runtime Limits**; **Comic Library** toggle per directory
 - **Ingestion** — format priority drag-reorder, file extension filters, copy/move toggle, test API key buttons, **per-directory API selection** (expand a directory row to whitelist APIs for that source)
 - **Grouping** — strategy selector (ISBN, Title/Author, FileNamePrefix, ComicIssue), Preview, Process, and Repair Format Paths buttons with results display
-- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **ComicInfo template** path/URL and download; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, field mappings, and cooldown logging
+- **Metadata** — Test Enrichment Connectivity button with per-service reachability results; Comic Vine, Metron, and VerseDB toggles and API key/token inputs; **ComicInfo template** download/generate and sidecar `.xml` support; **Metadata Guide button** opens a modal explaining the write-back pipeline, template tokens, field mappings, and cooldown logging
 - **Validation** — source paths show red **Not found** or green **OK** status inline
 
 ### Logging

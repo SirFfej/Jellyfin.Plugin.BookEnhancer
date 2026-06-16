@@ -323,4 +323,238 @@ public class ComicInfoParser : IFileParser
                 people.Add(new ComicPersonInfo { Name = name, Role = role });
         }
     }
+
+    /// <summary>
+    /// Loads a sidecar <c>.xml</c> file with the same base name as the comic file and merges its values
+    /// into <paramref name="metadata"/> before the comic is written back.
+    /// </summary>
+    /// <param name="metadata">The comic metadata to update.</param>
+    /// <param name="comicFilePath">Full path to the comic archive.</param>
+    public static void ApplySidecarMetadata(FileMetadata metadata, string comicFilePath)
+    {
+        if (metadata is null || string.IsNullOrWhiteSpace(comicFilePath))
+        {
+            return;
+        }
+
+        var directory = Path.GetDirectoryName(comicFilePath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            return;
+        }
+
+        var sidecarPath = Path.Combine(directory, Path.GetFileNameWithoutExtension(comicFilePath) + ".xml");
+        if (!File.Exists(sidecarPath))
+        {
+            return;
+        }
+
+        try
+        {
+            var doc = XDocument.Load(sidecarPath);
+            var sidecar = MapComicInfoDocument(doc);
+            MergeSidecar(metadata, sidecar);
+        }
+        catch
+        {
+            // Ignore unreadable sidecar files.
+        }
+    }
+
+    private static FileMetadata MapComicInfoDocument(XDocument doc)
+    {
+        var root = doc.Root;
+        if (root is null || !string.Equals(root.Name.LocalName, "ComicInfo", StringComparison.OrdinalIgnoreCase))
+        {
+            return new FileMetadata();
+        }
+
+        var meta = new FileMetadata
+        {
+            Title = root.Element("Title")?.Value,
+            SeriesName = root.Element("Series")?.Value,
+            SeriesNumber = root.Element("Number")?.Value,
+            Volume = root.Element("Volume")?.Value,
+            Description = root.Element("Summary")?.Value,
+            Publisher = root.Element("Publisher")?.Value,
+            AgeRating = root.Element("AgeRating")?.Value,
+            Manga = root.Element("Manga")?.Value,
+            StoryArc = root.Element("StoryArc")?.Value,
+            Format = root.Element("Format")?.Value,
+            Language = root.Element("Language")?.Value,
+            Isbn = root.Element("ISBN")?.Value ?? root.Element("GTIN")?.Value
+        };
+
+        if (!string.IsNullOrWhiteSpace(meta.SeriesNumber) && float.TryParse(meta.SeriesNumber, out var num))
+        {
+            meta.SeriesIndex = num;
+        }
+
+        var bw = root.Element("BlackAndWhite")?.Value;
+        if (bw != null && bool.TryParse(bw, out var isBw))
+        {
+            meta.BlackAndWhite = isBw;
+        }
+
+        var countStr = root.Element("PageCount")?.Value;
+        if (countStr != null && int.TryParse(countStr, out var pages))
+        {
+            meta.PageCount = pages;
+        }
+
+        var yearStr = root.Element("Year")?.Value;
+        var monthStr = root.Element("Month")?.Value;
+        var dayStr = root.Element("Day")?.Value;
+        if (yearStr != null && int.TryParse(yearStr, out var year))
+        {
+            meta.PublishYear = year;
+            if (monthStr != null && int.TryParse(monthStr, out var month))
+            {
+                if (dayStr != null && int.TryParse(dayStr, out var day))
+                {
+                    meta.PublishDate = new DateTime(year, month, day);
+                }
+                else
+                {
+                    meta.PublishDate = new DateTime(year, month, 1);
+                }
+            }
+        }
+
+        AddCommaSeparated(meta.Genres, root.Element("Genre")?.Value);
+        AddCommaSeparated(meta.Tags, root.Element("Tags")?.Value);
+        AddCommaSeparated(meta.Tags, root.Element("Characters")?.Value);
+        AddCommaSeparated(meta.Tags, root.Element("Teams")?.Value);
+        AddCommaSeparated(meta.Tags, root.Element("Locations")?.Value);
+
+        AddComicPeople(meta.ComicPeople, root.Element("Writer")?.Value, "Writer");
+        AddComicPeople(meta.ComicPeople, root.Element("Penciller")?.Value, "Penciller");
+        AddComicPeople(meta.ComicPeople, root.Element("Inker")?.Value, "Inker");
+        AddComicPeople(meta.ComicPeople, root.Element("Colorist")?.Value, "Colorist");
+        AddComicPeople(meta.ComicPeople, root.Element("Letterer")?.Value, "Letterer");
+        AddComicPeople(meta.ComicPeople, root.Element("CoverArtist")?.Value, "CoverArtist");
+        AddComicPeople(meta.ComicPeople, root.Element("Editor")?.Value, "Editor");
+        AddComicPeople(meta.ComicPeople, root.Element("Translator")?.Value, "Translator");
+
+        return meta;
+    }
+
+    private static void MergeSidecar(FileMetadata target, FileMetadata sidecar)
+    {
+        if (!string.IsNullOrWhiteSpace(sidecar.Title))
+        {
+            target.Title = sidecar.Title;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.SeriesName))
+        {
+            target.SeriesName = sidecar.SeriesName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.SeriesNumber))
+        {
+            target.SeriesNumber = sidecar.SeriesNumber;
+            if (float.TryParse(sidecar.SeriesNumber, out var num))
+            {
+                target.SeriesIndex = num;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Volume))
+        {
+            target.Volume = sidecar.Volume;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Description))
+        {
+            target.Description = sidecar.Description;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Publisher))
+        {
+            target.Publisher = sidecar.Publisher;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.AgeRating))
+        {
+            target.AgeRating = sidecar.AgeRating;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Manga))
+        {
+            target.Manga = sidecar.Manga;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.StoryArc))
+        {
+            target.StoryArc = sidecar.StoryArc;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Format))
+        {
+            target.Format = sidecar.Format;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Language))
+        {
+            target.Language = sidecar.Language;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sidecar.Isbn))
+        {
+            target.Isbn = sidecar.Isbn;
+        }
+
+        if (sidecar.BlackAndWhite.HasValue)
+        {
+            target.BlackAndWhite = sidecar.BlackAndWhite.Value;
+        }
+
+        if (sidecar.PageCount.HasValue)
+        {
+            target.PageCount = sidecar.PageCount.Value;
+        }
+
+        if (sidecar.PublishYear.HasValue)
+        {
+            target.PublishYear = sidecar.PublishYear.Value;
+        }
+
+        if (sidecar.PublishDate.HasValue)
+        {
+            target.PublishDate = sidecar.PublishDate.Value;
+        }
+
+        foreach (var genre in sidecar.Genres)
+        {
+            if (!target.Genres.Contains(genre, StringComparer.OrdinalIgnoreCase))
+            {
+                target.Genres.Add(genre);
+            }
+        }
+
+        foreach (var tag in sidecar.Tags)
+        {
+            if (!target.Tags.Contains(tag, StringComparer.OrdinalIgnoreCase))
+            {
+                target.Tags.Add(tag);
+            }
+        }
+
+        foreach (var person in sidecar.ComicPeople)
+        {
+            if (string.IsNullOrWhiteSpace(person.Name) || string.IsNullOrWhiteSpace(person.Role))
+            {
+                continue;
+            }
+
+            var existing = target.ComicPeople.FirstOrDefault(p =>
+                string.Equals(p.Name, person.Name, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(p.Role, person.Role, StringComparison.OrdinalIgnoreCase));
+            if (existing is null)
+            {
+                target.ComicPeople.Add(person);
+            }
+        }
+    }
 }
