@@ -18,11 +18,11 @@ public class ConvertCbrToCbzTask : IScheduledTask
         _appPaths = appPaths;
     }
 
-    public string Name => "Convert CBR/CB7 to CBZ";
+    public string Name => "Convert CBR/CB7/PDF to CBZ";
 
     public string Key => "BookEnhancerConvertCbrToCbz";
 
-    public string Description => "Converts CBR/CB7 comic archives to CBZ, enriches metadata, and writes ComicInfo.xml.";
+    public string Description => "Converts CBR/CB7 archives and PDF comic files in Comic Library directories to CBZ, enriches metadata, and writes ComicInfo.xml.";
 
     public string Category => "BookEnhancers";
 
@@ -58,12 +58,12 @@ public class ConvertCbrToCbzTask : IScheduledTask
             }
 
             var dirs = config.ManagedDirectories
-                .Where(d => d.Enabled && !string.IsNullOrWhiteSpace(d.LibraryPath))
+                .Where(d => d.Enabled && d.IsComicLibrary && !string.IsNullOrWhiteSpace(d.LibraryPath))
                 .ToList();
 
             if (dirs.Count == 0)
             {
-                logger.LogWarning("No enabled source directories with library paths configured");
+                logger.LogWarning("No enabled managed directories flagged as Comic Library");
                 return;
             }
 
@@ -76,7 +76,7 @@ public class ConvertCbrToCbzTask : IScheduledTask
             var convertedTotal = 0;
             var errorsTotal = 0;
 
-            logger.LogInformation($"Scanning {dirs.Count} managed directories for CBR/CB7 archives");
+            logger.LogInformation($"Scanning {dirs.Count} comic library directories for CBR/CB7/PDF archives");
 
             foreach (var dir in dirs)
             {

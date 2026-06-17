@@ -863,7 +863,7 @@
             });
 
             document.getElementById("btnConvertComics").addEventListener("click", function () {
-                if (!confirmAction("Start the Convert CBR/CB7 to CBZ task? Original archives will be moved to the backup/trash directory.")) return;
+                if (!confirmAction("Start the Convert CBR/CB7/PDF to CBZ task? Original archives will be moved to the backup/trash directory.")) return;
                 var btn = this;
                 var resultEl = document.getElementById("convertComicsResult");
 

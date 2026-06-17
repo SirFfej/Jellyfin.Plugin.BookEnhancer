@@ -15,13 +15,20 @@
 
 Unified metadata enrichment for ebooks, audiobooks, and comics in Jellyfin. Parses metadata directly from book files and enriches via online API cascade — no Calibre, Audiobookshelf, or Komga dependencies required.
 
+## What's New in v0.9.1.0
+
+- **Convert CBR/CB7 to CBZ now also converts PDFs** — managed directories flagged as **Comic Library** are scanned for CBR, CB7, and PDF files; all are converted to CBZ with embedded ComicInfo.xml.
+- **Comic conversion restricted to Comic Library directories** — the conversion task only runs on managed directories with the **Comic Library** flag enabled.
+- **Best-effort PDF page-image extraction** — PDFs are converted by extracting embedded page images. Text-only PDFs without embedded images are skipped and logged.
+
 ## What's New in v0.9.0.0
 
 - **Convert CBR/CB7 to CBZ is now a scheduled task** — the config-page button starts `Convert CBR/CB7 to CBZ` in Jellyfin's task scheduler instead of running synchronously. This avoids browser request timeouts and gives per-task logging.
 - **New Book Post-Organization Enrichment task** — enriches files whose metadata is incomplete or that were modified after their last enrichment attempt.
-- **Book Metadata Enrichment task now ignores cooldown** — use it to force a fresh enrichment pass; only Jellyfin-locked items are skipped.
+- **Book Metadata Enrichment task now ignores cooldown** — use it to force a fresh pass; only Jellyfin-locked items are skipped.
 - **Library Cleanup no longer calls online APIs** — it reorganizes using existing file/system metadata and logs unresolved files.
 - **Per-file Convert & Tag failure log** — failed conversions are written to a dedicated `BookEnhancer-ConvertFailures-{timestamp}.log` file in addition to the task log.
+
 
 ## Installation
 
@@ -160,7 +167,7 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 - **Ingestion scan** — daily log file appended across same-day runs (`IngestionScan-{yyyyMMdd}.log`)
 - **Library Cleanup** — log files prefixed with `log_` so they are retained by the server's log retention policy
 - **Unresolved metadata** — files with missing required template fields are logged to `log_LibraryCleanup-{yyyyMMdd}-unresolved.log`
-- **Convert failures** — failed CBR/CB7→CBZ conversions are logged to `BookEnhancer-ConvertFailures-{yyyyMMdd-HHmmss}.log`
+- **Convert failures** — failed CBR/CB7/PDF→CBZ conversions are logged to `BookEnhancer-ConvertFailures-{yyyyMMdd-HHmmss}.log`
 
 ## Configuration
 
@@ -170,7 +177,8 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
    - **Source Path**: where your book files live (e.g., `/media/books/import`)
    - **Target Library**: pick the Jellyfin library to organize into (auto-fills Library Path)
    - **Organize Template**: customize folder structure (optional)
-   - **Comic Library**: enable for directories whose PDF/CBZ/CBR/CB7 files should be treated as comics (filename issue parsing + ComicIssue grouping)
+    - **Comic Library**: enable for directories whose PDF/CBZ/CBR/CB7 files should be treated as comics (filename issue parsing + ComicIssue grouping + CBR/CB7/PDF→CBZ conversion)
+
    - Click **Create** to create the target directory if it doesn't exist
  4. Go to the **Ingestion** tab to configure format priority and enrichment settings:
     - **Hardcover API Key** (required for enrichment) — get one free at https://hardcover.app/account/api
@@ -190,7 +198,7 @@ Enriched metadata and dashboard edits are written back to file tags (ComicInfo.x
 | **Library Cleanup** | Reorganizes files to match current templates using existing metadata, removes stale duplicates and empty directories (default timeout: 3 hr) |
 | **Metadata Enrichment** | Scans all library files, attempts online enrichment, skips only Jellyfin-locked items (default timeout: 2 hr) |
 | **Post-Organization Enrichment** | Enriches incomplete files or files modified since last enrichment (default timeout: 2 hr) |
-| **Convert CBR/CB7 to CBZ** | Converts comic archives across all enabled managed directories, enriches, writes ComicInfo.xml |
+| **Convert CBR/CB7 to CBZ** | Converts CBR/CB7/PDF files in Comic Library directories to CBZ, enriches, writes ComicInfo.xml |
 
 Timeouts are cooperative and configurable on the Main tab. When a timeout fires, the task exits cleanly and can resume from checkpoints on the next run.
 

@@ -6,6 +6,7 @@ using MediaBrowser.Common.Configuration;
 using Microsoft.Extensions.Logging;
 using SharpCompress.Archives;
 using SharpCompress.Common;
+using UglyToad.PdfPig;
 
 namespace Jellyfin.Plugin.BookEnhancer.Services;
 
@@ -21,7 +22,7 @@ public class CbrToCbzService
 
     private static readonly HashSet<string> _comicExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".cbr", ".cb7"
+        ".cbr", ".cb7", ".pdf"
     };
 
     public CbrToCbzService(
@@ -135,7 +136,7 @@ public class CbrToCbzService
     }
 
     private async Task ConvertSingleFileAsync(
-        string cbrPath,
+        string sourcePath,
         string originalsRunDir,
         PluginConfiguration config,
         Func<string, Task>? logCallback,
@@ -146,12 +147,22 @@ public class CbrToCbzService
         {
             Directory.CreateDirectory(tempDir);
 
-            // Step 1: Extract CBR/CB7 to temp directory
-            await LogAsync(logCallback, $"  Extracting to temporary directory...").ConfigureAwait(false);
-            ExtractArchive(cbrPath, tempDir);
+            var ext = Path.GetExtension(sourcePath);
+            if (ext.Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                // Step 1a: Extract PDF page images to temp directory
+                await LogAsync(logCallback, "  Extracting PDF pages as images...").ConfigureAwait(false);
+                await ConvertPdfPagesToCbzAsync(sourcePath, tempDir, logCallback, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                // Step 1b: Extract CBR/CB7 to temp directory
+                await LogAsync(logCallback, "  Extracting to temporary directory...").ConfigureAwait(false);
+                ExtractArchive(sourcePath, tempDir);
+            }
 
             // Step 2: Repack as CBZ alongside original
-            var cbzPath = Path.ChangeExtension(cbrPath, ".cbz");
+            var cbzPath = Path.ChangeExtension(sourcePath, ".cbz");
             await LogAsync(logCallback, $"  Repacking as CBZ: {cbzPath}").ConfigureAwait(false);
             ZipFile.CreateFromDirectory(tempDir, cbzPath);
 
@@ -173,7 +184,7 @@ public class CbrToCbzService
             }
 
             // Step 4: Move original to backup directory (only after CBZ is verified valid)
-            await MoveOriginalToBackup(cbrPath, originalsRunDir, logCallback).ConfigureAwait(false);
+            await MoveOriginalToBackup(sourcePath, originalsRunDir, logCallback).ConfigureAwait(false);
 
             // Step 5: Extract metadata from new CBZ
             await LogAsync(logCallback, $"  Extracting metadata...").ConfigureAwait(false);
@@ -261,6 +272,79 @@ public class CbrToCbzService
 
             entry.WriteToFile(destPath);
         }
+    }
+
+    private static async Task ConvertPdfPagesToCbzAsync(
+        string pdfPath,
+        string targetDir,
+        Func<string, Task>? logCallback,
+        CancellationToken ct)
+    {
+        using var pdf = PdfDocument.Open(pdfPath);
+        var pageCount = pdf.NumberOfPages;
+        var extracted = 0;
+        var skippedPages = new List<int>();
+
+        for (var i = 1; i <= pageCount; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var page = pdf.GetPage(i);
+            var images = page.GetImages().ToList();
+            if (images.Count == 0)
+            {
+                skippedPages.Add(i);
+                continue;
+            }
+
+            var image = images[0];
+            byte[]? bytes = null;
+            var ext = "bin";
+
+            if (image.TryGetPng(out var pngBytes))
+            {
+                bytes = pngBytes;
+                ext = "png";
+            }
+            else
+            {
+                bytes = image.RawMemory.ToArray();
+                ext = GetImageExtensionFromMagic(bytes);
+            }
+
+            if (bytes is null || bytes.Length == 0)
+            {
+                skippedPages.Add(i);
+                continue;
+            }
+
+            var fileName = $"page-{i:D4}.{ext}";
+            await File.WriteAllBytesAsync(Path.Combine(targetDir, fileName), bytes, ct).ConfigureAwait(false);
+            extracted++;
+        }
+
+        if (skippedPages.Count > 0)
+            await LogAsync(logCallback, $"  Skipped {skippedPages.Count} page(s) with no extractable image: {string.Join(", ", skippedPages.Take(10))}{(skippedPages.Count > 10 ? "..." : string.Empty)}").ConfigureAwait(false);
+
+        if (extracted == 0)
+            throw new InvalidOperationException("PDF contains no extractable page images");
+
+        await LogAsync(logCallback, $"  Extracted {extracted} page image(s)").ConfigureAwait(false);
+    }
+
+    private static string GetImageExtensionFromMagic(byte[] bytes)
+    {
+        if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
+            return "jpg";
+        if (bytes.Length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47)
+            return "png";
+        if (bytes.Length >= 6 && bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46)
+            return "gif";
+        if (bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D)
+            return "bmp";
+        if (bytes.Length >= 4 && ((bytes[0] == 0x49 && bytes[1] == 0x49) || (bytes[0] == 0x4D && bytes[1] == 0x4D)))
+            return "tiff";
+        return "bin";
     }
 
     private static async Task MoveOriginalToBackup(string path, string backupRunDir, Func<string, Task>? logCallback)

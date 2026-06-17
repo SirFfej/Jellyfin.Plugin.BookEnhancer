@@ -623,7 +623,7 @@
                         </button>
                         <div id="convertComicsResult" class="be-test-result" style="display:none;"></div>
                         <div class="fieldDescription" style="margin-top:4px;">
-                            Scans all enabled managed directories for CBR/CB7 archives, converts them to CBZ, enriches metadata, and writes ComicInfo.xml.
+                            Scans managed directories flagged as Comic Library for CBR/CB7/PDF archives, converts them to CBZ, enriches metadata, and writes ComicInfo.xml.
                             Runs as a scheduled task; progress is available in Jellyfin's Scheduled Tasks page.
                         </div>
                     </div>
@@ -813,13 +813,17 @@
                 converted to CBZ first.
             </p>
 
-            <h3>Comic Conversion (CBR/CB7 &rarr; CBZ)</h3>
+            <h3>Comic Conversion (CBR/CB7/PDF &rarr; CBZ)</h3>
             <p>
                 The <strong>Convert CBR/CB7 to CBZ</strong> button on the Metadata tab starts a scheduled task instead of running
-                synchronously in the browser. The task scans all enabled managed directories, converts any CBR/CB7 archives to CBZ,
-                enriches metadata if enabled, writes ComicInfo.xml, and moves the original archives to the backup/trash directory.
-                Because it runs as a task, it is not subject to browser request timeouts and cannot be interrupted by closing the
-                config page.
+                synchronously in the browser. The task scans managed directories that have <strong>Comic Library</strong> enabled,
+                converts any CBR/CB7 archives and PDF comic files to CBZ, enriches metadata if enabled, writes ComicInfo.xml, and
+                moves the original archives to the backup/trash directory. Because it runs as a task, it is not subject to browser
+                request timeouts and cannot be interrupted by closing the config page.
+            </p>
+            <p>
+                PDF conversion extracts page images already embedded in the PDF. If a page has no extractable image, that page is
+                skipped. Text-based PDFs without embedded page images will not convert and are logged as failures.
             </p>
 
             <h3>Grouping strategies</h3>
