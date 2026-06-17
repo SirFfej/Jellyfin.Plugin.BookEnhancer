@@ -11,7 +11,7 @@
       {
         "changelog": "v0.9.1.0 - New: Convert is now limited to libraries that are flagged as Comic Library and will also convert PDF files to CBZ files for better comic info data storage. Build: 0W/0E.",
         "checksum": "A50D5AC59CAA79CE8C9AA7F109BA9959",
-        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.9.0.1/Jellyfin.Plugin.BookEnhancer_0.9.0.1.zip",
+        "sourceUrl": "https://github.com/SirFfej/Jellyfin.Plugin.BookEnhancer/releases/download/v0.9.1.0/Jellyfin.Plugin.BookEnhancer_0.9.1.0.zip",
         "targetAbi": "10.11.8.0",
         "timestamp": "2026-06-16T00:00:00Z",
         "version": "0.9.1.0"
