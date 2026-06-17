@@ -15,7 +15,7 @@
         "targetAbi": "10.11.8.0",
         "timestamp": "2026-06-16T00:00:00Z",
         "version": "0.9.1.0"
-      }
+      },
       {
         "changelog": "v0.9.0.1 - Fix: release ZIP now includes all required dependency DLLs (SharpCompress, PdfPig, TagLibSharp, etc.), resolving 'Could not load file or assembly' errors for Convert CBR/CB7 to CBZ and other features. Build: 0W/0E.",
         "checksum": "6BEC2A4F03C5F2F00C44695326C976C0",
